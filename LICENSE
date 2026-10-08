@@ -38,8 +38,9 @@ owners' terms:
 
 2. Art taken from Natural Selection 2, (c) Unknown Worlds Entertainment:
    the map overviews in panel/src/minimaps/, the skill tier badges in
-   panel/src/assets/skill-tiers.png, the NS2 monogram in
-   panel/src/assets/ns2-logo.png, and their built copies in web/assets/.
+   panel/src/assets/skill-tiers.png, the team logos in
+   panel/src/assets/logo-marines.png and logo-aliens.png, the NS2 monogram
+   in panel/src/assets/ns2-logo.png, and their built copies in web/assets/.
    Natural Selection 2 is a trademark of Unknown Worlds Entertainment.
 
 3. The ns2panel.com mark drawn by panel/src/ui/Ns2PanelIcon.tsx belongs to

@@ -1,29 +1,44 @@
-import { Ban, LogOut, Mic, MicOff, Skull, UserX, Users } from "lucide-preact";
+import { Ban, DoorOpen, Eye, LogOut, Mic, MicOff, Skull, UserX, Users } from "lucide-preact";
 import { useMemo, useState } from "preact/hooks";
-import type { Player, ServerState } from "../api/types";
+import type { Player, ServerState, TeamNumber } from "../api/types";
 import { TEAM_NAMES } from "../api/types";
+import aliensLogo from "../assets/logo-aliens.png";
+import marinesLogo from "../assets/logo-marines.png";
 import { banCommand, sendCommand } from "../store/commands";
 import { updateSettings, useSettings } from "../store/settings";
-import { IconButton, StatusIcon } from "../ui/Icon";
+import { IconButton, type LucideIcon, StatusIcon } from "../ui/Icon";
 import { Masked } from "../ui/Masked";
 import { PlayerLinks } from "../ui/PlayerLinks";
 import { maskIp, maskSteamId } from "../ui/format";
 
-type SortKey = "name" | "team" | "skill" | "score" | "kills" | "assists" | "deaths"
+type SortKey = "name" | "skill" | "score" | "kills" | "assists" | "deaths"
   | "resources" | "ping";
 
-const COLUMNS: { key: SortKey; label: string; num?: boolean; title?: string }[] = [
+// Widths in px. The four team tables are separate tables, so they line up only
+// because every column but Player has a fixed width; Player takes the rest.
+const COLUMNS: { key: SortKey; label: string; num?: boolean; title?: string; width?: number }[] = [
   { key: "name", label: "Player" },
-  { key: "team", label: "Team" },
-  { key: "skill", label: "Skill", num: true,
+  { key: "skill", label: "Skill", num: true, width: 125,
     title: "Hive skill, as the server holds it, with the game's badge for its tier. Hover "
       + "a value for the tier, and the marine, alien and commander figures." },
-  { key: "score", label: "Score", num: true },
-  { key: "kills", label: "K", num: true },
-  { key: "assists", label: "A", num: true },
-  { key: "deaths", label: "D", num: true },
-  { key: "resources", label: "Res", num: true },
-  { key: "ping", label: "Ping", num: true },
+  { key: "score", label: "Score", num: true, width: 72 },
+  { key: "kills", label: "K", num: true, width: 42 },
+  { key: "assists", label: "A", num: true, width: 42 },
+  { key: "deaths", label: "D", num: true, width: 42 },
+  { key: "resources", label: "Res", num: true, width: 56 },
+  { key: "ping", label: "Ping", num: true, width: 62 },
+];
+const WIDTH = { rejected: 92, shared: 190, steamId: 150, ip: 140, actions: 180 };
+// Below this the Player column would be squeezed to nothing: the table
+// scrolls sideways instead.
+const NAME_MIN_WIDTH = 200;
+
+/** The game's order on its scoreboard, then the two that are not playing. */
+const TEAMS: { team: TeamNumber; logo?: string; icon?: LucideIcon }[] = [
+  { team: 1, logo: marinesLogo },
+  { team: 2, logo: aliensLogo },
+  { team: 0, icon: DoorOpen },
+  { team: 3, icon: Eye },
 ];
 
 // Bots report steamid 0 and every per-player command resolves through
@@ -102,7 +117,7 @@ export function Players({ state }: { state: ServerState }) {
   const toggleSort = (key: SortKey) =>
     setSort((s) => s.key === key
       ? { key, dir: s.dir === 1 ? -1 : 1 }
-      : { key, dir: key === "name" || key === "team" ? 1 : -1 });
+      : { key, dir: key === "name" ? 1 : -1 });
 
   const act = (command: string, confirmText?: string) => {
     if (confirmText && !confirm(confirmText)) return;
@@ -117,7 +132,10 @@ export function Players({ state }: { state: ServerState }) {
   // The mod sends skill; a stock server does not, and gets no column.
   const showSkill = state.players.some((p) => p.skill !== null);
   const columns = COLUMNS.filter((c) => c.key !== "skill" || showSkill);
-  const columnCount = columns.length + 3 + (showRejected ? 1 : 0) + (showShared ? 1 : 0);
+  const tableWidth = NAME_MIN_WIDTH
+    + columns.reduce((sum, c) => sum + (c.width ?? 0), 0)
+    + (showRejected ? WIDTH.rejected : 0) + (showShared ? WIDTH.shared : 0)
+    + WIDTH.steamId + WIDTH.ip + WIDTH.actions;
 
   return (
     <section class="wrap">
@@ -173,159 +191,181 @@ export function Players({ state }: { state: ServerState }) {
         </label>
       </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              {columns.map((c) => (
-                <th
-                  key={c.key}
-                  class={c.num ? "num" : undefined}
-                  title={c.title}
-                  aria-sort={sort.key === c.key
-                    ? (sort.dir === 1 ? "ascending" : "descending")
-                    : "none"}
-                  onClick={() => toggleSort(c.key)}
-                >
-                  {c.label}
-                  {sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
-                </th>
-              ))}
-              {showRejected && (
-                <th class="static num" title={REJECTED_TITLE}>Rejected</th>
-              )}
-              {showShared && <th class="static" title={SHARED_TITLE}>Shared</th>}
-              <th class="static">Steam id</th>
-              <th class="static">IP</th>
-              <th class="static">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((p) => (
-              <tr key={p.key}>
-                <td class="name-cell">
-                  {p.name}{" "}
-                  {p.isBot && <span class="tag">BOT</span>}{" "}
-                  {p.isCommander && <span class="tag">COMM</span>}{" "}
-                  {p.gagged && <span class="tag" title="Muted by Shine">MUTED</span>}
-                </td>
-                <td class={`team-${p.team}`}>{TEAM_NAMES[p.team]}</td>
-                {showSkill && <SkillCell p={p} />}
-                <td class="num">{p.score}</td>
-                <td class="num">{p.kills}</td>
-                <td class="num">{p.assists}</td>
-                <td class="num">{p.deaths}</td>
-                <td class="num">{Math.round(p.resources)}</td>
-                <td class="num">{p.ping}</td>
-                {showRejected && (
-                  <td
-                    class={p.movesRejected && p.movesRejected.time > 0
-                      ? "num rejected-cell tone-error" : "num rejected-cell"}
-                    title={REJECTED_TITLE}
-                  >
-                    {p.movesRejected
-                      ? `${p.movesRejected.time} · ${p.movesRejected.other}`
-                      : "--"}
-                  </td>
-                )}
-                {showShared && (
-                  <td class="shared-cell">
-                    {p.familyShared ? (
-                      <span class="icon-row">
-                        <StatusIcon icon={Users} label="shared copy" tone="warn"
-                                    title="playing a Family Shared copy" />
-                        {p.ownerSteamId !== null && (
-                          <span class="owner-id">
-                            owner{" "}
-                            <Masked
-                              value={String(p.ownerSteamId)}
-                              masked={maskSteamId(p.ownerSteamId)}
-                              label="owner's Steam id"
-                            />
-                          </span>
+      {rows.length === 0 ? (
+        <p class="muted">
+          {state.players.length === 0
+            ? "Nobody is connected."
+            : "No players match this filter."}
+        </p>
+      ) : TEAMS.map(({ team, logo, icon: I }) => {
+        const members = rows.filter((p) => p.team === team);
+        return (
+          <section key={team} class="team-section" data-team={team}>
+            <h2 class={`section-title team-heading team-${team}`}>
+              {logo
+                ? <img class="team-logo" src={logo} alt="" />
+                : I && <I class="team-icon" size={20} aria-hidden="true" />}
+              {TEAM_NAMES[team]}{" "}
+              <span class="muted">{members.length === 0 ? "none" : members.length}</span>
+            </h2>
+            {members.length > 0 && (
+              <div class="table-wrap">
+                <table class="players-table" style={`min-width: ${tableWidth}px`}>
+                  <colgroup>
+                    {columns.map((c) => (
+                      <col key={c.key} style={c.width ? `width: ${c.width}px` : undefined} />
+                    ))}
+                    {showRejected && <col style={`width: ${WIDTH.rejected}px`} />}
+                    {showShared && <col style={`width: ${WIDTH.shared}px`} />}
+                    <col style={`width: ${WIDTH.steamId}px`} />
+                    <col style={`width: ${WIDTH.ip}px`} />
+                    <col style={`width: ${WIDTH.actions}px`} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      {columns.map((c) => (
+                        <th
+                          key={c.key}
+                          class={c.num ? "num" : undefined}
+                          title={c.title}
+                          aria-sort={sort.key === c.key
+                            ? (sort.dir === 1 ? "ascending" : "descending")
+                            : "none"}
+                          onClick={() => toggleSort(c.key)}
+                        >
+                          {c.label}
+                          {sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
+                        </th>
+                      ))}
+                      {showRejected && (
+                        <th class="static num" title={REJECTED_TITLE}>Rejected</th>
+                      )}
+                      {showShared && <th class="static" title={SHARED_TITLE}>Shared</th>}
+                      <th class="static">Steam id</th>
+                      <th class="static">IP</th>
+                      <th class="static">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.map((p) => (
+                      <tr key={p.key}>
+                        <td class="name-cell">
+                          {p.name}{" "}
+                          {p.isBot && <span class="tag">BOT</span>}{" "}
+                          {p.isCommander && <span class="tag">COMM</span>}{" "}
+                          {p.gagged && <span class="tag" title="Muted by Shine">MUTED</span>}
+                        </td>
+                        {showSkill && <SkillCell p={p} />}
+                        <td class="num">{p.score}</td>
+                        <td class="num">{p.kills}</td>
+                        <td class="num">{p.assists}</td>
+                        <td class="num">{p.deaths}</td>
+                        <td class="num">{Math.round(p.resources)}</td>
+                        <td class="num">{p.ping}</td>
+                        {showRejected && (
+                          <td
+                            class={p.movesRejected && p.movesRejected.time > 0
+                              ? "num rejected-cell tone-error" : "num rejected-cell"}
+                            title={REJECTED_TITLE}
+                          >
+                            {p.movesRejected
+                              ? `${p.movesRejected.time} · ${p.movesRejected.other}`
+                              : "--"}
+                          </td>
                         )}
-                      </span>
-                    ) : <span class="muted">--</span>}
-                  </td>
-                )}
-                <td>
-                  {p.isBot
-                    ? <span class="muted mono">--</span>
-                    : (
-                      <span class="icon-row">
-                        <Masked
-                          value={String(p.steamId)}
-                          masked={maskSteamId(p.steamId)}
-                          label="Steam id"
-                        />
-                        <PlayerLinks steamId={p.steamId} />
-                      </span>
-                    )}
-                </td>
-                <td>
-                  <Masked value={p.ip} masked={maskIp(p.ip)} label="IP address" />
-                </td>
-                <td>
-                  <div class="actions">
-                    <IconButton icon={UserX} label="Kick" danger disabled={p.isBot}
-                                reason={p.isBot ? BOT_REASON : undefined}
-                                onClick={() => act(`sv_kick ${p.steamId}`, `Kick ${p.name}?`)} />
-                    <IconButton icon={Ban} label="Ban 24h" danger disabled={p.isBot}
-                                reason={p.isBot ? BOT_REASON : undefined}
-                                onClick={() => act(banCommand(state, p.steamId, 1440, "WebUI"),
-                                  `Ban ${p.name} for 24 hours?`)} />
-                    <IconButton icon={p.gagged ? Mic : MicOff} label={p.gagged ? "Unmute" : "Mute"}
-                                data={{ action: "mute" }}
-                                disabled={p.isBot || !canMute}
-                                reason={p.isBot ? BOT_REASON
-                                  : (!canMute ? MUTE_REASON
-                                    : (p.gagged ? "Shine: sh_ungag" : "Shine: sh_gag, for the rest of the map"))}
-                                onClick={() => act(p.gagged
-                                  ? `sh_ungag ${p.steamId}` : `sh_gag ${p.steamId}`)} />
-                    <IconButton icon={Skull} label="Slay" disabled={p.isBot}
-                                reason={p.isBot ? BOT_REASON : undefined}
-                                onClick={() => act(`sv_slay ${p.steamId}`)} />
-                    <IconButton icon={LogOut} label="Eject" disabled={p.isBot || !p.isCommander}
-                                reason={p.isBot ? BOT_REASON
-                                  : (!p.isCommander ? "Not commanding" : undefined)}
-                                onClick={() => act(`sv_eject ${p.steamId}`,
-                                  `Eject ${p.name} from the command chair?`)} />
-                    <select
-                      class="btn btn-sm"
-                      disabled={p.isBot}
-                      title={p.isBot ? BOT_REASON : "Move to team"}
-                      value=""
-                      onChange={(e) => {
-                        const el = e.target as HTMLSelectElement;
-                        const team = el.value;
-                        el.value = "";
-                        if (team !== "") {
-                          act(`sv_switchteam ${p.steamId} ${team}`);
-                        }
-                      }}
-                    >
-                      <option value="">Move to...</option>
-                      <option value="0">Ready room</option>
-                      <option value="1">Marines</option>
-                      <option value="2">Aliens</option>
-                      <option value="3">Spectate</option>
-                    </select>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={columnCount} class="muted" style="padding: 16px">
-                  {state.players.length === 0
-                    ? "Nobody is connected."
-                    : "No players match this filter."}
-                </td>
-              </tr>
+                        {showShared && (
+                          <td class="shared-cell">
+                            {p.familyShared ? (
+                              <span class="icon-row">
+                                <StatusIcon icon={Users} label="shared copy" tone="warn"
+                                            title="playing a Family Shared copy" />
+                                {p.ownerSteamId !== null && (
+                                  <span class="owner-id">
+                                    owner{" "}
+                                    <Masked
+                                      value={String(p.ownerSteamId)}
+                                      masked={maskSteamId(p.ownerSteamId)}
+                                      label="owner's Steam id"
+                                    />
+                                  </span>
+                                )}
+                              </span>
+                            ) : <span class="muted">--</span>}
+                          </td>
+                        )}
+                        <td>
+                          {p.isBot
+                            ? <span class="muted mono">--</span>
+                            : (
+                              <span class="icon-row">
+                                <Masked
+                                  value={String(p.steamId)}
+                                  masked={maskSteamId(p.steamId)}
+                                  label="Steam id"
+                                />
+                                <PlayerLinks steamId={p.steamId} />
+                              </span>
+                            )}
+                        </td>
+                        <td>
+                          <Masked value={p.ip} masked={maskIp(p.ip)} label="IP address" />
+                        </td>
+                        <td>
+                          <div class="actions">
+                            <IconButton icon={UserX} label="Kick" danger disabled={p.isBot}
+                                        reason={p.isBot ? BOT_REASON : undefined}
+                                        onClick={() => act(`sv_kick ${p.steamId}`, `Kick ${p.name}?`)} />
+                            <IconButton icon={Ban} label="Ban 24h" danger disabled={p.isBot}
+                                        reason={p.isBot ? BOT_REASON : undefined}
+                                        onClick={() => act(banCommand(state, p.steamId, 1440, "WebUI"),
+                                          `Ban ${p.name} for 24 hours?`)} />
+                            <IconButton icon={p.gagged ? Mic : MicOff} label={p.gagged ? "Unmute" : "Mute"}
+                                        data={{ action: "mute" }}
+                                        disabled={p.isBot || !canMute}
+                                        reason={p.isBot ? BOT_REASON
+                                          : (!canMute ? MUTE_REASON
+                                            : (p.gagged ? "Shine: sh_ungag" : "Shine: sh_gag, for the rest of the map"))}
+                                        onClick={() => act(p.gagged
+                                          ? `sh_ungag ${p.steamId}` : `sh_gag ${p.steamId}`)} />
+                            <IconButton icon={Skull} label="Slay" disabled={p.isBot}
+                                        reason={p.isBot ? BOT_REASON : undefined}
+                                        onClick={() => act(`sv_slay ${p.steamId}`)} />
+                            <IconButton icon={LogOut} label="Eject" disabled={p.isBot || !p.isCommander}
+                                        reason={p.isBot ? BOT_REASON
+                                          : (!p.isCommander ? "Not commanding" : undefined)}
+                                        onClick={() => act(`sv_eject ${p.steamId}`,
+                                          `Eject ${p.name} from the command chair?`)} />
+                            <select
+                              class="btn btn-sm"
+                              disabled={p.isBot}
+                              title={p.isBot ? BOT_REASON : "Move to team"}
+                              value=""
+                              onChange={(e) => {
+                                const el = e.target as HTMLSelectElement;
+                                const team = el.value;
+                                el.value = "";
+                                if (team !== "") {
+                                  act(`sv_switchteam ${p.steamId} ${team}`);
+                                }
+                              }}
+                            >
+                              <option value="">Move to...</option>
+                              <option value="0">Ready room</option>
+                              <option value="1">Marines</option>
+                              <option value="2">Aliens</option>
+                              <option value="3">Spectate</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </tbody>
-        </table>
-      </div>
+          </section>
+        );
+      })}
     </section>
   );
 }

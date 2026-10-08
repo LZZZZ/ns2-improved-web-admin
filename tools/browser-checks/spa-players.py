@@ -19,6 +19,8 @@ looks like a failure rather than like a design choice:
     the server reports them: a Shared column with the owner's id masked, and a
     Rejected column; the mod's Hive skill column (P1); and every human row
     links to ns2panel.com (P3) and to the player's Steam profile
+  * one table per team, in the scoreboard's order, under the game's logo
+    for the two playing teams; one sort for all four
   * Mute is disabled without Shine and says why -- the game has no mute,
     and the 2012 panel's sv_mute never existed (defect 18); under Shine's
     basecommands it is sh_gag, and the row shows the gag and offers Unmute
@@ -61,6 +63,8 @@ def check(label, ok, detail=""):
 STEAMID_CELL = "r.cells[r.cells.length-3]"
 IP_CELL = "r.cells[r.cells.length-2]"
 ROWS = "document.querySelectorAll('table tbody tr')"
+# The team a row is listed under: its section's team number, as a string.
+TEAM_OF = "(r=>r.closest('.team-section').dataset.team)"
 
 
 async def main():
@@ -125,6 +129,34 @@ async def main():
             check("a Steam id reveals on click", "10000000" in str(revealed),
                   str(revealed)[:48])
 
+            print("\n== one table per team")
+            sections = json.loads(await c.eval(
+                "JSON.stringify([...document.querySelectorAll('.team-section')].map(s=>"
+                "[s.dataset.team,s.querySelector('h2').textContent,"
+                "s.querySelectorAll('tbody tr').length,!!s.querySelector('table')]))"))
+            check("Marines, Aliens, Ready room, Spectators, in that order",
+                  [x[0] for x in sections] == ["1", "2", "0", "3"],
+                  str([x[1] for x in sections]))
+            with urllib.request.urlopen(f"{MOCK}/?request=json", timeout=5) as r:
+                fixture = json.loads(r.read())["player_list"]
+            counts = {t: sum(1 for p in fixture if p["team"] == int(t)) for t in "1203"}
+            check("each lists that team's players, and only those",
+                  all(x[2] == counts[x[0]] for x in sections)
+                  and await c.eval(f"[...{ROWS}].every(r=>r.closest('.team-section'))"),
+                  str(counts))
+            check("an empty team says so, with no table",
+                  all(("none" in x[1]) != x[3] for x in sections))
+            check("no Team column: the table is the team",
+                  not await c.eval("[...document.querySelectorAll('thead th')]"
+                                   ".some(t=>t.textContent==='Team')"))
+            logos = await c.eval(
+                "(async()=>(await Promise.all([...document.querySelectorAll('.team-logo')]"
+                ".map(async i=>{try{await i.decode();return i.naturalWidth}catch(e){return 0}})))"
+                ".join(','))()", await_promise=True)
+            check("the game's logo for Marines and Aliens, 64 px", logos == "64,64", logos)
+            check("and an icon for the other two",
+                  await c.eval("document.querySelectorAll('.team-section .team-icon').length") == 2)
+
             print("\n== a bot's buttons say why they cannot work (defect 7)")
             bot_disabled = await c.eval(
                 f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
@@ -164,6 +196,10 @@ async def main():
                       "[...document.querySelectorAll('thead th')]"
                       ".find(t=>t.textContent.startsWith('Ping'))"
                       ".getAttribute('aria-sort')")))
+            check("one sort for every team's table",
+                  await c.eval("[...document.querySelectorAll('thead')].every(h=>"
+                               "[...h.querySelectorAll('th')].find(t=>t.textContent"
+                               ".startsWith('Ping')).getAttribute('aria-sort')==='descending')"))
 
             print("\n== the rest of a row's actions")
             await c.eval("(()=>{const i=document.querySelector('input[type=search]');"
@@ -191,7 +227,8 @@ async def main():
             cmd, _ = await last_activity()
             check("Move to Marines sends sv_switchteam <id> 1",
                   cmd == "sv_switchteam 10000000 1", cmd)
-            check("and the row moves", await c.eval(f"{row}.cells[1].textContent") == "Marines")
+            check("and the row moves to the Marines' table",
+                  await c.eval(f"{TEAM_OF}({row})") == "1")
             eject = f"[...{row}.querySelectorAll('.actions button')].find(b=>b.textContent==='Eject')"
             check("Eject is offered only to a commander",
                   await c.eval(f"{eject}.disabled") is True
@@ -257,8 +294,8 @@ async def main():
                   not await c.eval(f"{even}.disabled"))
             await c.eval("document.querySelector('[data-command=sv_rrall]').click()")
             await asyncio.sleep(2.5)
-            teams = set(await c.eval(f"[...{ROWS}].map(r=>r.cells[1].textContent)") or [])
-            check("All to ready room moves everyone", teams == {"Ready room"}, sorted(teams))
+            teams = set(await c.eval(f"[...{ROWS}].map({TEAM_OF})") or [])
+            check("All to ready room moves everyone", teams == {"0"}, sorted(teams))
 
             print("\n== Activity (G2): the full list on its own tab")
             async def open_tab(label):

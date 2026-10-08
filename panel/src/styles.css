@@ -255,6 +255,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .team-1 { color: var(--marine); }
 .team-2 { color: var(--alien); }
+
+/* Players: one table per team, under the game's logo for it
+   (tools/make-team-logos.sh) or an icon for the two that are not playing. */
+.team-heading { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.team-heading .muted { font-weight: 400; }
+.team-section:first-of-type .team-heading { margin-top: 4px; }
+.team-logo { width: 26px; height: 26px; margin: -2px 0; }
+.team-icon { color: var(--text-dim); margin: 0 1px; }
+.players-table { table-layout: fixed; }
 .tag {
   font-size: 11px;
   border: 1px solid var(--border);

@@ -243,7 +243,7 @@ proves it against the mock:
 
 | 2012 panel | Now | Gate |
 | --- | --- | --- |
-| Player table: name, Steam id, IP, team, score, K/A/D, res, ping | Players | `spa-players.py` |
+| Player table: name, Steam id, IP, team, score, K/A/D, res, ping | Players, one table per team; the team is the table the row is in | `spa-players.py` |
 | Its Time column | Recent players' *played* (mod). The old column was time since that browser page first saw the player, reset by a reload | `spa-recent.py` |
 | Kick | Players row | `spa-players.py` |
 | Ban (24 hours) | Players row; `sh_banid` under Shine | `spa-bans.py` |

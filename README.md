@@ -69,8 +69,9 @@ in 10 s windows, plus tick spacing and snapshot size against what
 
 ![The Performance tab](docs/screenshots/performance.png)
 
-**Players**, with Hive skill and the game's skill badges, Family Sharing,
-rejected moves, and Steam ids and IPs masked until asked.
+**Players**, one table per team, with Hive skill and the game's skill
+badges, Family Sharing, rejected moves, and Steam ids and IPs masked until
+asked.
 
 ![The Players tab](docs/screenshots/players.png)
 
@@ -93,7 +94,7 @@ command line under it.
 
 | Tab | What it does |
 | --- | --- |
-| Players | Sort, filter, kick, ban, slay, move, eject, mute (Shine's `sh_gag`), and the round buttons. IPs and Steam ids masked until asked, per row. A bot's buttons disabled, with the reason. With the mod: Hive skill with the game's skill badge, and the marine, alien and commander figures on hover. On the 09-26+ engine: Family Sharing and rejected moves. Links to the player's Steam profile and ns2panel.com page. |
+| Players | One table per team (Marines, Aliens, Ready room, Spectators), under the game's team logos. Sort, filter, kick, ban, slay, move, eject, mute (Shine's `sh_gag`), and the round buttons. IPs and Steam ids masked until asked, per row. A bot's buttons disabled, with the reason. With the mod: Hive skill with the game's skill badge, and the marine, alien and commander figures on hover. On the 09-26+ engine: Family Sharing and rejected moves. Links to the player's Steam profile and ns2panel.com page. |
 | Recent players | Everyone seen in the last 24 hours (up to 100), connected or not, so a player who left can still be banned. Search by part of a name, a former name, any Steam id form or an IP. Links to each player's Steam profile and ns2panel.com page. Needs the mod. |
 | Bans | The bans in force, from the table that decides them (Shine's, under its ban plugin). Ban by any common Steam id form, unban per row. |
 | Chat | Read the chat with team and time, and send to all, marines or aliens. A send is confirmed by finding it in the chat. |
@@ -293,6 +294,7 @@ reports success it did not verify.
 | `tools/check-openapi.py` | Validate every committed fixture against [docs/openapi.yaml](docs/openapi.yaml). Reports schema violations, fields a capture has that the spec does not describe, and fixtures no response claims. Needs PyYAML. |
 | `tools/make-minimaps.sh` | `tools/make-minimaps.sh <server>/ns2/maps/overviews`. Convert the stock maps' overviews (`*.tga`) into the Maps tab's minimaps, `panel/src/minimaps/*.png`: trimmed, 320 px, 64-colour PNG. Re-run after a game update that changes a map. |
 | `tools/make-skill-tiers.sh` | `tools/make-skill-tiers.sh <client>/ns2/ui/skill_tier_icons.dds`. Convert the game's skill badges (from the **client** install: the server has no UI art) into the Players tab's sprite sheet, `panel/src/assets/skill-tiers.png`. Re-run if a game update changes the badges. |
+| `tools/make-team-logos.sh` | `tools/make-team-logos.sh <client>/ns2/ui`. Convert the game's marine and alien logos (`logo_marine.dds`, `logo_alien.dds`, from the client install) into the Players tab's team headings, `panel/src/assets/logo-marines.png` and `logo-aliens.png`. |
 | `tools/make-commands.py` | Regenerate `panel/src/commands.json`, what the Console's command line suggests: the game's admin commands and Shine's, with their arguments and help, read from a server install's Lua (`--lua <server>/ns2/lua --shine <Shine's lua/shine>`), plus a hand-kept list of engine commands. Re-run after a game or Shine update. |
 | `tools/make-whitelist.py` | Regenerate `panel/src/whitelist.json`, the dated copy of the ranked-mod whitelist the panel ships, from the Workshop pages the mod's `getwhitelist` reads (no API key; needs curl). The panel falls back on it without the mod or when the server could not read Steam, and shows its date. Re-run before a release. |
 | `tools/build-workshop.sh` | Stage the Workshop item in `build/workshop/` (gitignored): `content/` with only `web/`, `lua/` and `LICENSE`, the preview, and a `workshopitem.vdf` for `steamcmd +workshop_build_item`. Refuses uncommitted changes to what it ships (`--allow-dirty` overrides). A new item (no `workshop/publishedfileid`) needs `--visibility`: 3 is unlisted, for testing before going public. `--changenote` defaults to the version. Uploads nothing; prints the steamcmd command, since the login is interactive. |
