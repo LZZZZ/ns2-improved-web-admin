@@ -187,6 +187,19 @@ installed mod's own `ServerWebInterface.lua` back, and delete any
 boot with a mod mounted also writes a default `ConsistencyConfig.json`
 into `config/` (seen on 09-26); delete it too.
 
+### Mounting the published item
+
+To test what operators get rather than this repo's working tree, put the
+Workshop item's hex id, `e3742516`, in `MapCycle.json`'s `mods` instead
+of the Combat Fix overlay, and boot: the server downloads the item into
+`mods/content/4920/3816039702/` and mounts it from there. The local
+overlay is for changes not yet uploaded; this is for an upload.
+
+Put the rig back the same way, and also remove the download:
+`mods/content/4920/3816039702/`, `mods/SparkCache/3816039702/`, and its
+entries in `mods/appworkshop_4920.acf` (restore a copy taken before the
+boot), plus `config/improved-webadmin/`, which the mod creates.
+
 ### Probes and harnesses
 
 A probe is easier than a print statement: generate a copy of

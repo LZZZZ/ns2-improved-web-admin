@@ -695,8 +695,9 @@ supported mechanism, not a trick.
   Accepted. Whitelisting can be requested once the mod is published and
   has some mileage.
 - **Clients download the mod on join.** `NetworkServicesServer::SetModList`
-  publishes the server's mods and clients fetch them. The built panel is
-  about 650 KB, more than half of it minimaps; one download, cached -- but
+  publishes the server's mods and clients fetch them. The item is 775 KB
+  as Steam counts it, the built panel about 650 KB of that, more than
+  half of it minimaps; one download, cached -- but
   every player pays it for a panel only admins use.
 - **The mod web root merges rather than replaces.** `/js/rcon.js` and
   `/css/bootstrap.css` still resolve from `ns2/web/` with the mod
@@ -707,9 +708,31 @@ supported mechanism, not a trick.
 - No consistency risk: `ServerWebInterface.lua` is loaded only from
   `Server.lua:35`, so clients never see it.
 
-### Still untested
+### Mounted from the Workshop *(verified 2026-10-08)*
 
-The proof used a local mount directory, not a published workshop item.
-Whether a published item mounts `web/` and `lua/` identically, and what a
-joining client actually downloads, are the open questions -- see *Next* in
-the [README](../README.md#next).
+The proof above used a local mount directory. The published item
+([3816039702](https://steamcommunity.com/sharedfiles/filedetails/?id=3816039702), 0.1.0, unlisted) was then mounted the way an
+operator would: `e3742516` in `MapCycle.json`'s `mods`, on the rig with
+the 09-27 engine, nothing copied by hand.
+
+| What was tested | Result |
+| --- | --- |
+| A dedicated server fetching an **unlisted** item | Works: `Queuing download of NS2 Improved Web Admin[3816039702]`, then `Mounting mod 'NS2 Improved Web Admin'[3816039702] from <modstorage>/content/4920/3816039702/` |
+| What it downloaded | Byte-identical to `build/workshop/content/`: `web/`, `lua/`, `LICENSE`, nothing else. Steam counts the item as 775 KB. |
+| `lua/ServerWebInterface.lua` from the item | Shadows the game's: the state blob carries `mod_version: "0.1.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
+| `web/` from the item | `index.html` and all 22 other files `200`, byte-identical to `web/` |
+| The mod's data folder | `config://improved-webadmin/whitelist.json` written by `getwhitelist` (116 ids) |
+| `getinstalledmodslist` | The item listed `active`, as `e3742516` |
+| Ranking | `Mod NS2 Improved Web Admin[3816039702] is not whitelisted`, `Ranking disabled`, `ranking_active: false`, as expected |
+
+Two details seen on the way:
+
+- **A new item stays hidden** until the uploading account accepts the
+  Steam Workshop legal agreement, whatever its visibility; its page reads
+  "marked as hidden". Steam's anonymous `GetPublishedFileDetails` answers
+  `result 9` for the unlisted item even after that, while its page opens.
+- The engine serves `THIRD-PARTY-LICENSES.txt` as `text/html`, so a
+  browser runs its lines together. The panel does not link it.
+
+Still open: what a joining client actually downloads -- see *Next* in the
+[README](../README.md#next).

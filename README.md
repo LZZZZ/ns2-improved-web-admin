@@ -6,7 +6,7 @@ corrected `ServerWebInterface.lua`, mounted together.
 
 > **Read this first.** This project was entirely vibe-coded: written by an
 > AI coding assistant, directed and reviewed by a human. It is **still in
-> development** and has not yet been published to the Workshop. It is
+> development**: the Workshop item is an unlisted beta. It is
 > provided **as is, with no warranty** of any kind. It runs Lua inside your
 > game server and changes how that server handles bans, reserved slots and
 > the map cycle. **Use it at your own risk**, test it on a server you can
@@ -29,8 +29,20 @@ ones, and verified against a real dedicated server, the mock and the
 OpenAPI spec. Every action the 2012 panel had is accounted for and gated
 ([docs/CURRENT-UI.md](docs/CURRENT-UI.md#where-each-2012-action-went-audited-2026-10-06)).
 
-**Not yet published to the Workshop.** The mod has been mounted only from
-a local directory. What is still open is in [Next](#next).
+**Published as an unlisted beta, 0.1.0**: Workshop item
+[3816039702](https://steamcommunity.com/sharedfiles/filedetails/?id=3816039702), hex `e3742516`. Anyone with the link can open it and
+a server can mount it, but Workshop search does not list it. A dedicated
+server downloaded it from the Workshop and served the panel and the Lua
+from it on 2026-10-08
+([CONSTRAINTS.md](docs/CONSTRAINTS.md#mounted-from-the-workshop-verified-2026-10-08)).
+What is still open is in [Next](#next).
+
+## Installing
+
+Add `e3742516` to `mods` in the server's `MapCycle.json`, then change map
+or restart; the server downloads the item itself. The panel is then at
+`/index.html` on the web admin port, as before. Read [Security](#security)
+first, and expect the server to be unranked while the mod is mounted.
 
 ## Screenshots
 
@@ -305,11 +317,12 @@ on `app_update 4940 validate`. Nothing in this project edits it.
 
 ## Next
 
-- **Publish the workshop item**, and test it on a server that mounts it
-  from the Workshop. The mechanism is proven with a local mount directory
-  only, so two questions are open: does a published item mount `web/` and
-  `lua/` the way a local directory does, and what does a joining client
-  actually download?
+- **What a joining client downloads.** A server mounts the published
+  item exactly as it did the local directory (verified 2026-10-08); what
+  a player pays on join still needs a client to join a server running it.
+- **Make the item public** once that and a populated round look right:
+  the visibility setting on the item's Steam page, or
+  `tools/build-workshop.sh --visibility 0` and an upload.
 - **Captures from a populated round** with the mod mounted: players with
   names, teams and a commander, chat, performance under load, the log,
   and a paged `getperf` reply.
