@@ -10,136 +10,40 @@ Script.Load("lua/RingBuffer.lua")
 
 -- ===================== improved-webadmin ================================
 --
--- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
--- game's, so this file replaces the vanilla one wholesale. It started as a
--- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `improved-webadmin:`. The vanilla code is a starting point, not something
--- to preserve: change it wherever that improves the result, keeping the HTTP
--- API backward compatible when that is cheap (README.md, "Design decisions").
+-- Replaces ns2/lua/ServerWebInterface.lua. Additions over vanilla:
 --
--- 1. Console output is captured and returned.
+--   runcommand, getconsole  console output, captured by wrapping
+--                           ServerAdminPrint and Shared.Message
+--   getchatlist&since=N     200-message chat ring with ids
+--   getbans                 bans in force; Shine's table under its ban plugin
+--   getrecentplayers        players seen in the last 24 h, saved under config://
+--   getperf                 10 s performance windows and parsed engine log lines
+--   getlog                  log-Server.txt by byte offset
+--   getmapvote              Shine's mapvote state
+--   getwhitelist            the ranked-mod whitelist, read from Steam
+--   server state            mod_version, max_players, map_loaded_at,
+--                           ranking_active, shine; per player: skill, gag,
+--                           family sharing, rejected moves
 --
---    Vanilla runs `Shared.ConsoleCommand(actions.rcon)` and answers with the
---    ordinary state blob, so a kick that worked and a kick that matched nobody
---    are byte-identical over HTTP. The panel has never been able to tell them
---    apart and fakes it with a timed refresh.
---
---    ServerAdminPrint (core/lua/ServerAdmin.lua:156) and Shared.Message are
---    both plain writable globals that nobody aliases locally, and
---    Shared.ConsoleCommand is synchronous, so wrapping them tees every line
---    into a ring buffer and a command's own output is available the moment it
---    returns. Measured in tools/spikes/console-output-probe.lua; findings in
---    docs/REQUIREMENTS.md item 5.
---
---    Two request types read it:
---
---      request=runcommand&cmd=...   run it and return the lines it produced
---      request=getconsole&since=N   everything since line N, for a console
---
---    The legacy `command`/`rcon` fallthrough still works exactly as before, so
---    the 2012 panel keeps functioning against this server.
---
--- 2. `mod_version` in the server-state response, so a panel can tell whether
---    it is talking to this Lua or to a stock server and say so rather than
---    quietly offering features that cannot work.
---
--- 3. Three one-line bugs fixed, all of them cases where the server reports
---    success it never had. Details in docs/CONSTRAINTS.md items 7-9.
---
---      setreservedslotamount  called SetReservedSlotAmount(amount) against a
---                             function declared (client, amount), so the guard
---                             rejected every call and the whole Reserved Slots
---                             tab has never worked.
---      sv_unban               passed the console argument through as a string
---                             to a map keyed by number, so it could never
---                             match a ban that was plainly in getbanlist.
---      getbanlist             listed bans that had expired and no longer
---                             blocked anyone.
---
---    Found later (CONSTRAINTS items 10 and 11): an unban that did not let the
---    player back in, and sv_remove_reserved_slot never saving its removal.
---
---    Two are fixed here. `sv_unban` is fixed by wrapping the UnbanUser global
---    rather than by shipping a second copy of ServerAdminCommands.lua: it is a
---    global, nobody aliases it, and ServerAdminCommands.lua loads before this
---    file (Server.lua:34 and :35), so the wrapper is in place before anything
---    can call it -- and it fixes the game console's own sv_unban too, not just
---    the web one.
---
--- 4. Shine is first-class (docs/CONSTRAINTS.md, "Shine"). The state blob says
---    whether Shine is loaded and which of the plugins that replace vanilla
---    behaviour are on, and `getbans` reads Shine's own ban table when its ban
---    plugin owns the list -- who banned, when, for how long, none of which
---    GetBannedPlayersList() keeps.
---
--- 5. Recent players: everyone seen in the last 24 hours, up to 100, with name,
---    former names, IP, first and last seen and time played, kept in
---    config://improved-webadmin/ so the list outlives a map change. Read with
---    request=getrecentplayers. See docs/REQUIREMENTS.md item 6.
---
---    Under Shine's ban plugin, a ban of someone who is not connected is
---    recorded with the name this list last saw instead of "<unknown>".
---    Vanilla's sv_ban keeps "Unknown": its ban table is file-local.
---
--- 6. The map cycle (docs/CONSTRAINTS.md items 12 and 13). `getmapcycle` reads
---    MapCycle.json, which is what rotation reads, instead of the copy loaded
---    with the map, and no longer rewrites the live cycle's mod ids to hex on
---    the way out. `setmapcycle` refuses a cycle the game could not use
---    without writing it, and answers with what the file holds afterwards.
---    `getmapvote` says what Shine's mapvote will do with the cycle.
---
--- 7. `getinstalledmodslist` marks each mod `active` when it is mounted now
---    (docs/REQUIREMENTS.md item 3). Installed is not loaded, and the cycle is
---    not what is loaded either: it takes effect at the next map change.
---
--- 8. `getperf`: what `perfmon` logs, in 10 s windows, for the Performance tab
---    (docs/REQUIREMENTS.md item 10). Vanilla `getperfdata` keeps one reading a
---    minute of three numbers and stays as it was, for the 2012 panel. Each
---    window adds the engine's own ServerPerformanceData (score, idle, moves,
---    entities, interp warns and fails, the configured rates) plus the tickrate
---    counted from UpdateServer calls and the worst tick, which the engine's
---    whole-millisecond interval cannot give at 60 tick and up.
---
---    Replies are paged, at most 60 windows and 60 engine records each, with
---    `more` while there is more: an hour in one reply cost most of a tick
---    to encode (docs/SERVER-COST.md).
---
---    Its `engine` part is what the engine prints only to the log: `tickstat`
---    lines (tick spacing, snapshot sizes, choke), players' snapshot rate
---    steps, a bwlimit warning, and the `perfmon:` block. The log is scanned
---    every 2 s, with a cursor of its own (`esince`).
---
--- 9. `getlog`: the engine's own log-Server.txt, tailed by byte offset, for the
---    Log tab (docs/REQUIREMENTS.md item 7). It holds what never passes through
---    Lua -- connects, auth, engine errors, Script tracing -- and, unlike the
---    console buffer, it outlives a map change. Reachable only when -logdir is
---    the config directory, which the default layout is; otherwise the reply
---    says so and the console buffer is what there is.
---
--- 10. `getwhitelist`: the ranked-mod whitelist, read from Steam (docs/CONSTRAINTS.md item 17).
---    The engine reads it at boot from a Workshop item and gives Lua no way
---    to see it, so the mod reads the item's public page itself, once an hour
---    at most and only when a panel asks, and keeps it in
---    config://improved-webadmin/ across map changes.
+-- Vanilla bugs fixed: setreservedslotamount never applied; sv_unban never
+-- matched; an unbanned player stayed refused until restart;
+-- sv_remove_reserved_slot was not saved; getbanlist listed expired bans;
+-- getmapcycle rewrote the live cycle's mod ids; setmapcycle wrote invalid
+-- cycles. The stock request types keep their response shapes.
 --
 -- =========================================================================
 
 local kModVersion = "0.1.0"
 
--- Lines kept for the console tab. Each carries an increasing id, so a client
--- polls with `since` and learns from a gap that it missed some.
+-- Console lines, each with an increasing id: a client polls with `since` and
+-- detects a gap.
 local kConsoleBufferSize = 500
 local consoleBuffer = CreateRingBuffer(kConsoleBufferSize)
 local nextConsoleId = 1
 local droppedConsoleLines = 0
 
--- Engine chatter that would drown a console. Filtered at capture, and counted
--- so the count is visible rather than the lines just going missing.
---
--- Empty by measurement rather than by omission: an idle server produced zero
--- lines over 75 s, because the periodic `Script tracing` messages in
--- log-Server.txt are written engine-side and never pass through Lua. The
--- mechanism stays for a busy server that proves otherwise.
+-- Lines dropped at capture, counted in `filtered`. Empty: nothing noisy
+-- reaches Lua on an idle server.
 local kNoisePatterns = {
 }
 local filteredConsoleLines = 0
@@ -153,30 +57,10 @@ local function IsNoise(text)
     return false
 end
 
--- A fourth bug, found while testing the third and worse than it: an unban
--- that works does not actually let the player back in.
---
--- GenerateBannedPlayersMap (ServerAdminCommands.lua:304) only ever *adds* to
--- `bannedPlayersMap`, and UnbanUser removes from `bannedPlayers` without
--- clearing the map, so the removed ban survives in it. GetIsUserBanned and
--- GetIsUserBannedPermanently read that map, and OnCheckConnectionAllowed
--- (line 376) reads them, so until the server restarts the unbanned player is
--- still refused -- while every list says they are not banned. Measured on the
--- rig: after a successful unban, getbanlist was empty and GetIsUserBanned
--- still answered true.
---
--- It cannot bite on a stock server only because sv_unban never works there.
--- Fixing item 8 is what exposes it, so both have to be fixed together.
---
--- Both functions are globals that OnCheckConnectionAllowed calls by name, so
--- replacing them here is enough. They consult the live ban list instead of the
--- map: a linear scan over a list of bans, against a hash lookup, on a path
--- that runs once per connection attempt.
---
--- Compare ids as numbers on both sides. Vanilla stores them as numbers, but
--- Shine's ban plugin replaces GetBannedPlayersList() with one built from its
--- own table, keyed by *string* ids -- seen on a Shine server, where all 119
--- ids came back as strings. A plain `ban.id == id` never matches those.
+-- GenerateBannedPlayersMap (ServerAdminCommands.lua:304) only adds to
+-- bannedPlayersMap and UnbanUser never removes from it, so GetIsUserBanned
+-- refuses an unbanned player until restart. These read the live list instead.
+-- Ids compare as numbers: Shine's GetBannedPlayersList() returns string ids.
 local function FindLiveBan(userId)
 
     local id = tonumber(userId)
@@ -211,11 +95,8 @@ if type(GetIsUserBannedPermanently) == "function" then
 
 end
 
--- CONSTRAINTS item 8. Ban records key `bannedPlayersMap` by a number
--- (`tonumber(playerId)`, ServerAdminCommands.lua:446) but UnBan hands the raw
--- console argument -- a string -- straight to UnbanUser (line 485), so the
--- lookup always missed and the server answered "No matching Steam Id in ban
--- list" about an entry it was listing at the same moment.
+-- sv_unban passes the id as a string (ServerAdminCommands.lua:485), but bans
+-- are keyed by number (:446), so it never matched.
 local originalUnbanUser = UnbanUser
 if type(originalUnbanUser) == "function" then
 
@@ -225,17 +106,10 @@ if type(originalUnbanUser) == "function" then
 
 end
 
--- sv_remove_reserved_slot takes the slot out of memory and then saves with
--- Server.SaveConfigSettings() (ServerAdminCommands.lua:670), where adding a
--- slot and setting the amount use Server.SaveReservedSlotsConfig(). The
--- removal never reaches ReservedSlotsConfig.json: measured on the rig
--- 2026-09-27, the file still held the slot after "Removed reserved slot for
--- One", until an unrelated sv_reserved_slots saved it. A restart in between
--- brings the removed slot back.
---
--- RemoveReservedSlot is a local, so it cannot be wrapped. A second hook on the
--- same console command marks the config dirty and the next tick saves it,
--- which is right whichever of the two hooks the engine runs first.
+-- sv_remove_reserved_slot saves with Server.SaveConfigSettings() rather than
+-- Server.SaveReservedSlotsConfig() (ServerAdminCommands.lua:670), so the
+-- removal is lost on restart. RemoveReservedSlot is local and cannot be
+-- wrapped: a second hook marks the config dirty and the next tick saves it.
 local reservedSlotsDirty = false
 Event.Hook("Console_sv_remove_reserved_slot", function()
     reservedSlotsDirty = true
@@ -248,13 +122,11 @@ local function SaveReservedSlotsIfDirty()
     end
 end
 
--- Every command created by CreateServerAdminCommand emits this line before it
--- runs (core/lua/ServerAdmin.lua:113), so its presence is a receipt that the
--- command existed and was dispatched. Absence means an Event.Hook-style
--- command such as sv_help, or nothing at all.
+-- Printed by every CreateServerAdminCommand command before it runs
+-- (core/lua/ServerAdmin.lua:113), so it marks a dispatched admin command.
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
 
--- The last line teed, for telling an echo from a new line (see the wrapper).
+-- The last line captured, for spotting Shine's echoes to in-game admins.
 local lastTeedText, lastTeedAt = nil, nil
 
 local function TeeConsoleLine(source, text)
@@ -262,8 +134,7 @@ local function TeeConsoleLine(source, text)
     text = tostring(text)
     lastTeedText, lastTeedAt = text, Shared.GetSystemTime()
 
-    -- Classified here rather than in runcommand, so a command someone runs
-    -- from the game console is labelled the same way as one from the panel.
+    -- Here rather than in runcommand, so game-console commands are labelled too.
     if string.match(text, kAuditPattern) then
         source = "audit"
     end
@@ -286,23 +157,14 @@ local function TeeConsoleLine(source, text)
 
 end
 
--- ServerAdminPrint calls Shared.Message itself, so without this flag every
--- admin message would be captured twice -- sv_help yields 74 lines for 37
--- commands. The flag suppresses the inner call, not the outer one.
+-- ServerAdminPrint calls Shared.Message; this stops the inner call capturing
+-- the line a second time.
 local inServerAdminPrint = false
 
--- Shine replaces ServerAdminPrint on its first tick, without chaining to what
--- was there, and its version returns at once when there is no client -- which
--- is every command run from the web admin. On a Shine server that dropped our
--- wrapper and, with it, the output of every vanilla admin command: sv_kick's
--- "No matching player", the whole of sv_listbans. Measured on the rig with a
--- Shine config, 2026-09-27; Shine's source is lua/shine/core/server/logging.lua.
---
--- So the wrapper re-installs itself over whatever ServerAdminPrint currently
--- is, every tick and before every web request. The flag also keeps a chain
--- that runs through our wrapper twice (another mod wrapping ours, then ours
--- wrapping it) from teeing a line twice. Extra arguments pass through: Shine's
--- version takes a third.
+-- Shine replaces ServerAdminPrint on its first tick without chaining, and its
+-- version prints nothing without a client, which is every web command. So the
+-- wrapper re-installs itself over the current function every tick and before
+-- every web request. Extra arguments pass through: Shine's takes a third.
 local ourServerAdminPrint
 
 local function EnsureServerAdminPrintWrapped()
@@ -318,13 +180,8 @@ local function EnsureServerAdminPrintWrapped()
             return current(client, message, ...)
         end
 
-        -- Shine's AdminPrint prints a line to the server console and then
-        -- sends the same line to every admin in game, each through
-        -- ServerAdminPrint(admin, line). The server printed it once; the
-        -- copies are deliveries. Measured on the rig with an admin joined,
-        -- 2026-10-06: without this, every Shine line arrived twice. A line
-        -- for a player that is not such an echo -- an in-game admin's own
-        -- command output -- is still captured.
+        -- Shine's AdminPrint prints a line, then sends it to each in-game admin
+        -- through ServerAdminPrint(admin, line). Skip those copies.
         local echo = client ~= nil and tostring(message) == lastTeedText
             and lastTeedAt ~= nil and Shared.GetSystemTime() - lastTeedAt <= 1
         if not echo then
@@ -358,37 +215,22 @@ if type(originalSharedMessage) == "function" then
 
 end
 
--- Print and Log are deliberately NOT wrapped. They are distinct functions, so
--- an identity check does not rule them out, but they are format-string front
--- ends onto Shared.Message: wrapping them captured `Requesting server ranking
--- be enabled, request success: %s` from Print and then the formatted
--- `... success: false` from Shared.Message underneath it. Every line arrived
--- twice, once as a useless template. Shared.Message already sees everything
--- they emit, formatted. Measured on the rig, 2026-09-05.
+-- Print and Log are not wrapped: they format and call Shared.Message, so
+-- wrapping them captures each line twice, once as the unformatted template.
 
 
--- improved-webadmin: chat for the Chat tab (CONSTRAINTS item 3).
---
--- The game keeps the last 20 messages (Server.lua:74) and getchatlist hands
--- over all of them every time. This keeps 200, with times and increasing ids,
--- so a client polls with `since` and learns from `dropped` what it missed.
---
--- It is fed by wrapping Server.AddChatToHistory, which player chat
--- (NetworkMessages_Server.lua:285), sv_say and sv_tsay
--- (ServerAdminCommands.lua:196, :222) and Shine's sh_say
--- (shine/core/server/logging.lua:209) all call. Wrapped rather than replaced,
--- because Server.lua is not ours: two installed workshop mods ship their own.
--- And wrapped late, because this file is loaded at Server.lua:35, before the
--- function is defined at :82. Re-installed when something replaces it, like
--- the ServerAdminPrint wrapper above.
+-- Chat for getchatlist&since=N. The game keeps 20 messages (Server.lua:74);
+-- this keeps 200 with ids. Fed by wrapping Server.AddChatToHistory, which
+-- player chat, sv_say, sv_tsay and Shine's sh_say all call. It is defined
+-- after this file loads (Server.lua:82), so it is wrapped on first use and
+-- re-wrapped if replaced.
 local kChatBufferSize = 200
 local chatBuffer = CreateRingBuffer(kChatBufferSize)
 local nextChatId = 1
 local droppedChatEntries = 0
 local ourAddChatToHistory
 
--- As with ServerAdminPrint: if another mod wraps ours and we then wrap
--- theirs, the chain runs through our wrapper twice. Only the outer one records.
+-- If our wrapper ends up in the chain twice, only the outer one records.
 local inAddChatToHistory = false
 
 local function RecordChat(message, playerName, steamId, teamNumber, teamOnly)
@@ -431,8 +273,8 @@ local function EnsureChatWrapped()
             error(err, 0)
         end
 
-        -- After the original, so what it refuses is not recorded, and guarded,
-        -- so nothing here can break chat itself.
+        -- After the original, so a refused message is not recorded; pcall so
+        -- recording cannot break chat.
         pcall(RecordChat, message, playerName, steamId, teamNumber, teamOnly)
 
     end
@@ -453,10 +295,8 @@ local function ChatSince(sinceId)
 end
 
 
--- Shine, and its plugins that replace something vanilla does. Shine loads
--- after this file, so every lookup happens per request rather than at load.
--- Nil when Shine is absent, which also keeps the key out of the state blob.
--- basecommands holds sh_gag, the only mute there is: the game has none.
+-- Shine plugins that replace vanilla behaviour; basecommands holds sh_gag.
+-- Shine loads after this file, so lookups happen per request.
 local kShinePlugins = { "ban", "reservedslots", "mapvote", "basecommands" }
 
 local function GetShinePlugin(name)
@@ -487,15 +327,12 @@ local function GetShineState()
 
 end
 
--- An expiry further out than this is not a date but a way of writing "never":
--- Shine was seen storing 6e+24 on a real server. Reported as permanent, so no
--- client has to guess where the line is.
+-- An expiry further out than this means permanent (Shine stores e.g. 6e+24).
 local kPermanentAfter = 100 * 365 * 24 * 60 * 60
 
--- The bans in force, newest first, from whichever table actually decides them.
--- Under Shine's ban plugin that is Shine's own table, which keeps who banned,
--- when and for how long; GetBannedPlayersList() throws all three away, and
--- hands the rest over in pairs() order, which changes between calls.
+-- The bans in force, newest first. Under Shine's ban plugin, from Shine's
+-- table, which keeps issuer, issue time and duration;
+-- GetBannedPlayersList() drops those and returns pairs() order.
 local function GetBansInForce()
 
     local now = Shared.GetSystemTime()
@@ -539,7 +376,7 @@ local function GetBansInForce()
 
     end
 
-    -- Vanilla appends, so the list is already oldest first.
+    -- Vanilla appends, so the list is oldest first.
     local list = GetBannedPlayersList()
     for i = #list, 1, -1 do
         local ban = list[i]
@@ -554,23 +391,11 @@ local function GetBansInForce()
 
 end
 
--- Recent players (docs/REQUIREMENTS.md item 6): everyone seen in the last day,
--- so a player who has already left can still be found and banned.
---
--- It has to outlive a map change, and a map change rebuilds all Lua state, so
--- the list lives in a file under config://. Measured on 09-26: mod Lua can
--- write there, but "a" truncates like "w" and there is no os.rename or
--- os.remove. The file is therefore rewritten whole, and a crash mid-write
--- leaves it torn with no way to swap a finished copy in.
---
--- Two slots stand in for write-then-rename. Saves alternate between them,
--- each stamped with an increasing `seq`, and the loader takes the newest one
--- that parses. A torn write costs one save, not the list, and the next save
--- overwrites the torn slot.
---
--- Nothing here depends on whether ClientDisconnect fires at a map change: a
--- disconnect only stamps a time, and `connected` is read off the live player
--- list at request time, so a map change never reads as everyone leaving.
+-- Recent players: seen in the last 24 h, at most 100, saved under config://
+-- to survive map changes. Mod Lua has no os.rename, so saves alternate
+-- between two files stamped with an increasing `seq`, and the loader takes
+-- the newest that parses: a torn write loses one save, not the list.
+-- `connected` is read from the live player list, not from disconnect events.
 local kRecentWindow = 24 * 60 * 60
 local kRecentCapacity = 100
 local kRecentFormerNames = 5
@@ -584,11 +409,10 @@ local kRecentSlots = {
 
 -- Account id -> entry, as saved.
 local recentPlayers = { }
--- Account id -> the system time `played` was last brought up to, while that
--- player is connected on this map.
+-- Account id -> the time `played` was last updated to, for connected players.
 local recentAccrued = { }
--- nil until the file has been read. Then "ok", "fallback" (the newest slot was
--- torn and the older one was used), "empty" (no file yet) or "unreadable".
+-- nil until loaded, then "ok", "fallback" (newest file torn, older one used),
+-- "empty" (no file) or "unreadable".
 local recentLoadStatus
 local recentSeq = 0
 local recentNextSlot = 1
@@ -630,7 +454,7 @@ local function SanitizeRecentEntry(raw)
 
 end
 
--- One slot: "absent", or "torn", or the decoded document.
+-- "absent", "torn", or the decoded document.
 local function ReadRecentSlot(path)
 
     local file = io.open(path, "r")
@@ -682,7 +506,7 @@ local function EnsureRecentLoaded()
     elseif not best then
         recentLoadStatus = "unreadable"
     elseif torn > 0 then
-        -- The torn slot is the next one written, so it is gone after one save.
+        -- The torn file is the next one written.
         recentLoadStatus = "fallback"
     else
         recentLoadStatus = "ok"
@@ -690,8 +514,7 @@ local function EnsureRecentLoaded()
 
 end
 
--- The humans connected right now, by account id, from the same walk the state
--- blob does.
+-- Connected humans, by account id.
 local function GetConnectedClients()
 
     local connected = { }
@@ -710,8 +533,8 @@ local function ClientAddress(client)
     return address and IPAddressToString(address) or ""
 end
 
--- Oldest out first, then the rest past the capacity. Someone still connected
--- is never dropped, however long they have been on.
+-- Drops entries past the window, then the oldest past capacity. Connected
+-- players are always kept.
 local function PruneRecent(now, connected)
 
     local kept = { }
@@ -752,8 +575,8 @@ local function RecentEntry(id, now)
 
 end
 
--- Player:GetName() answers kDefaultPlayerName while a name is still empty, so
--- that placeholder never replaces a real name or becomes a former one.
+-- GetName() returns kDefaultPlayerName before a name is set; that never
+-- replaces a real name or becomes a former one.
 local function SetRecentName(entry, name)
 
     if type(name) ~= "string" or name == "" or name == entry.name then return end
@@ -858,8 +681,7 @@ Event.Hook("ClientDisconnect", function(client)
     end
     recentAccrued[id] = nil
 
-    -- Saved on the next tick rather than here, so a map change or a mass
-    -- disconnect costs one write, not one per player.
+    -- Saved on the next tick, so a mass disconnect costs one write.
     recentDirty = true
     recentUrgent = true
 
@@ -911,8 +733,7 @@ local function GetRecentPlayers()
             names = entry.names,
             ipaddress = entry.ipaddress,
             first_seen = entry.first_seen,
-            -- A connected player is being seen now, whatever the last sweep
-            -- wrote, and has played up to now.
+            -- Connected: seen now, and played up to now.
             last_seen = connected[id] and now or entry.last_seen,
             played = entry.played + ((connected[id] and since) and math.max(0, now - since) or 0),
             connected = connected[id] ~= nil,
@@ -938,16 +759,10 @@ local function GetRecentPlayers()
 
 end
 
--- Shine's sh_banid records an absent player as "<unknown>" (its BanID, in
--- lua/shine/extensions/ban/server.lua), and every consumer of the ban -- its
--- table, the vanilla file it syncs, its net data, the OnPlayerBanned hook --
--- takes the name from Plugin:AddBan's second argument. AddBan is a public
--- method on the plugin, so the name is supplied there, from the recent list,
--- before anything stores it. Shine's own console line prints a local and
--- still says "<unknown>"; the line below says what was actually recorded.
---
--- Shine loads after this file and can re-create a plugin, so the wrapper is
--- re-applied every tick and before every web request, per plugin table.
+-- Shine's sh_banid names an absent player "<unknown>". Plugin:AddBan is where
+-- the name is stored, so the wrapper substitutes the recent-players name.
+-- Shine can re-create the plugin, so it is re-applied every tick and before
+-- every web request.
 local kShineUnknownName = "<unknown>"
 local shineAddBanWrappers = setmetatable({ }, { __mode = "k" })
 
@@ -1006,25 +821,18 @@ local perfDataBuffer = CreateRingBuffer(kMaxPerfDatas)
 -- The last time performance data was sampled.
 local lastPerfDataTime = 0
 
--- improved-webadmin: performance windows for `getperf` (item 8 above).
+-- Performance windows for getperf. The engine completes a
+-- ServerPerformanceData about once a second; these are accumulated into
+-- kPerfWindowSeconds windows.
 --
--- The engine completes a ServerPerformanceData about once a second (measured:
--- every 1.00 s, 30 UpdateServer calls apart at tickrate 30). Each fresh one is
--- accumulated until the window holds kPerfWindowSeconds, the way perfmon
--- accumulates its 30 s. Measured on the rig (REQUIREMENTS item 10):
+--   * Accumulate() of a sample with GetDurationMs() == 0 crashes the server
+--     with SIGFPE, which pcall cannot catch. The first samples after a map
+--     load are empty.
+--   * GetUpdateIntervalMs() is whole milliseconds (16 at tickrate 60), so the
+--     tickrate is counted from UpdateServer calls instead.
+--   * The rate getters follow runtime changes, so they are read per request.
 --
---   * Accumulate() of a sample with GetDurationMs() == 0 kills the server with
---     SIGFPE, which pcall cannot catch. The engine's first samples after a map
---     load are empty. Never pass one in.
---   * GetUpdateIntervalMs() is whole milliseconds: 16 at tickrate 60, which
---     reads as 62.5 (the `tick 62.5` in perfmon lines). The tickrate here is
---     counted instead: UpdateServer runs once per tick.
---   * The getters that report settings follow a runtime `tickrate`, `sendrate`,
---     `moverate` or `interp` at once, so the configured rates are read per
---     request, not at load.
---
--- The buffer lives and dies with the Lua VM, i.e. with the map. `loaded_at`
--- says when it started, so a client that sees it change knows the ids restarted.
+-- The buffer resets with the map; a new `loaded_at` means the ids restarted.
 local kPerfWindowSeconds = 10
 local kMaxPerfWindows = 360   -- an hour
 local perfWindows = CreateRingBuffer(kMaxPerfWindows)
@@ -1042,8 +850,8 @@ local function PerfRound(v, places)
     return math.floor(v * m + 0.5) / m
 end
 
--- One closed window, as the panel reads it. Computed as ServerPerformanceData.
--- DetailText computes its perfmon line, with its divisions guarded.
+-- One closed window. Same figures as ServerPerformanceData.DetailText, with
+-- its divisions guarded.
 local function PerfWindowFromAcc(acc, ticks, elapsed, worstTick)
     local durationMs = acc:GetDurationMs()
     local moves = acc:GetMovesProcessed()
@@ -1056,8 +864,7 @@ local function PerfWindowFromAcc(acc, ticks, elapsed, worstTick)
         tickrate = PerfRound(elapsed > 0 and ticks / elapsed or 0, 2),
         worst_tick_ms = PerfRound(worstTick * 1000, 1),
         players = players,
-        -- Both 0 with nobody on the server, and DetailText refuses to describe
-        -- such a sample; the panel says "no players" rather than "score 0".
+        -- Both 0 with nobody on the server.
         score = acc:GetScore(),
         quality = acc:GetQuality(),
         idle_pct = PerfRound(100 * acc:GetTimeSpentIdling() / durationMs),
@@ -1066,7 +873,7 @@ local function PerfWindowFromAcc(acc, ticks, elapsed, worstTick)
         moves_per_s = PerfRound(moves / (durationMs / 1000)),
         move_ms = moves > 0 and PerfRound(acc:GetTimeSpentOnMoves() / moves, 3) or nil,
         entities = acc:GetEntityCount(),
-        -- Raw counts over the window. perfmon prints warns and fails per second.
+        -- Counts over the window; perfmon prints them per second.
         incomplete = acc:GetIncompleteCount(),
         interp_warns = acc:GetNumInterpWarns(),
         interp_fails = acc:GetNumInterpFails(),
@@ -1090,13 +897,12 @@ local function UpdatePerfWindows()
     if stamp == perfLastStamp then return end
     perfLastStamp = stamp
 
-    -- See above: an empty sample in Accumulate() is a SIGFPE.
+    -- An empty sample would SIGFPE in Accumulate().
     if data:GetDurationMs() <= 0 then return end
 
     if not perfAcc then
         perfAcc = ServerPerformanceData()
-        -- The window starts here, so its tick count and its engine samples
-        -- cover the same span.
+        -- Start here, so the tick count and the samples cover the same span.
         perfWindowStart, perfTicks, perfWorstTick = now, 0, 0
         return
     end
@@ -1111,16 +917,12 @@ local function UpdatePerfWindows()
 
 end
 
--- Records in one getperf reply, per cursor. An hour of windows and tickstat
--- lines in one reply is 360 KB of JSON, and dkjson took 8.4 ms to write it on
--- a workstation: most of a tick at 80, in the tick, each time a panel opened
--- the tab late in a map. A page of 60 takes 1.4 ms (docs/SERVER-COST.md). So a reply holds at most
--- this many from its cursor, oldest first, says `more`, and the client asks
--- again; each page lands in a tick of its own.
+-- Most records per getperf reply, per cursor, oldest first; the client pages
+-- with `more`. An hour in one reply took 8.4 ms to encode, 60 take 1.4 ms.
 local kPerfReplyMax = 60
 
--- The windows after `sinceId`, at most kPerfReplyMax of them; the id to poll
--- from next; whether more are held.
+-- The windows after `sinceId` (at most kPerfReplyMax), the next cursor, and
+-- whether more are held.
 local function PerfWindowsSince(sinceId)
     local windows = { }
     for _, w in ipairs(perfWindows:ToTable()) do
@@ -1144,30 +946,19 @@ local function PerfConfig()
         sendrate = data:GetSendrate(),
         interp_ms = data:GetInterpMs(),
         max_players = data:GetMaxPlayers(),
-        -- 09-27 and later; follows a runtime `bwlimit` (REQUIREMENTS item 10).
+        -- 09-27 beta engine and later.
         bw_limit = Server.GetBwLimit and tonumber((select(2, pcall(Server.GetBwLimit)))) or nil,
     }
 end
 
--- improved-webadmin: the log tail (item 9 above).
+-- getlog: log-Server.txt by byte offset. io.open reaches only mounted roots,
+-- so this works only when the log is in the config directory (no -logdir, or
+-- -logdir equal to -config_path). A reply holds at most 64 KB (256 KB took
+-- 4.4 ms to encode); a client further behind gets `more`.
 --
--- io.open reaches only mounted roots, so the log is readable when the engine
--- writes it into the config directory: -logdir equal to -config_path, or
--- neither flag, the default layout. Measured on the rig (09-26, REQUIREMENTS
--- item 7): what a read returns is fresh, never ended mid-line in 5404 reads
--- under load, and costs about 0.2 ms for 64 KB and 0.7 ms for 256 KB. The
--- engine serves a 16 MB reply without complaint, so the cap is ours: a reply
--- is a poll, not a download. It is 64 KB, the tail's size, every way a reply
--- reads: 256 KB of lines took 4.4 ms to split and encode, a third of a tick
--- at 80, and 64 KB takes 1.1 ms (docs/SERVER-COST.md). A client behind by more
--- gets `more` and asks again, each reply in a tick of its own.
---
--- Offsets are bytes and every line carries its own, so a client merges replies
--- without duplicates and pages back from its first line. The header's Date and
--- Time name the file: a restart moves the old file to log-Server.old.txt and
--- starts a new one, which can be longer than the cursor by the time anyone
--- asks. A file shorter than the cursor was cut. Either way the reply is a
--- fresh tail, marked `reset`, rather than bytes read from the wrong place.
+-- Every line carries its byte offset. The header's Date and Time identify the
+-- file: a different file, or one shorter than the cursor, gets a fresh tail
+-- marked `reset`.
 local kLogPath = "config://log-Server.txt"
 local kLogTailBytes = 64 * 1024
 local kLogMaxBytes = 64 * 1024
@@ -1179,7 +970,7 @@ local function LogRead(f, from, to)
 end
 
 -- "09/28/2026 02:50:11 AM" from the header, or "" for a file without one.
--- The engine writes it to the second; a restart takes longer than that.
+-- Seconds suffice: a restart takes longer.
 local function LogFileId(f)
     local head = LogRead(f, 0, 128)
     local date, time = string.match(head, "^Date: ([^\r\n]*)\r?\nTime: ([^\r\n]-):?\r?\n")
@@ -1202,8 +993,7 @@ local function LogLines(text, from)
     return lines, from + pos - 1
 end
 
--- The bytes from `from` to the end of the file, as lines, from the first line
--- that starts at or after `from` unless `from` is a line start already.
+-- The last kLogTailBytes, from the first line start in them.
 local function LogTail(f, size)
     local from = math.max(0, size - kLogTailBytes)
     local text = LogRead(f, from, size)
@@ -1223,8 +1013,7 @@ local function LogSince(f, size, since)
     local stop = math.min(size, since + kLogMaxBytes)
     local text = LogRead(f, since, stop)
     local lines, to = LogLines(text, since)
-    -- A line longer than the cap would hold the cursor still forever. Serve
-    -- the cap's worth of it as a line and go on.
+    -- A line longer than the cap would stall the cursor: serve it cut.
     if to == since and stop == since + kLogMaxBytes then
         lines, to = { { off = since, text = text } }, stop
     end
@@ -1239,7 +1028,7 @@ local function LogBefore(f, before)
         if nl then
             text, from = string.sub(text, nl + 1), from + nl
         else
-            -- One line longer than a page: serve it cut rather than nothing.
+            -- One line longer than a page: serve it cut.
             return from, before, { { off = from, text = text } }, false
         end
     end
@@ -1247,14 +1036,10 @@ local function LogBefore(f, before)
     return from, before, lines, false
 end
 
--- Is config://log-Server.txt the file this server is writing? It opens just
--- as well when it is a copy an earlier run left behind with -logdir pointing
--- here, and then it is frozen: found on the rig, 2026-09-28, where a boot with
--- -logdir elsewhere served the previous run's log as if it were live. The
--- engine writes a line to the log before Shared.Message returns (measured:
--- item 7), so print one and look for it, through a handle opened after the
--- print. Once per map load, on the first getlog; the line says why it is
--- there. Around the console tee, which it would only clutter.
+-- Whether config://log-Server.txt is the live log, not a copy left by an
+-- earlier run while this one has -logdir elsewhere. Prints a marker and looks
+-- for it through a handle opened after the print. Once per map, bypassing the
+-- console capture.
 local logIsLive = nil
 
 local function CheckLogIsLive()
@@ -1282,14 +1067,13 @@ end
 
 local function GetLog(actions)
 
-    -- Before the open: a handle sees the file as it was when it was opened
-    -- (measured on the rig: the check's own line, written after the open,
-    -- was not in that read), and the first reply should show that line.
+    -- Before the open: a handle does not see later writes, and the first
+    -- reply should include the marker line.
     local checked, live = pcall(CheckLogIsLive)
 
     local opened, f, err = pcall(io.open, kLogPath, "rb")
     if not opened or not f then
-        -- A stale copy that was deleted reads as missing, not as stale.
+        -- A deleted stale copy reads as missing.
         return { source = "none", path = kLogPath, error = tostring(opened and err or f) }
     end
 
@@ -1348,30 +1132,20 @@ local function GetLog(actions)
 
 end
 
--- improved-webadmin: the engine's own reports from the log, for `getperf` (item 8
--- above). Some of what the Performance tab wants is printed by the engine
--- straight into log-Server.txt and never passes through Lua. Measured on the
--- rig, 09-27 engine (docs/REQUIREMENTS.md item 10):
+-- Engine output that reaches only log-Server.txt, for getperf's `engine`:
 --
---   * `tickstat N` prints one bare `TICKSTAT| ...` line every N seconds, with
---     no timestamp, even with nobody on; it survives a map change. So a line
---     is stamped with the time this scan found it, and the scan runs every
---     kEngineScanSeconds to keep that close. There is no backfill at a map
---     load: an unstamped line from before it would land at the wrong time.
---   * A player whose updates keep hitting bwlimit logs
---     `client N: snapshot rate A -> B/s (...)`; a bwlimit too small for a full
---     game logs a warning naming the value that avoids it.
---   * The `perfmon:` block is printed only when someone types `perfmon`, and
---     covers the last second.
+--   * `TICKSTAT| ...` lines, one every N s after `tickstat N`. They carry no
+--     timestamp, so each is stamped when a scan finds it, every
+--     kEngineScanSeconds. The first scan after a map load starts at the end
+--     of the file.
+--   * `client N: snapshot rate A -> B/s (...)` steps and the bwlimit warning.
+--   * The `perfmon:` block, printed when someone runs `perfmon`.
 --
--- Lines are recognised only by a match anchored at both ends, and a TICKSTAT
--- line only when most of its segments parse, so a line that merely starts
--- with a player's name (`<name> connected.`) cannot pass for one. A segment
--- the parser does not know -- a later engine adding one -- is counted in
--- `unparsed` rather than failing the line.
+-- Patterns are anchored at both ends and a TICKSTAT line must parse at least
+-- kTickstatMinSegments segments, so a player name cannot fake one. Unknown
+-- segments are counted in `unparsed`.
 local kEngineScanSeconds = 2
--- The most one scan reads. Not getlog's cap: a scan meets about 1 KB, and only
--- after a log flood more; it then reads the newest 256 KB, once (1.8 ms).
+-- The most one scan reads. A scan normally meets about 1 KB; 256 KB takes 1.8 ms.
 local kEngineScanMaxBytes = 256 * 1024
 local kMaxTickstats = 360          -- an hour at `tickstat 10`
 local kMaxPerfmonBlocks = 60
@@ -1389,7 +1163,7 @@ local engineScanError = nil
 local tickstatLastAt = nil
 local tickstatSaid = nil           -- the last `tickstat: on|off` reply
 
--- One per segment of the format string in server_linux, in order.
+-- One per segment of server_linux's TICKSTAT format, in order.
 local kTickstatSegments = {
     { "^win (%S+) s hz (%S+) target (%S+)$", "win_s", "hz", "target" },
     { "^int p50 (%S+) p99 (%S+) p999 (%S+) max (%S+) ms$",
@@ -1528,8 +1302,8 @@ local function ParseEngineLine(text, now)
 
 end
 
--- Read what the engine wrote since the last scan. The first scan after a map
--- load starts at the end of the file (see above).
+-- Parse what the engine wrote since the last scan. The first scan after a map
+-- load only sets the cursor.
 local function ScanEngineLog()
 
     local opened, f, err = pcall(io.open, kLogPath, "rb")
@@ -1551,8 +1325,7 @@ local function ScanEngineLog()
             enginePartialBlock = nil
         end
         if size - engineCursor > kEngineScanMaxBytes then
-            -- Far behind (a hitch longer than any scan interval): the latest
-            -- stretch only, from a line start.
+            -- Too far behind: only the last kEngineScanMaxBytes, from a line start.
             local from = size - kEngineScanMaxBytes
             local nl = string.find(LogRead(f, from, size), "\n", 1, true)
             engineCursor = nl and from + nl or size
@@ -1585,16 +1358,13 @@ local function EngineSince(buffer, sinceId, into)
     return into
 end
 
--- `getperf`'s `engine`: what the scans found since `sinceId`, at most
--- kPerfReplyMax records across the three lists. They share one id sequence
--- but drop out of their rings at different rates, so the page ends at the
--- kPerfReplyMax-th lowest id held, not at sinceId + kPerfReplyMax.
+-- getperf's `engine`: records since `sinceId`, at most kPerfReplyMax across
+-- the three lists. They share one id sequence but leave their rings at
+-- different rates, so the page ends at the kPerfReplyMax-th lowest id held.
 local function EngineReport(sinceId)
-    -- As getlog does: a copy an earlier run left in the config directory
-    -- opens as well as the live file, and would never grow.
+    -- As in getlog: a stale copy of the log opens but never grows.
     local checked, live = pcall(CheckLogIsLive)
-    -- The server's clock, so a client judges "is tickstat still logging"
-    -- against it rather than against its own.
+    -- The server's clock, for judging whether tickstat is still logging.
     local report = { last_id = nextEngineId - 1, more = false, now = Shared.GetSystemTime() }
     if checked and live == false then
         report.source = "none"
@@ -1642,11 +1412,8 @@ Shared.SetWebRoot("web")
 --
 -- Returns a list of all of the mods installed on the server (not necessarily active)
 --
--- improved-webadmin: `active` says which are mounted now, so a client need not
--- guess from the map cycle -- the engine mounts two hotfix mods the cycle does
--- not name, and a map's own mods only with that map. Active ids are spelled
--- as GetModId spells them (measured on 09-26); GetModTitle takes only the
--- installed index, as ServerStats.lua notes, hence the set.
+-- `active`: mounted now, which includes hotfix mods the cycle does not name.
+-- GetModTitle takes only the installed index, hence the set.
 local function GetModList()
 
     local active = { }
@@ -1661,42 +1428,42 @@ local function GetModList()
         local name = Server.GetModTitle(i)
         returnList[i] = { id = id, name = name, active = active[id] == true }
     end
-    
+
     return returnList
-    
+
 end
 
 local function GetMapList()
 
     local returnList = { }
-    
+
     for i = 1, Server.GetNumMaps() do
         local name  = Server.GetMapName(i)
         local modId = Server.GetMapModId(i)
         returnList[i] = { name = name, modId = modId }
     end
-    
+
     return returnList
-    
+
 end
 
 local function GetTeamResourceCount()
 
     local marineRes = 0
     local alienRes = 0
-    
+
     local teamInfo = GetEntitiesForTeam("TeamInfo", 1)
     if table.icount(teamInfo) > 0 then
         marineRes = teamInfo[1]:GetTeamResources()
     end
-    
+
     teamInfo = GetEntitiesForTeam("TeamInfo", 2)
     if table.icount(teamInfo) > 0 then
         alienRes = teamInfo[1]:GetTeamResources()
     end
-    
+
     return marineRes, alienRes
-    
+
 end
 
 -- Returns a Lua table containing the state of the server.
@@ -1704,42 +1471,38 @@ local function GetServerState()
 
     local playerRecords = Shared.GetEntitiesWithClassname("Player")
 
-    -- improved-webadmin: Shine's gags, under its basecommands plugin. Read through
-    -- its own IsClientGagged, which also expires a timed gag.
+    -- Shine's gags. IsClientGagged also expires a timed gag.
     local gags = GetShinePlugin("basecommands")
     if gags and type(gags.IsClientGagged) ~= "function" then
         gags = nil
     end
 
-    -- improved-webadmin: Family Sharing, from the 09-26 beta engine on (its
-    -- CHANGELOG). Looked up per request: a stock engine has neither function,
-    -- and then the keys stay out of the blob.
+    -- Family Sharing, 09-26 beta engine and later. Keys are omitted without it.
     local getShared = Server.GetIsFamilyShared
     local getOwner = Server.GetOwnerUserId
 
-    -- improved-webadmin: one of ScoringMixin's numbers, or nil when the player has
-    -- no such method, it errors or it is not a number.
+    -- A ScoringMixin number, or nil when the method is missing, errors or does
+    -- not return a number.
     local function skillOf(player, method)
         local f = player[method]
         if type(f) ~= "function" then return nil end
         local ok, v = pcall(f, player)
         return ok and tonumber(v) or nil
     end
-    
+
     local playerList = { }
     for _, player in ientitylist(playerRecords) do
-    
+
         local client = Server.GetOwner(player)
         -- The ServerClient may be nil if this player was just removed from the server
         -- right before this function was called.
         if client then
-        
+
             local playerData =
             {
                 name = player:GetName(),
                 steamid = client:GetUserId(),
-                -- improved-webadmin: a real boolean, like `iscomm` beside it. Stock
-                -- sends tostring()'s "true"/"false" (CONSTRAINTS item 4).
+                -- A boolean; vanilla sends "true"/"false" strings.
                 isbot = client:GetIsVirtual() == true,
                 team = player:GetTeamNumber(),
                 iscomm = player:GetIsCommander(),
@@ -1757,8 +1520,7 @@ local function GetServerState()
                     playerData.gagged = gagged == true
                 end
             end
-            -- improved-webadmin: beta engine only. Bots, the listen host and LAN
-            -- players always read as not shared (CHANGELOG).
+            -- Bots, the listen host and LAN players read as not shared.
             if type(getShared) == "function" then
                 local ok, shared = pcall(getShared, client)
                 if ok and type(shared) == "boolean" then
@@ -1771,9 +1533,8 @@ local function GetServerState()
                     end
                 end
             end
-            -- improved-webadmin: moves the server rejected. Time-credit rejections
-            -- usually mean a modified client; "other" can be a poor connection
-            -- (CHANGELOG). ServerClient methods, also beta only.
+            -- Rejected moves (beta engine). Time-credit rejections usually mean
+            -- a modified client; "other" can be a poor connection.
             if type(client.GetMovesRejectedTimeCredit) == "function" then
                 local ok, n = pcall(client.GetMovesRejectedTimeCredit, client)
                 if ok and tonumber(n) then
@@ -1786,43 +1547,30 @@ local function GetServerState()
                     playerData.moves_rejected_other = tonumber(n)
                 end
             end
-            -- improved-webadmin: Hive skill, as the server holds it for ranking and
-            -- team balance (ScoringMixin; under UWE Hotfix 344, from Steam
-            -- User Stats). Marines play at skill + offset and aliens at skill -
-            -- offset; the commander's pair works the same way. Out of the blob
-            -- for a player without them.
+            -- Hive skill as the server holds it. Marines play at skill +
+            -- offset, aliens at skill - offset; likewise the commander pair.
             local skill = skillOf(player, "GetPlayerSkill")
             if skill then
                 playerData.skill = skill
                 playerData.skill_offset = skillOf(player, "GetPlayerSkillOffset")
                 playerData.comm_skill = skillOf(player, "GetCommanderSkill")
                 playerData.comm_skill_offset = skillOf(player, "GetCommanderSkillOffset")
-                -- The tier the game draws the skill badge for:
-                -- ScoringMixin:GetSkillTier(), -1 for a bot, -2 with no skill,
-                -- 0 for a rookie, 1-7 from the skill less its uncertainty. It
-                -- keeps its first answer on the player (`skillTier`) for the
-                -- rest of the map, and the game asks only on a rookie-only
-                -- server, so what was there is put back: a panel poll must not
-                -- decide when that answer is fixed.
+                -- Badge tier: -1 bot, -2 no skill, 0 rookie, 1-7. GetSkillTier()
+                -- caches its first answer in player.skillTier for the map, so
+                -- the old value is restored and a poll does not fix it.
                 local kept = player.skillTier
                 playerData.skill_tier = skillOf(player, "GetSkillTier")
                 player.skillTier = kept
             end
             table.insert(playerList, playerData)
-            
+
         end
-        
+
     end
-    
-    -- improved-webadmin: the engine's own verdict on whether this server's rounds
-    -- count for ranking (PlayerRanking.lua's GetTrackServer reads the same).
-    -- The engine turns it on by itself when the server is not hidden, is
-    -- dedicated, has no cheats or Lua hot reloading, has at most 5 spectator
-    -- slots and 12 to 20 player slots, and every mounted mod is whitelisted
-    -- (server_linux, 09-28; CONSTRAINTS item 18). So with this mod mounted
-    -- it should read false until the mod is whitelisted. The generated
-    -- binding returns a real boolean; nil, and so no key, when it is missing
-    -- or errors.
+
+    -- Whether the engine counts this server's rounds for ranking. One of its
+    -- conditions is that every mounted mod is whitelisted. nil when the
+    -- binding is missing or errors.
     local rankingActive
     if type(Server.GetIsRankingActive) == "function" then
         local ok, active = pcall(Server.GetIsRankingActive)
@@ -1834,12 +1582,12 @@ local function GetServerState()
     local marineRes, alienRes = GetTeamResourceCount()
     local gamestarted = GetGamerules():GetGameStarted()
     local gametime = gamestarted and math.floor(Shared.GetTime() - GetGamerules():GetGameStartTime()) or 0
-    
+
     return
     {
         webdomain = "[[webdomain]]",
         webport = "[[webport]]",
-        -- improved-webadmin: real booleans, as above.
+        -- Booleans, as above.
         cheats  = Shared.GetCheatsEnabled() == true,
         devmode = Shared.GetDevMode() == true,
         map = tostring(Shared.GetMapName()),
@@ -1854,20 +1602,17 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- improved-webadmin: absent on a stock server, which is how a panel knows.
+        -- Absent on a stock server.
         mod_version = kModVersion,
-        -- improved-webadmin: the reserved slot amount cannot exceed it.
+        -- Upper bound for the reserved slot amount.
         max_players = Server.GetMaxPlayers(),
-        -- improved-webadmin: when this map loaded, Unix seconds: the Lua VM is
-        -- rebuilt at a map change, so this is that change's time. The panel
-        -- shows it rather than timing a change it may not have seen.
+        -- Unix time of the map load (the Lua VM is rebuilt at a map change).
         map_loaded_at = perfLoadedAt,
-        -- improved-webadmin: whether ranking is on, as the engine decided it.
         ranking_active = rankingActive,
-        -- improved-webadmin: absent when Shine is not loaded.
+        -- Absent without Shine.
         shine = GetShineState()
     }
-    
+
 end
 
 local function DecToHex(id)
@@ -1900,13 +1645,13 @@ local function ModIdsFromHex(t)
     end
 end
 
--- improved-webadmin: the map cycle. CONSTRAINTS items 12 and 13.
+-- Map cycle.
 
 local kMapCycleFile = "config://MapCycle.json"
 
--- table.copyDict (Table.lua:441) computes a deep copy and then stores the
--- original, so hex-encoding its result rewrote the live cycle. The metatable
--- is kept because dkjson uses it to tell an empty object from an empty array.
+-- table.copyDict (Table.lua:441) returns the original rather than its copy, so
+-- hex-encoding it rewrote the live cycle. The metatable is kept: dkjson uses
+-- it to tell an empty object from an empty array.
 local function DeepCopy(value)
 
     if type(value) ~= "table" then
@@ -1920,11 +1665,9 @@ local function DeepCopy(value)
 
 end
 
--- The cycle rotation will actually use: MapCycle_CycleMap and sv_changemap
--- read the file, not the table loaded with the map, so a hand edit shows up
--- here at once. Read directly because LoadConfigFile prints a line on every
--- call, which would land in the console capture. Nil when the file is missing
--- or does not parse as a cycle.
+-- MapCycle.json, which rotation reads, rather than the copy loaded with the
+-- map. Read directly because LoadConfigFile logs a line on every call. nil
+-- when the file is missing or not a cycle.
 local function ReadMapCycleFile()
 
     local file = io.open(kMapCycleFile, "r")
@@ -1965,8 +1708,7 @@ local function CheckModIds(mods, where)
     for i, mod in ipairs(mods) do
         if type(mod) == "string" then
             -- A `:` marks a non-workshop source, which ModIdsFromHex passes
-            -- through. Anything else must convert, or it is written as a
-            -- string the game then skips or mounts as garbage.
+            -- through. Anything else must be hex.
             if not string.find(mod, ":")
                 and not (string.find(mod, "^%x+$") and tonumber64("0x" .. mod)) then
                 return string.format("%s[%d] is not a hex mod id: %s", where, i, mod)
@@ -1979,8 +1721,7 @@ local function CheckModIds(mods, where)
 
 end
 
--- Why a cycle cannot be written, or nil when it can. Vanilla wrote anything
--- that parsed and errored on a cycle without `maps`, answering 200 either way.
+-- Why a cycle cannot be written, or nil when it can.
 local function CheckMapCycle(cycle)
 
     if type(cycle) ~= "table" then
@@ -2012,8 +1753,8 @@ local function CheckMapCycle(cycle)
 
 end
 
--- What Shine's mapvote will do with the cycle. Its options are read from the
--- cycle once, at plugin start, so an edit reaches the vote at the next map.
+-- Shine's mapvote. It reads its options from the cycle at plugin start, so a
+-- cycle edit reaches the vote at the next map.
 local function GetMapVote()
 
     local plugin = GetShinePlugin("mapvote")
@@ -2044,7 +1785,7 @@ local function GetMapVote()
     return {
         enabled = true,
         maps_from_cycle = config.GetMapsFromMapCycle == true,
-        -- The plugin's own value can differ from its config per map.
+        -- The plugin's value can differ from its config per map.
         round_limit = tonumber(plugin.RoundLimit) or tonumber(config.RoundLimit) or 0,
         next_map = nextMap,
         options = options,
@@ -2052,17 +1793,11 @@ local function GetMapVote()
 
 end
 
--- improved-webadmin: the workshop search. CONSTRAINTS item 2, measured on 09-26
--- (REQUIREMENTS item 4). Server.SearchWorshop answers at most 50 hits and
--- ignores its page: pages 1, 2, 3 and 500 were the same 50. Its callback gets
--- one table, and an empty one both for no matches and for a search Steam
--- failed (NoConnection, with the rig offline), so an empty result is not an
--- error and must not be reported as one. What vanilla got wrong and this
--- fixes: a search that never answers restarted silently forever, a missing
--- `searchtext` never started a search at all, a `p` that is not a number
--- errored (an empty 200), and "a" page 11 shared a cache key with "a1" page 1.
-
-local kWorkshopLimit = 50           -- the most SearchWorshop answers, measured
+-- Workshop search. Server.SearchWorshop returns at most 50 results and
+-- ignores the page. Its callback gets an empty table both for no matches and
+-- for a failed search, so an empty result is not reported as an error. A
+-- search with no answer after kWorkshopTimeout is given up.
+local kWorkshopLimit = 50           -- SearchWorshop's maximum
 local kWorkshopTimeout = 30         -- seconds before a search is given up
 local kWorkshopCacheSeconds = 60
 
@@ -2104,8 +1839,7 @@ local function SearchWorkshop(searchtext, page)
 
     Server.SearchWorshop(searchtext, page, function(results)
 
-        -- A search given up on, and since restarted, must not answer for the
-        -- new one.
+        -- Ignore a search that was given up on and restarted.
         local current = workshopSearches[key]
         if not current or current.generation ~= generation then
             return
@@ -2125,7 +1859,7 @@ local function SearchWorkshop(searchtext, page)
             cached_at = Shared.GetTime(),
             result = json.encode({
                 done = true, page = page, items = items, count = #items,
-                -- There may be more matches than the engine hands over.
+                -- There may be more matches than the engine returns.
                 capped = #items >= kWorkshopLimit,
             }),
         }
@@ -2136,13 +1870,9 @@ local function SearchWorkshop(searchtext, page)
 
 end
 
--- improved-webadmin: installmod says what it did. Server.InstallMod returns nothing
--- and drops what it cannot parse without a word: `zz`, `0` and an empty id
--- left no trace in the log, and `-5` became mod 18446744073709551611, which
--- Steam then reported as not found (measured on 09-26). So what is not a plain
--- hex id is refused before the call. Whether a download worked shows only in
--- getinstalledmodslist: a mod is listed once it is downloaded and unpacked,
--- under its real title, and never before.
+-- Server.InstallMod returns nothing and silently drops or misreads bad ids
+-- (`-5` becomes 18446744073709551611), so only plain hex ids are passed on.
+-- Whether the download worked shows later in getinstalledmodslist.
 local function InstallMod(modid)
 
     if type(modid) ~= "string" or not string.find(modid, "^%x+$") or #modid > 16 then
@@ -2167,19 +1897,11 @@ local function InstallMod(modid)
 
 end
 
--- improved-webadmin: the ranked-mod whitelist (docs/CONSTRAINTS.md item 17, item 10 above).
---
--- A mod that is not on it turns ranking off. The engine reads it at boot:
--- it is the "Required items" of an unlisted Workshop item, fetched in one
--- query with the hotfix list (whose required items, the hotfix mods, are
--- never checked). libSpark_Network.so hard-codes the items per branch
--- (ModServices::s_LiveModIds); Lua can read only the hotfix list's id, and
--- the server has no call that lists an item's children. Steam's keyless API
--- answers "not found" for unlisted items, so the mod reads the item's public
--- page instead, the same 115 ids the keyed API gives (2026-10-08).
---
--- Ids are decimal strings, as Steam spells them. The panel compares them with
--- the hex ids the rest of the API uses.
+-- Ranked-mod whitelist: a mounted mod not on it turns ranking off. It is the
+-- "Required items" of an unlisted Workshop item per branch, hard-coded in
+-- libSpark_Network.so; Lua can get only the hotfix list's id. Steam's keyless
+-- API reports unlisted items as not found, so the item's public page is
+-- parsed instead. Ids are decimal strings, as Steam spells them.
 local kWhitelistPage = "https://steamcommunity.com/sharedfiles/filedetails/?id="
 local kWhitelistFile = "config://improved-webadmin/whitelist.json"
 local kWhitelistFileVersion = 1
@@ -2188,7 +1910,7 @@ local kWhitelistRetrySeconds = 5 * 60
 local kWhitelistTimeout = 30
 local kWhitelistMaxItems = 2000
 
--- What ModServices.GetHotfixListModId() returns -> that branch's whitelist.
+-- ModServices.GetHotfixListModId() -> that branch's whitelist.
 local kWhitelistBranches = {
     ["2633436686"] = { branch = "live", whitelist = "2909200101" },
     ["2708090797"] = { branch = "beta", whitelist = "2860343495" },
@@ -2226,10 +1948,9 @@ local function IsIdList(t)
 
 end
 
--- The ids in a Workshop page's "Required items", in page order. Each one is an
+-- The ids in a Workshop page's "Required items", in order. Each is an
 -- <a href=".../filedetails/?id=N"><div class="requiredItem">title</div></a>,
--- back to back after the block's opening tag; the first thing that is not one
--- ends the list. Nil when the page has no such block.
+-- back to back after the block's opening tag. nil when there is no block.
 local function ParseRequiredItems(page)
 
     if type(page) ~= "string" then return nil end
@@ -2259,8 +1980,7 @@ local function LoadWhitelistFile()
     local text = file:read("*a")
     file:close()
 
-    -- One file, rewritten whole: a torn write fails here and costs one read
-    -- from Steam, which is all the file saves.
+    -- A torn write fails to parse and costs one read from Steam.
     local ok, data = pcall(json.decode, text or "")
     if ok and type(data) == "table" and data.version == kWhitelistFileVersion
             and tonumber(data.read_at) and type(data.hotfix_list_id) == "string"
@@ -2287,13 +2007,10 @@ local function SaveWhitelistFile()
 
 end
 
--- Read one item's page; callback(ids) or callback(nil, why).
---
--- SendHTTPRequest's callback gets (body, curl's error message, curl's code,
--- HTTP status), measured on the rig: a refused connection or an unknown host
--- is an empty body with the message, a page is the whole body (64 KB) with
--- 200. Steam answers 200 for an item it does not have, too, so a page with no
--- "Required items" is the failure to look for.
+-- Read one item's page; callback(ids) or callback(nil, why). SendHTTPRequest's
+-- callback gets (body, curl error message, curl code, HTTP status). Steam
+-- answers 200 for an item it does not have, so a page without "Required
+-- items" is the failure case.
 local function FetchRequiredItems(id, callback)
 
     local ok, err = pcall(Shared.SendHTTPRequest, kWhitelistPage .. id, "GET",
@@ -2324,7 +2041,7 @@ local function StartWhitelistFetch(hotfixListId, branch)
     local generation = whitelistGeneration
     whitelistFetch = { started = Shared.GetTime(), generation = generation }
 
-    -- A read given up on, and since restarted, must not answer for the new one.
+    -- Ignore a read that was given up on and restarted.
     local function current()
         return whitelistFetch ~= nil and whitelistFetch.generation == generation
     end
@@ -2335,8 +2052,7 @@ local function StartWhitelistFetch(hotfixListId, branch)
         Log("improved-webadmin: whitelist not read: %s", why)
     end
 
-    -- One page after the other: concurrent HTTPS is what aborted the 09-03
-    -- libcurl (crash-20260905-0329).
+    -- One page at a time: concurrent HTTPS crashed the 09-03 engine's libcurl.
     FetchRequiredItems(branch.whitelist, function(whitelist, why)
         if not current() then return end
         if not whitelist then return fail(why) end
@@ -2386,7 +2102,7 @@ local function GetWhitelist()
         whitelistErrorAt = now
     end
 
-    -- Another branch's copy is no copy at all.
+    -- A copy saved for another branch does not count.
     local data = whitelistData
     if data and data.hotfix_list_id ~= hotfixListId then
         data = nil
@@ -2409,13 +2125,9 @@ local function GetWhitelist()
 
 end
 
--- improved-webadmin: what a request with no parameters at all gets (CONSTRAINTS
--- item 6). That is a browser at the address the boot log prints, which used
--- to be handed every player's name, Steam id and IP. The engine passes Lua
--- neither the path nor the headers, so this cannot tell `/` from a missing
--- file, nor a browser from a script: both get this page, which holds no
--- server data. A script asking for state sends `request=json`, as both panels
--- do. Lua returns only a type and a body, so no HTTP redirect.
+-- The reply to a request with no parameters, i.e. a browser at the root.
+-- Vanilla served the full state there, player IPs included. Lua gets neither
+-- path nor headers and cannot redirect, so this page links to the panel.
 local kRootPage = [[<!doctype html>
 <html lang="en">
 <head>
@@ -2432,21 +2144,15 @@ local kRootPage = [[<!doctype html>
 
 local function OnWebRequest(actions)
 
-    -- improved-webadmin: no parameters at all, so no client of the API.
     if type(actions) ~= "table" or next(actions) == nil then
         return "text/html", kRootPage
     end
 
-    -- improved-webadmin: before anything a request runs can print.
+    -- Before the request can print, ban or chat.
     EnsureServerAdminPrintWrapped()
-
-    -- improved-webadmin: before a request can ban someone who has left.
     EnsureShineAddBanWrapped()
-
-    -- improved-webadmin: before a request can send chat.
     EnsureChatWrapped()
 
-    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -2458,7 +2164,6 @@ local function OnWebRequest(actions)
         local elapsed = Shared.GetTime() - started
         local produced = ConsoleLinesSince(firstId - 1)
 
-        -- The audit line is already labelled; its presence is the receipt.
         local dispatched = false
         for _, line in ipairs(produced) do
             if line.src == "audit" then
@@ -2469,16 +2174,14 @@ local function OnWebRequest(actions)
 
         return "application/json", json.encode({
             cmd = command,
-            -- True when the command was dispatched as an admin command. False
-            -- means either a plain console command or no such command -- the
-            -- server does not distinguish those, and neither should a client.
+            -- True for an admin command. False for a plain console command
+            -- and for no such command alike: the server cannot tell them apart.
             dispatched = dispatched,
             elapsed = elapsed,
             lines = lines,
             last_id = nextConsoleId - 1,
         })
 
-    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0
@@ -2487,32 +2190,26 @@ local function OnWebRequest(actions)
         return "application/json", json.encode({
             lines = lines,
             last_id = nextConsoleId - 1,
-            -- Lines that fell out of the ring before anyone read them, and
-            -- lines dropped as engine noise. Both are reported rather than
-            -- silently vanishing.
+            -- Lines lost to ring overflow, and lines dropped as noise.
             dropped = droppedConsoleLines,
             filtered = filteredConsoleLines,
             buffer_size = kConsoleBufferSize,
         })
 
-    -- improved-webadmin: the bans in force, from the table that decides them.
     elseif actions.request == "getbans" then
 
         local source, now, bans = GetBansInForce()
         return "application/json", json.encode({
             source = source,
-            -- The server's clock, so a client measures time left against it
-            -- rather than against its own.
+            -- The server's clock, for computing time left.
             now = now,
             bans = bans,
         })
 
-    -- improved-webadmin: players seen in the last day, connected or not.
     elseif actions.request == "getrecentplayers" then
 
         return "application/json", json.encode(GetRecentPlayers())
 
-    -- improved-webadmin: the engine's log, since a byte offset (item 9 above).
     elseif actions.request == "getlog" then
 
         return "application/json", json.encode(GetLog(actions))
@@ -2521,11 +2218,8 @@ local function OnWebRequest(actions)
 
     if actions.request == "getbanlist" then
 
-        -- CONSTRAINTS item 9. The game prunes expired bans only when the ban
-        -- file is loaded or saved (ServerAdminCommands.lua:312), so between
-        -- those moments getbanlist reports bans that stopped blocking anyone
-        -- some time ago -- and the Unban button on them does nothing, because
-        -- there is nothing left to unban. Report what is actually in force.
+        -- The game prunes expired bans only when the ban file is loaded or
+        -- saved (ServerAdminCommands.lua:312); list only bans in force.
         local now = Shared.GetSystemTime()
         local inForce = { }
         for _, ban in ipairs(GetBannedPlayersList()) do
@@ -2537,10 +2231,8 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(inForce)
     elseif actions.request == "getreservedslots" then
 
-        -- improved-webadmin: when Shine's reservedslots plugin is on, it sets the
-        -- slot count and grants access by permission; the vanilla list is not
-        -- what is enforced. Its count rides along, and the 2012 panel ignores
-        -- the extra key.
+        -- Under Shine's reservedslots plugin the vanilla list is not what is
+        -- enforced; add Shine's slot count.
         local data = GetReservedSlotData()
         local plugin = GetShinePlugin("reservedslots")
         if plugin and type(plugin.Config) == "table" then
@@ -2550,15 +2242,13 @@ local function OnWebRequest(actions)
     elseif actions.request == "getperfdata" then
         return "application/json", json.encode(perfDataBuffer:ToTable())
 
-    -- improved-webadmin: performance windows since `since` (item 8 above).
     elseif actions.request == "getperf" then
 
-        -- Paged: at most kPerfReplyMax windows and as many engine records,
-        -- each with `more` while the cursor has not caught up.
+        -- Paged; see kPerfReplyMax.
         local since = tonumber(actions.since) or 0
         local windows, lastId, more = PerfWindowsSince(since)
         return "application/json", json.encode({
-            -- The engine's log lines, read with their own cursor.
+            -- Engine log records, with their own cursor.
             engine = EngineReport(tonumber(actions.esince) or 0),
             window_s = kPerfWindowSeconds,
             capacity = kMaxPerfWindows,
@@ -2572,15 +2262,14 @@ local function OnWebRequest(actions)
 
     elseif actions.request == "getchatlist" then
 
-        -- improved-webadmin: with `since`, this mod's 200-entry ring, from that id
-        -- on. Without it, the game's 20 exactly as stock serves them: the
-        -- 2012 panel polls that shape.
+        -- With `since`, this mod's ring from that id on. Without it, the
+        -- game's 20 in the stock shape, which the 2012 panel polls.
         local since = tonumber(actions.since)
         if since then
             return "application/json", json.encode({
                 entries = ChatSince(since),
                 last_id = nextChatId - 1,
-                -- Entries that fell out of the ring before anyone read them.
+                -- Entries lost to ring overflow.
                 dropped = droppedChatEntries,
                 buffer_size = kChatBufferSize,
             })
@@ -2592,16 +2281,14 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(GetMapList())
     elseif actions.request == "getmapcycle" then
 
-        -- improved-webadmin: the file rotation reads, and a copy that is really a
-        -- copy. Json doesn't really have 64 numbers just use the old hex format
+        -- Mod ids go out as hex: JSON has no 64-bit integers.
         local mapcycle = ReadMapCycleFile() or DeepCopy(MapCycle_GetMapCycle())
         return "application/json", json.encode(MapCycleForClient(mapcycle))
 
     elseif actions.request == "setmapcycle" then
 
-        -- improved-webadmin: refuse what the game cannot use, without writing it,
-        -- and answer with what the file holds afterwards. Vanilla answered an
-        -- empty 200 to all of it; the 2012 panel ignores the body either way.
+        -- Refuse a cycle the game cannot use, without writing it, and reply
+        -- with what the file holds afterwards.
         local ok, mapcycle = pcall(json.decode, actions.data or "")
         local problem = (not ok or mapcycle == nil) and "not valid JSON"
                         or CheckMapCycle(mapcycle)
@@ -2628,35 +2315,28 @@ local function OnWebRequest(actions)
         end
         return "application/json", json.encode({ ok = true, cycle = MapCycleForClient(written) })
 
-    -- improved-webadmin: Shine's mapvote, as far as it concerns the cycle.
     elseif actions.request == "getmapvote" then
 
         return "application/json", json.encode(GetMapVote())
 
     elseif actions.request == "setreservedslotamount" then
-    
-        -- CONSTRAINTS item 7. Vanilla calls SetReservedSlotAmount(amount)
-        -- against a function declared (client, amount), so the amount landed
-        -- in `client`, `amount` was nil, and the guard rejected every call
-        -- while the request still answered 200.
+
+        -- SetReservedSlotAmount takes (client, amount); vanilla passed only
+        -- the amount, so every call was rejected.
         SetReservedSlotAmount(nil, actions.amount)
         return ""
-        
+
     elseif actions.request == "installmod" then
 
-        -- improved-webadmin: a reply that says what was done. The 2012 panel
-        -- ignores the body, so it is unaffected.
         return "application/json", json.encode(InstallMod(actions.modid))
 
-    -- improved-webadmin: the ranked-mod whitelist, as Steam last gave it.
     elseif actions.request == "getwhitelist" then
 
         return "application/json", json.encode(GetWhitelist())
 
     elseif actions.request == "getmods" then
 
-        -- improved-webadmin: see SearchWorkshop. The replies keep `loading` and
-        -- `items`, the two keys the 2012 panel reads.
+        -- Replies keep `loading` and `items`, the keys the 2012 panel reads.
         local searchtext = type(actions.searchtext) == "string" and actions.searchtext or ""
         local page = math.floor(tonumber(actions.p) or 1)
         if not (page >= 1 and page <= 1000) then   -- also NaN and inf
@@ -2665,13 +2345,13 @@ local function OnWebRequest(actions)
         return "application/json", SearchWorkshop(searchtext, page)
 
     end
-    
+
     if actions.command then
         Shared.ConsoleCommand(actions.rcon)
     end
-    
+
     return "application/json", json.encode(GetServerState())
-    
+
 end
 Event.Hook("WebRequest", OnWebRequest)
 
@@ -2680,39 +2360,28 @@ Event.Hook("WebRequest", OnWebRequest)
 --
 local function UpdateServerWebInterface()
 
-    -- improved-webadmin: catch a replacement (Shine's, on its first tick) before an
-    -- in-game command's output is lost from the console stream.
+    -- Re-wrap what Shine or another mod replaced: Shine replaces
+    -- ServerAdminPrint on its first tick.
     EnsureServerAdminPrintWrapped()
-
-    -- improved-webadmin: name absent players' bans under Shine (see above).
     EnsureShineAddBanWrapped()
-
-    -- improved-webadmin: record chat for getchatlist's cursor (see above).
     EnsureChatWrapped()
 
-    -- improved-webadmin: persist a reserved slot removal (see above).
     SaveReservedSlotsIfDirty()
-
-    -- improved-webadmin: keep the recent-players list and its file current.
     UpdateRecentPlayers()
-
-    -- improved-webadmin: the windows `getperf` serves.
     UpdatePerfWindows()
-
-    -- improved-webadmin: and the engine's own lines from the log.
     UpdateEngineLog()
 
     if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then
-    
+
         local playerRecords = Shared.GetEntitiesWithClassname("Player")
         local entCount = Shared.GetEntitiesWithClassname("Entity"):GetSize()
         local newData = { players = playerRecords:GetSize(), tickrate = Server.GetFrameRate(), time = Shared.GetSystemTime(), ent_count = entCount }
         perfDataBuffer:Insert(newData)
-        
+
         lastPerfDataTime = Shared.GetSystemTime()
-        
+
     end
-    
+
 end
 
 Event.Hook("UpdateServer", UpdateServerWebInterface)
