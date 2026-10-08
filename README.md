@@ -317,10 +317,7 @@ on `app_update 4940 validate`. Nothing in this project edits it.
 
 ## Next
 
-- **What a joining client downloads.** A server mounts the published
-  item exactly as it did the local directory (verified 2026-10-08); what
-  a player pays on join still needs a client to join a server running it.
-- **Make the item public** once that and a populated round look right:
+- **Make the item public** once a populated round looks right:
   the visibility setting on the item's Steam page, or
   `tools/build-workshop.sh --visibility 0` and an upload.
 - **Captures from a populated round** with the mod mounted: players with

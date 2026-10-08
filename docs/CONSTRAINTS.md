@@ -734,5 +734,11 @@ Two details seen on the way:
 - The engine serves `THIRD-PARTY-LICENSES.txt` as `text/html`, so a
   browser runs its lines together. The panel does not link it.
 
-Still open: what a joining client actually downloads -- see *Next* in the
-[README](../README.md#next).
+**What a joining client downloads** *(2026-10-08)*: the whole item,
+775,191 bytes, byte-identical to the upload, fetched during the connect
+and then cached. A client on the 09-28 engine joined the rig with the
+item mounted, downloaded it in about a second, mounted it, and joined
+with no error from it. None of it is used on the client: the Lua runs
+only on the server and `web/` is served only by the server's web admin.
+The server lists every mounted mod for its clients, and nothing marks a
+mod server-only. The minimaps are 367 KB of it; they stay.
