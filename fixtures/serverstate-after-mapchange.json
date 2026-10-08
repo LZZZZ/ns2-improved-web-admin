@@ -1,0 +1,33 @@
+{
+  "webdomain": "127.0.0.1",
+  "cheats": "false",
+  "webport": "8080",
+  "map": "ns2_veil",
+  "marines": 0,
+  "devmode": "false",
+  "players_online": 1,
+  "uptime": 11,
+  "player_list": [
+    {
+      "name": "Skulkovich",
+      "ipaddress": "0.0.0.0",
+      "iscomm": false,
+      "deaths": 0,
+      "resources": 0,
+      "ping": 11,
+      "score": 0,
+      "steamid": 10000000,
+      "isbot": "false",
+      "kills": 0,
+      "team": 0,
+      "assists": 0
+    }
+  ],
+  "marine_res": 60,
+  "alien_res": 60,
+  "server_name": "Example NS2 Server",
+  "frame_rate": 30.009992599487,
+  "game_started": false,
+  "game_time": 0,
+  "aliens": 0
+}

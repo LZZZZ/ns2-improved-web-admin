@@ -1,0 +1,783 @@
+/* Hand-written, custom properties, no framework and no web font: the server
+   is plain HTTP on a possibly isolated network, so everything is local and
+   the stack falls back to whatever the operator's system has.
+
+   Dark is the default -- this is a tool opened at night next to a game --
+   and light is a deliberate choice rather than an afterthought. */
+
+:root {
+  --bg: #14171c;
+  --bg-raised: #1b1f26;
+  --bg-inset: #101317;
+  --border: #2b323c;
+  --text: #e6e9ee;
+  --text-dim: #98a2b3;
+  --accent: #4ea1ff;
+  --marine: #4ea1ff;
+  --alien: #f0a44a;
+  --danger: #ff6b6b;
+  --ok: #4ec97f;
+  --warn: #ffc857;
+  --serious: #ec835a;
+  /* ns2panel.com's orange (its own orange-400), for its mark beside a
+     Steam id; the light theme takes the same family's 700. */
+  --ns2panel: #fb923c;
+  /* The Log tab's colours (L1), each checked against --bg-inset. */
+  --log-time: #7d8796;
+  --log-thread: #6fa8dc;
+  --log-error: #ff6b6b;
+  --log-warning: #f0a44a;
+  --log-chat: #e07cf0;
+  --log-admin: #f2d15c;
+  --log-connection: #4fc7cf;
+  /* Chat, by its speaker's team: the teams' own colours. */
+  --log-marine: var(--marine);
+  --log-alien: var(--alien);
+  /* Chart series: the dataviz reference palette's first four categorical
+     slots, dark steps, validated against --bg-raised (the first three
+     all-pairs CVD 9.4, normal vision 20.9; the four adjacent, as lines are
+     checked, CVD 8.4 and normal vision 19.8; all >= 3:1). Fixed order, never
+     cycled. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --chart-grid: #252b34;
+  --chart-axis: #38404b;
+  --radius: 6px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-raised: #ffffff;
+  --bg-inset: #eceef2;
+  --border: #d6dae1;
+  --text: #14171c;
+  --text-dim: #5c6673;
+  --accent: #1667c7;
+  --marine: #1667c7;
+  --alien: #b26a10;
+  --danger: #c0392b;
+  --ok: #1f8a4c;
+  --warn: #9a6b00;
+  --serious: #b4501f;
+  --ns2panel: #c2410c;
+  --log-time: #5c6570;
+  --log-thread: #2f6aa8;
+  --log-error: #b42318;
+  --log-warning: #a8510f;
+  --log-chat: #9b1fae;
+  --log-admin: #7c5c00;
+  --log-connection: #0b7280;
+  --log-marine: var(--marine);
+  /* --alien is 3.6:1 on the console box; this is its 4.7:1 step. */
+  --log-alien: #9a5b0c;
+  /* Light steps, against white. Slots 3 and 4 are 2.8:1 and 2.2:1, so the
+     charts carry a live legend (the relief the palette check asks for). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --chart-grid: #e6e8ec;
+  --chart-axis: #c9ced6;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+        sans-serif;
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+/* ------------------------------------------------------------- app shell */
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Full width on purpose: the main content is a wide table and the 2012 panel
+   wasted most of a wide screen on a fixed centred container. */
+.wrap { width: 100%; padding: 0 16px; }
+
+.header {
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* The server name is operator-controlled with no length limit; the 2012
+   navbar overlapped the player table on a long one. It truncates here and
+   never pushes the stats out of the header. */
+.server-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logo { flex: 0 0 auto; display: block; margin-right: -6px; }
+
+.stats { display: flex; gap: 14px; flex-wrap: wrap; color: var(--text-dim); }
+.stat b { color: var(--text); font-weight: 600; }
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+  overflow-x: auto;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 9px 14px;
+  cursor: pointer;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.tab:hover:not(:disabled) { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tab:disabled { opacity: 0.4; cursor: default; }
+
+main { flex: 1; padding: 16px 0 32px; }
+
+/* ---------------------------------------------------------------- pieces */
+
+.banner {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  background: var(--bg-raised);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+.banner h2 { font-size: 14px; margin: 0 0 4px; }
+.banner p { margin: 0; color: var(--text-dim); }
+/* Red, for what stops the panel working: the server unreachable, the engine's
+   bwlimit warning. Its heading takes the colour and any icon in it. */
+.banner-error { border-left-color: var(--danger); }
+.banner-error h2 { display: flex; align-items: center; gap: 6px; color: var(--danger); }
+.banner-error h2 svg { flex: none; }
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+input[type="search"], input[type="text"], select {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 9px;
+}
+input[type="search"] { min-width: 220px; }
+/* Twice the usual box, so a long placeholder fits; never wider than the
+   screen. */
+input[type="search"].filter-wide { width: 440px; max-width: 100%; min-width: 0; }
+
+.btn {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.btn-sm { padding: 2px 7px; font-size: 12px; }
+.round-controls { gap: 6px; margin-bottom: 0; }
+.owner-id { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; }
+.ns2panel-link { color: var(--ns2panel); display: inline-flex; opacity: 0.85; }
+.ns2panel-link:hover { opacity: 1; }
+.ns2panel-link svg { display: block; }
+
+/* The game's skill badges (tools/make-skill-tiers.sh): its sheet of ten
+   100x32 rows, shown 20 px high as the scoreboard does. --row is tier + 2. */
+.skill-badge {
+  display: inline-block;
+  width: 62.5px;
+  height: 20px;
+  margin: -2px 6px -2px 0;
+  vertical-align: middle;
+  background: url("./assets/skill-tiers.png") 0 calc(var(--row) * -20px) / 62.5px 200px no-repeat;
+}
+.skill-value { display: inline-block; min-width: 4ch; }
+
+.muted { color: var(--text-dim); }
+.mono { font-family: var(--mono); font-size: 12px; }
+
+/* ---------------------------------------------------------------- tables */
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 10px; white-space: nowrap; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+thead th.static { cursor: default; }
+tbody tr { border-top: 1px solid var(--border); }
+tbody tr:hover { background: var(--bg-raised); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.name-cell { white-space: normal; word-break: break-word; min-width: 160px; }
+
+.team-1 { color: var(--marine); }
+.team-2 { color: var(--alien); }
+.tag {
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 6px;
+  color: var(--text-dim);
+}
+
+/* A masked value keeps the width of the real one, so revealing a row does not
+   shift the table under the pointer. */
+.masked {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-dim);
+}
+.masked:hover { color: var(--text); }
+.revealed { font-family: var(--mono); font-size: 12px; user-select: all; }
+
+.actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Icons (G3). The words stay in the page, hidden but read out and matched;
+   the title carries them for the pointer. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  line-height: 1;
+}
+.btn-icon svg { display: block; }
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: middle;
+  color: var(--text-dim);
+  cursor: help;
+}
+.status-icon svg { display: block; flex: 0 0 auto; }
+.status-icon.tone-ok { color: var(--ok); }
+.status-icon.tone-warn { color: var(--warn); }
+.status-icon.tone-danger { color: var(--danger); }
+.icon-row { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; vertical-align: middle; }
+
+/* -------------------------------------------------------------- activity */
+
+/* The latest command sent from this tab, in one line; the Activity tab has
+   the rest. */
+.cmd-confirm {
+  border-top: 1px solid var(--border);
+  background: var(--bg-raised);
+  padding: 5px 0;
+}
+.cmd-confirm .wrap { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.cmd-confirm time { color: var(--text-dim); font-family: var(--mono); font-size: 12px; }
+.cmd-confirm .cmd { font-family: var(--mono); font-size: 12px; }
+.cmd-confirm .note { color: var(--text-dim); min-width: 0; overflow-wrap: anywhere; }
+.cmd-confirm .tone-error { color: var(--danger); }
+.cmd-confirm .link-button { font-size: 12px; }
+
+.activity-table td.note { white-space: normal; overflow-wrap: anywhere; min-width: 240px; }
+.activity-table td.cmd { white-space: normal; overflow-wrap: anywhere; }
+
+.statusbar {
+  border-top: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 6px 0;
+}
+.statusbar .wrap { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-ok { background: var(--ok); }
+.dot-error { background: var(--danger); }
+.dot-idle { background: var(--text-dim); }
+.spacer { flex: 1; }
+
+@media (max-width: 640px) {
+  .wrap { padding: 0 10px; }
+  th, td { padding: 6px; }
+}
+
+/* --------------------------------------------------------------- console */
+
+.console-tab { display: flex; flex-direction: column; gap: 8px; }
+
+.console {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 8px 10px;
+  height: 58vh;
+  min-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.console-empty { font-family: inherit; margin: 4px 0; }
+
+.console-line { display: flex; gap: 10px; align-items: baseline; }
+.console-line time { color: var(--text-dim); flex: 0 0 auto; }
+/* Server output can be long and must wrap rather than widen the page. */
+.console-text { white-space: pre-wrap; word-break: break-word; }
+
+/* ServerAdminPrint is what an admin command says to the person who ran it;
+   Shared.Message is everything else the server says. Audit lines are the
+   dispatch receipt and are hidden by default. */
+.src-admin .console-text { color: var(--text); }
+.src-server .console-text { color: var(--text-dim); }
+.src-audit .console-text { color: var(--accent); opacity: 0.75; }
+
+.console-input { display: flex; gap: 6px; align-items: center; }
+.console-input .prompt { font-family: var(--mono); color: var(--text-dim); }
+.console-input input {
+  flex: 1;
+  font-family: var(--mono);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 9px;
+}
+.console-input input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.command-box { position: relative; flex: 1; display: flex; }
+.command-box input { width: 100%; }
+/* The command line sits under the log, so the list opens upwards over it. */
+.command-suggestions {
+  position: absolute;
+  left: 0; right: 0; bottom: calc(100% + 4px);
+  z-index: 20;
+  margin: 0; padding: 4px 0;
+  list-style: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.command-suggestions li {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.command-suggestions li.picked { background: var(--bg-inset); }
+.command-name { color: var(--text); }
+.command-args { font-size: 12px; }
+.command-help { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.command-source { font-size: 11px; color: var(--text-dim); border: 1px solid var(--border);
+                  border-radius: 4px; padding: 0 5px; }
+.command-hint { font-size: 12px; margin: 0 0 0 18px; }
+.command-hint .mono { color: var(--text); }
+@media (max-width: 640px) {
+  .command-help { display: none; }
+}
+.tone-error { color: var(--danger); }
+
+.console-status { margin: 0; }
+.console-status .mono { color: var(--text); }
+.command-line { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.command-output {
+  margin: 4px 0 0;
+  padding: 6px 9px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ chat */
+
+/* The chat reuses the console's box. Ready room and spectators keep the
+   text colour; the two teams take theirs. */
+.chat-line .console-text { color: var(--text); }
+.chat-player { flex: 0 0 auto; font-weight: 600; }
+.chat-line .tag { flex: 0 0 auto; }
+.chat-id { flex: 0 0 auto; font-size: 11.5px; }
+.chat-stock { margin: 0; font-size: 12px; }
+.chat-input select { flex: 0 0 auto; }
+
+/* ------------------------------------------------------------------- log */
+
+/* The log reuses the console's box. Kinds are tinted, not hidden: engine
+   chatter recedes, errors, warnings, chat and admin commands stand out in
+   their own colours, the rest reads as text. Times and the thread take theirs
+   on every line. */
+.log-filters { flex-wrap: wrap; gap: 4px 14px; margin-bottom: 0; }
+.log-filters + .toolbar { margin-top: 0; }
+.log-filters .count { font-size: 12px; }
+.log-search {
+  flex: 0 1 280px;
+  min-width: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 8px;
+}
+.log-file { font-size: 12px; }
+.log-save svg { vertical-align: -2px; }
+.log-edge { margin: 0 0 6px; font-family: inherit; }
+.log-line .console-text { color: var(--text); }
+.log-time { color: var(--log-time); }
+.log-thread { color: var(--log-thread); }
+.logtone-engine .log-msg { color: var(--text-dim); }
+.logtone-error .log-msg { color: var(--log-error); }
+.logtone-warning .log-msg { color: var(--log-warning); }
+/* Chat takes its speaker's team colour, and a mark in the chat colour so a
+   marine's line is not read as a connection, nor an alien's as a warning.
+   The ready room, spectators, Admin and anyone gone keep the text colour. */
+.logtone-chat .log-msg { color: var(--text); }
+.chat-team-1 .log-msg { color: var(--log-marine); }
+.chat-team-2 .log-msg { color: var(--log-alien); }
+.chat-mark { color: var(--log-chat); margin-right: 5px; }
+.chat-mark svg { vertical-align: -2px; }
+.logtone-admin .log-msg { color: var(--log-admin); }
+.logtone-connection .log-msg { color: var(--log-connection); }
+.log-filters .kind-error { color: var(--log-error); }
+.log-filters .chat-mark { margin: 0 3px 0 2px; vertical-align: -2px; }
+.log-filters .kind-admin { color: var(--log-admin); }
+.log-filters .kind-connection { color: var(--log-connection); }
+.log-unavailable p + p, .log-reset p + p { margin-top: 6px; }
+
+/* ----------------------------------------------------------- bans, slots */
+
+.form-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  padding: 10px 12px;
+  margin: 16px 0;
+}
+.form-card h2 { font-size: 14px; margin: 0 0 8px; }
+.form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.form-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.form-row label.grow { flex: 1 1 220px; }
+.form-row input[type="text"], .form-row select {
+  color: var(--text);
+  font-size: 14px;
+  height: 34px;
+}
+.form-row input[name="steamid"], .form-row input[name="slotid"] { width: 280px; }
+.form-row input[name="amount"], .form-row input[name="minutes"] { width: 90px; }
+.form-hint { margin: 8px 0 0; font-size: 12px; }
+
+/* Ban reasons are free text from whoever banned; they wrap rather than
+   widen the table. */
+.reason-cell { white-space: normal; word-break: break-word; min-width: 200px; }
+.expires-cell { font-variant-numeric: tabular-nums; }
+
+.slot-count { font-size: 20px; font-weight: 600; align-self: center; }
+.slot-count .muted { font-size: 13px; font-weight: 400; }
+
+.read-only { opacity: 0.6; }
+
+/* ---------------------------------------------------------- recent players */
+
+.former-names { font-size: 12px; }
+.tag-ok { color: var(--ok); border-color: var(--ok); }
+.tag-danger { color: var(--danger); border-color: var(--danger); }
+.status-cell, .ip-cell { font-variant-numeric: tabular-nums; }
+.storage-note { margin: 0 0 8px; font-size: 13px; }
+tbody tr.ban-row { border-top: none; background: var(--bg-raised); }
+.ban-row td { white-space: normal; padding: 8px 10px 10px; }
+
+/* -------------------------------------------------------------------- maps */
+
+.section-title { font-size: 14px; margin: 20px 0 8px; }
+.section-title .muted { font-weight: 400; }
+.section-title .tag { margin-left: 8px; font-weight: 400; }
+.inline-form { display: contents; }
+.form-row input[name="cycletime"] { width: 90px; }
+.next-map { align-self: center; font-size: 15px; }
+.cycle-settings .spacer { flex: 1; }
+
+.drag-handle {
+  display: inline-block;
+  cursor: grab;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  touch-action: none;
+  user-select: none;
+}
+.drag-handle:hover { color: var(--text); }
+tr.dragging { opacity: 0.5; }
+tr.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+tr.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+tr.current-map .name-cell { font-weight: 600; }
+.name-cell .tag { margin-left: 6px; }
+
+/* Cycle and available maps side by side, stacked below the width where both
+   tables fit. Dragging between them is the pointer's way; the buttons stay. */
+.maps-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 20px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .maps-columns { grid-template-columns: minmax(0, 1fr); }
+}
+.maps-columns.dragging-map { user-select: none; cursor: grabbing; }
+.available-pane { border-radius: var(--radius); }
+.available-pane.drop-target .table-wrap { outline: 2px dashed var(--danger); outline-offset: 2px; }
+.drop-hint { margin: 6px 0 0; font-size: 12px; color: var(--danger); }
+.row-notes:empty { display: none; }
+.map-name { cursor: default; border-radius: 3px; }
+.map-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.minimap-pop {
+  position: fixed;
+  z-index: 20;
+  padding: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  font-weight: 400;
+  white-space: normal;
+}
+.minimap-pop img { display: block; width: 320px; max-width: calc(100vw - 40px); height: auto; }
+.minimap-pop .muted { font-size: 12px; }
+.drag-handle { vertical-align: middle; }
+.drag-handle svg { display: block; }
+.notes-cell { white-space: normal; }
+.notes-cell { min-width: 220px; font-size: 12px; }
+.notes-cell > * { display: block; margin: 2px 0; }
+.notes-cell .tag { display: inline-block; }
+.notes-cell > .icon-row { display: flex; flex-wrap: wrap; }
+.note-warn { color: var(--warn); }
+.mod-chip {
+  display: inline-block;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 6px;
+  margin: 1px 4px 1px 0;
+  background: var(--bg-inset);
+}
+.vote-pending { margin-top: 6px !important; }
+
+/* Mods */
+.mod-counts { align-self: center; }
+.selectable { user-select: all; cursor: text; }
+.mods-table a { color: var(--accent); }
+/* A status never wraps inside itself; the cell grows instead. */
+.mods-table .status-cell { white-space: nowrap; }
+
+/* Workshop */
+.form-row label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  font-size: 13px;
+}
+.search-status { margin: 12px 0; }
+.search-status .query { word-break: break-word; }
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  text-align: left;
+  font-weight: 500;
+}
+.link-button:hover { text-decoration: underline; }
+.workshop-table a { color: var(--accent); }
+.thumb-cell { width: 60px; padding: 4px 6px; }
+.thumb { display: block; object-fit: cover; border-radius: 4px; background: var(--bg-inset); }
+tbody tr.detail-row { border-top: none; background: var(--bg-raised); }
+.detail-row td { white-space: normal; padding: 8px 12px 14px; }
+.workshop-detail { display: flex; gap: 16px; align-items: flex-start; }
+.detail-body { flex: 1; min-width: 0; }
+.detail-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.detail-facts dt { color: var(--text-dim); }
+.detail-facts dd { margin: 0; }
+.detail-facts .tag { display: inline-block; margin: 0 4px 2px 0; }
+/* A mod's description is its author's, and can be long: text, wrapped, and
+   scrolled inside its own box rather than stretching the table. */
+.description {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .workshop-detail { flex-direction: column; }
+}
+
+/* ------------------------------------------------------------ performance */
+
+.perf-tab { display: flex; flex-direction: column; gap: 10px; }
+
+.perf-rates { display: flex; gap: 14px; flex-wrap: wrap; margin: 0; color: var(--text-dim); }
+.perf-rates b { color: var(--text); font-weight: 600; }
+
+.perf-strip {
+  display: flex;
+  gap: 8px 22px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.perf-stat { display: flex; align-items: baseline; gap: 4px; }
+.perf-stat .label { color: var(--text-dim); font-size: 12px; margin-right: 2px; }
+.perf-stat b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.tone-ok { color: var(--ok); }
+.tone-warn { color: var(--warn); }
+.tone-serious { color: var(--serious); }
+
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr));
+  gap: 12px;
+}
+.perf-chart {
+  margin: 0;
+  min-width: 0;
+  padding: 8px 8px 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.perf-chart figcaption { font-size: 13px; font-weight: 600; margin: 0 0 4px 4px; }
+.perf-chart .u-legend { font-size: 12px; color: var(--text-dim); text-align: left; }
+.perf-chart .u-legend .u-value { color: var(--text); font-variant-numeric: tabular-nums; }
+.perf-chart .u-select { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+/* F1: the headline chart takes the grid's full width. */
+.perf-wide { grid-column: 1 / -1; }
+
+/* The engine's tickstat lines. Its status is one line under the summary,
+   while tickstat is not logging. */
+.perf-engine { margin: 0; font-size: 13px; }
+.perf-tab > .banner { margin: 0; }
+.strip-note { flex-basis: 100%; margin: 0; font-size: 13px; }
+.tickstat-status { color: var(--text-dim); }
+
+/* -------------------------------------------------------------- settings */
+
+.settings-tab { max-width: 880px; margin-left: 0; }
+.settings-tab label.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 2px 0;
+}
+.settings-tab h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 4px;
+}
+.settings-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px 24px;
+}
+.settings-stack { display: flex; flex-direction: column; gap: 2px; }
+.settings-fixed { margin: 4px 0 0; padding-left: 20px; font-size: 12px; line-height: 1.7; }
+.clock-sample { font-variant-numeric: tabular-nums; }
+.settings-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.settings-storage { margin: 0; flex: 1 1 320px; font-size: 12px; }
+.statusbar .link-button { color: inherit; font-weight: inherit; font-size: inherit; }
+
+.console-paused {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 13px;
+}

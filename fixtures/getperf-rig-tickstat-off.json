@@ -1,0 +1,51 @@
+{
+  "capacity": 360,
+  "window_s": 10,
+  "loaded_at": 1790591914,
+  "last_id": 1,
+  "map": "ns2_summit",
+  "config": {
+    "interp_ms": 100,
+    "max_players": 16,
+    "tickrate": 30,
+    "sendrate": 20,
+    "moverate": 26,
+    "bw_limit": 51200
+  },
+  "windows": [
+    {
+      "ticks": 301,
+      "time": 1790591926,
+      "entities": 152,
+      "players": 0,
+      "idle_pct": 80.5,
+      "moves_pct": 0,
+      "entities_pct": 3.4,
+      "moves_per_s": 0,
+      "incomplete": 0,
+      "quality": 0,
+      "interp_fails": 0,
+      "lua_kb": 19488,
+      "tickrate": 30,
+      "id": 1,
+      "interp_warns": 0,
+      "worst_tick_ms": 36.4,
+      "duration_ms": 10033,
+      "score": 0
+    }
+  ],
+  "engine": {
+    "scan_s": 2,
+    "tickstat_said": {
+      "time": 1790591927,
+      "text": "off"
+    },
+    "tickstats": [],
+    "perfmon": [],
+    "events": [],
+    "now": 1790591930,
+    "path": "config://log-Server.txt",
+    "last_id": 0,
+    "source": "log"
+  }
+}

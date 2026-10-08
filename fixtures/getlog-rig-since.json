@@ -1,0 +1,22 @@
+{
+  "source": "file",
+  "more": false,
+  "file_id": "09/28/2026 03:26:13 AM",
+  "from": 10277,
+  "size": 10350,
+  "to": 10350,
+  "path": "config://log-Server.txt",
+  "lines": [
+    {
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_say",
+      "off": 10277
+    },
+    {
+      "text": "Chat All - Admin: rig_log_marker_1",
+      "off": 10315
+    }
+  ],
+  "max_bytes": 262144,
+  "tail_bytes": 65536,
+  "at_start": false
+}

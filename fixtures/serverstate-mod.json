@@ -1,0 +1,20 @@
+{
+  "webport": "8080",
+  "map": "ns2_summit",
+  "devmode": false,
+  "players_online": 0,
+  "uptime": 156,
+  "player_list": [],
+  "marine_res": 83,
+  "alien_res": 83,
+  "server_name": "webadmin-spa local test (do not join)",
+  "frame_rate": 30.007535934448,
+  "game_started": true,
+  "game_time": 143,
+  "mod_version": "0.1.0",
+  "marines": 0,
+  "max_players": 16,
+  "aliens": 0,
+  "webdomain": "127.0.0.1",
+  "cheats": true
+}

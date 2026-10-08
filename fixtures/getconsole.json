@@ -1,0 +1,92 @@
+{
+  "filtered": 0,
+  "dropped": 0,
+  "buffer_size": 500,
+  "lines": [
+    {
+      "id": 1,
+      "src": "server",
+      "text": "Loading config://MapCycle.json",
+      "time": 1788643247
+    },
+    {
+      "id": 2,
+      "src": "server",
+      "text": "Requesting server ranking be enabled, request success: false",
+      "time": 1788643247
+    },
+    {
+      "id": 3,
+      "src": "server",
+      "text": "Server  : 0.000000 : INFO: LuaJIT setup: maxtrace=20,000, maxmcode=35,000",
+      "time": 1788643247
+    },
+    {
+      "id": 4,
+      "src": "server",
+      "text": "Loading config://ProgressionConfig.json",
+      "time": 1788643247
+    },
+    {
+      "id": 5,
+      "src": "server",
+      "text": "Loading config://RemoteStats.json",
+      "time": 1788643247
+    },
+    {
+      "id": 6,
+      "src": "server",
+      "text": "Server  : 0.000000 : GetThunderdomeInjectEntities()",
+      "time": 1788643248
+    },
+    {
+      "id": 7,
+      "src": "server",
+      "text": "Server  : 0.033134 : Reset AI TeamBrain for Marines",
+      "time": 1788643248
+    },
+    {
+      "id": 8,
+      "src": "server",
+      "text": "Server  : 0.033134 : Reset AI TeamBrain for Aliens",
+      "time": 1788643248
+    },
+    {
+      "id": 9,
+      "src": "server",
+      "text": "Server  : 0.033134 : Reset location group stale timers",
+      "time": 1788643248
+    },
+    {
+      "id": 10,
+      "src": "server",
+      "text": "Player List -",
+      "time": 1788643278
+    },
+    {
+      "id": 11,
+      "src": "audit",
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_kick",
+      "time": 1788643278
+    },
+    {
+      "id": 12,
+      "src": "admin",
+      "text": "No matching player",
+      "time": 1788643278
+    },
+    {
+      "id": 13,
+      "src": "audit",
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_reserved_slots",
+      "time": 1788643278
+    },
+    {
+      "id": 14,
+      "src": "server",
+      "text": "Reserved slot amount set to 3",
+      "time": 1788643278
+    }
+  ],
+  "last_id": 14
+}

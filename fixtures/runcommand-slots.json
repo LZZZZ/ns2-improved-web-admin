@@ -1,0 +1,20 @@
+{
+  "elapsed": 0,
+  "lines": [
+    {
+      "id": 13,
+      "src": "audit",
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_reserved_slots",
+      "time": 1788643278
+    },
+    {
+      "id": 14,
+      "src": "server",
+      "text": "Reserved slot amount set to 3",
+      "time": 1788643278
+    }
+  ],
+  "dispatched": true,
+  "cmd": "sv_reserved_slots 3",
+  "last_id": 14
+}

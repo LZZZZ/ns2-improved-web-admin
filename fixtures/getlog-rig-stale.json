@@ -1,0 +1,6 @@
+{
+  "source": "none",
+  "error": "the file does not grow: a line this server printed did not reach it",
+  "path": "config://log-Server.txt",
+  "stale": true
+}

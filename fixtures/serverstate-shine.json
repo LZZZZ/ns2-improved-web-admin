@@ -1,0 +1,25 @@
+{
+  "webdomain": "127.0.0.1",
+  "webport": "8080",
+  "devmode": "false",
+  "players_online": 0,
+  "uptime": 38,
+  "marine_res": 60,
+  "alien_res": 60,
+  "server_name": "webadmin-spa rig - live config copy (do not join)",
+  "frame_rate": 49.988208770752,
+  "game_started": false,
+  "game_time": 0,
+  "mod_version": "0.1.0",
+  "max_players": 16,
+  "cheats": "false",
+  "marines": 0,
+  "shine": {
+    "reservedslots": false,
+    "ban": true,
+    "mapvote": true
+  },
+  "map": "ns2_summit",
+  "aliens": 0,
+  "player_list": []
+}

@@ -1,0 +1,15 @@
+# Build output is committed on purpose (see README.md, "Design decisions") --
+# the panel ships as static game content, so `web/` is NOT ignored.
+
+node_modules/
+.DS_Store
+*.log
+
+# Local capture of a live server's responses. May contain player names,
+# SteamIDs and IP addresses -- never commit.
+fixtures/live/
+*.local.json
+
+# Python bytecode from tools/
+__pycache__/
+*.pyc

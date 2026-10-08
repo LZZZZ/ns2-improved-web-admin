@@ -1,0 +1,80 @@
+{
+  "capped": false,
+  "items": [
+    {
+      "title": "ns2_Jambi",
+      "description": "Jambi\r\n\r\nUpdated August 14, 2018",
+      "authorid": "76561197964102428",
+      "filesize": 8787886,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/581251986368684735/A2F71DB3388825C647EAD5FFBDF8E8021EF8A90E/",
+      "tags": "map",
+      "childcount": 0,
+      "version": 1534262014,
+      "id": "7b986f5"
+    },
+    {
+      "title": "ns2_jambi_redux",
+      "description": "ns2_jambi_redux\r\n\r\nmodid: 6d45366f",
+      "authorid": "76561197972578251",
+      "filesize": 11165976,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/773983150601751812/8AF1020E3C5DFEEA16C90F4C0A61858B8BDBF8CB/",
+      "tags": "",
+      "childcount": 0,
+      "version": 1572195033,
+      "id": "6d45366f"
+    },
+    {
+      "title": "ns2_dmd_jambi",
+      "description": "Mod ID: 33305de3\r\r\r\n\r\r\r\nDMD Version of Descent! As usual, we are modifying our favorite maps to give them a new dynamic.\r\r\r\n\r\r\r\nChanges:\r\r\r\n-takes longer to get to Gravity as a Marine\r\r\r\n\r\r\r\nHave a suggestion? Let us know. We are always trying out new variations to keep NS2 interesting.\r\r\r\n\r\r\r\nVersion Credits:\r\r\r\nxtcmen (Jambi), Rusty, WiseChoices\r\r\r\n\r\r\r\ndiamondgamers.net",
+      "authorid": "76561197963994390",
+      "filesize": 8995154,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/2443642764234651462/63735AD9D3DDB5F1A6CCD9D7B8117B9718A3C24F/",
+      "tags": "map,Passes Default Consistency",
+      "childcount": 0,
+      "version": 1524336924,
+      "id": "33305de3"
+    },
+    {
+      "title": "JudgE's Transparent Minimaps",
+      "description": "\nAll vanilla maps + jambi, nexus\r and mineral\r\nUPDATE 18.02.2021\nAdd ns2_metro, some maps fixed to match the original maps\n\nUPDATE 10.02.2019\nAdd ns2_tram_nextstop, ns2_tram_redux, ns2_veil_cured, ns2_jambi_redux\r\nUPDATE 19.03.2018\nAdd ns2_mineral\r\rUPDATE 19.02.2018\nAdd ns2_nexus . Some improvements.\r\nUPDATE 04.02.2018\nAdd ns2_jambi\r\nUPDATE 28.01.2018\nImproved visibility and color of ventilation and other objects.",
+      "authorid": "76561197998184161",
+      "filesize": 104864302,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/1843662478366959099/CD1B840A1631D755F00A9C884239CF1C95661D19/",
+      "tags": "",
+      "childcount": 0,
+      "version": 1642864154,
+      "id": "4c58b359"
+    },
+    {
+      "title": "Ayumi",
+      "description": "NS2_Ayumi - Work in Progress\n\nRoughly based on NS1_Ayumi by Paer Fredriksson\n\nmod_id = \"98ee90a0\"\n\n5 Techpoints, 10 RTs\nJambi similar layout, but bit smaller",
+      "authorid": "76561197961543554",
+      "filesize": 134897257,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/1850415123624547726/5540DF34EE6B4CEDBBA9DFDE3CBE773E5B7A7167/",
+      "tags": "",
+      "childcount": 0,
+      "version": 1685014004,
+      "id": "98ee90a0"
+    },
+    {
+      "title": "Chinese Minimap Plus DEV",
+      "description": "ns2_jambi\nns2_mineral_dev\nns2_mineshaft_shafted\nns2_nexus\nns2_kodiak_fixes\nns2_summit_andabove\nns2_veil_cured\nns2_cagedfree_farmfresh\nns2_derelict_fixed",
+      "authorid": "76561197975391826",
+      "filesize": 5277513,
+      "steamresult": 1,
+      "thumbnailurl": "https://images.steamusercontent.com/ugc/1646594784585662406/8AF1020E3C5DFEEA16C90F4C0A61858B8BDBF8CB/",
+      "tags": "Must be run on Server,Localization",
+      "childcount": 0,
+      "version": 1609991486,
+      "id": "23a43f4f"
+    }
+  ],
+  "count": 6,
+  "done": true,
+  "page": 1
+}

@@ -1,0 +1,162 @@
+[
+  {
+    "name": "ns2_ayumi",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_biodome",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_caged",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_derelict",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_descent",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_docking",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_eclipse",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_kodiak",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_metro",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_mineshaft",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_origin",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_refinery",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_summit",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_tanith",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_tram",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_unearthed",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_veil",
+    "modId": "0"
+  },
+  {
+    "name": "ns2_stag",
+    "modId": "266c0d1d"
+  },
+  {
+    "name": "ns2_descent_mmpg",
+    "modId": "d372bd76"
+  },
+  {
+    "name": "skybox_02_ab",
+    "modId": "b0ab9e7e"
+  },
+  {
+    "name": "ns2_mineral_nsl",
+    "modId": "b0ab9e7e"
+  },
+  {
+    "name": "ns2_metro_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_derelict_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_mineshaft_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_tanith_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_kodiak_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_refinery_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_tr4m_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_eclipse_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_veil_mmpg",
+    "modId": "a80c2439"
+  },
+  {
+    "name": "ns2_summit_mmpg",
+    "modId": "d372b93b"
+  },
+  {
+    "name": "ns2_tram_mmpg",
+    "modId": "d372b4f8"
+  },
+  {
+    "name": "ns2_biodome_mmpg",
+    "modId": "d372c2fc"
+  },
+  {
+    "name": "ns2_jambi",
+    "modId": "7b986f5"
+  },
+  {
+    "name": "ns2_summit_new",
+    "modId": "48b95c32"
+  },
+  {
+    "name": "ns2_tram_nextstop",
+    "modId": "48b95c32"
+  },
+  {
+    "name": "ns2_docking_mmpg",
+    "modId": "d372bb98"
+  },
+  {
+    "name": "ns2_nexus_fixes",
+    "modId": "ad283f25"
+  },
+  {
+    "name": "ns2_tanith_redline",
+    "modId": "a0015b65"
+  },
+  {
+    "name": "ns2_caged_mmpg",
+    "modId": "d372c04b"
+  }
+]

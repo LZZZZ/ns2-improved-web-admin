@@ -1,0 +1,247 @@
+[
+  {
+    "name": "NS2Panel",
+    "active": true,
+    "id": "aa473d86"
+  },
+  {
+    "name": "Hive Spawn Selector",
+    "active": true,
+    "id": "debda985"
+  },
+  {
+    "name": "Bleu's Improved Tooltips",
+    "active": true,
+    "id": "e1eb3efa"
+  },
+  {
+    "name": "ns2_stag",
+    "active": false,
+    "id": "266c0d1d"
+  },
+  {
+    "name": "Combat Fix",
+    "active": true,
+    "id": "1e62a2ce"
+  },
+  {
+    "name": "[Shine] Lock Teams",
+    "active": false,
+    "id": "582e77fa"
+  },
+  {
+    "name": "[Shine] Lockteams V2",
+    "active": true,
+    "id": "de58cc8c"
+  },
+  {
+    "name": "[Shine] Lifeform Picker",
+    "active": true,
+    "id": "e1c54b1d"
+  },
+  {
+    "name": "descent_mmpg",
+    "active": false,
+    "id": "d372bd76"
+  },
+  {
+    "name": "ns2_mineral_nsl",
+    "active": true,
+    "id": "b0ab9e7e"
+  },
+  {
+    "name": "[Shine] Lifeform Selector",
+    "active": false,
+    "id": "d19a5830"
+  },
+  {
+    "name": "Devnull - Quick Buy",
+    "active": false,
+    "id": "9e704b45"
+  },
+  {
+    "name": "NS2: Combat",
+    "active": false,
+    "id": "8ae61f8f"
+  },
+  {
+    "name": "Mephs Mapping Playground",
+    "active": false,
+    "id": "a80c2439"
+  },
+  {
+    "name": "Blast to the Past",
+    "active": true,
+    "id": "cc416160"
+  },
+  {
+    "name": "Shine Administration",
+    "active": true,
+    "id": "706d242"
+  },
+  {
+    "name": "NSL Team Badges",
+    "active": false,
+    "id": "cdcba4ba"
+  },
+  {
+    "name": "summit_mmpg",
+    "active": false,
+    "id": "d372b93b"
+  },
+  {
+    "name": "Devnull - Interesting Score Screen",
+    "active": true,
+    "id": "9b55583a"
+  },
+  {
+    "name": "tram_mmpg",
+    "active": false,
+    "id": "d372b4f8"
+  },
+  {
+    "name": "Drey's Improved Blueprint Placement",
+    "active": true,
+    "id": "ab5272a6"
+  },
+  {
+    "name": "Devnull - Enhanced ScoreBoard",
+    "active": true,
+    "id": "9ad32966"
+  },
+  {
+    "name": "[Shine] Epsilon",
+    "active": true,
+    "id": "c6fbbb0"
+  },
+  {
+    "name": "BDT Community Balance Mod (dev)",
+    "active": false,
+    "id": "b2621977"
+  },
+  {
+    "name": "biodome_mmpg",
+    "active": false,
+    "id": "d372c2fc"
+  },
+  {
+    "name": "ns2_Jambi",
+    "active": true,
+    "id": "7b986f5"
+  },
+  {
+    "name": "Spawn Selector",
+    "active": false,
+    "id": "dc1e20aa"
+  },
+  {
+    "name": "Matched Play Hotfix",
+    "active": false,
+    "id": "b7745506"
+  },
+  {
+    "name": "Mustachify",
+    "active": false,
+    "id": "9dc52beb"
+  },
+  {
+    "name": "ns2_tram_nextstop",
+    "active": true,
+    "id": "48b95c32"
+  },
+  {
+    "name": "docking_mmpg",
+    "active": false,
+    "id": "d372bb98"
+  },
+  {
+    "name": "Mouse Wheel Jump",
+    "active": false,
+    "id": "bbe5db27"
+  },
+  {
+    "name": "Devnull - [Shine] Extras",
+    "active": true,
+    "id": "9b817608"
+  },
+  {
+    "name": "[Shine] Wonitor",
+    "active": true,
+    "id": "235ee3a6"
+  },
+  {
+    "name": "UWE Hotfix 344",
+    "active": true,
+    "id": "d41d68cd"
+  },
+  {
+    "name": "[Shine] Tier Info",
+    "active": false,
+    "id": "72c5fd4e"
+  },
+  {
+    "name": "Badges+",
+    "active": true,
+    "id": "b7149f9"
+  },
+  {
+    "name": "1423731186",
+    "active": false,
+    "id": "54dc69f2"
+  },
+  {
+    "name": "ns2_nexus_fixes",
+    "active": false,
+    "id": "ad283f25"
+  },
+  {
+    "name": "NSL Mod",
+    "active": false,
+    "id": "a2ddae8"
+  },
+  {
+    "name": "Tanith Redline",
+    "active": false,
+    "id": "a0015b65"
+  },
+  {
+    "name": "Community Balance Mod-Small (CC)",
+    "active": false,
+    "id": "cf6c0efb"
+  },
+  {
+    "name": "Devnull - Fair Start",
+    "active": true,
+    "id": "9928e9e9"
+  },
+  {
+    "name": "caged_mmpg",
+    "active": false,
+    "id": "d372c04b"
+  },
+  {
+    "name": "Mod Panels++",
+    "active": true,
+    "id": "3536f85e"
+  },
+  {
+    "name": "Enhanced Spectator",
+    "active": true,
+    "id": "4384b7fe"
+  },
+  {
+    "name": "Drey's Enhanced Hud",
+    "active": true,
+    "id": "ac9bce1f"
+  },
+  {
+    "name": "ENSL CompMod",
+    "active": false,
+    "id": "6fd4cd9c"
+  },
+  {
+    "name": "NSL Badges",
+    "active": true,
+    "id": "acd4ecf3"
+  }
+]

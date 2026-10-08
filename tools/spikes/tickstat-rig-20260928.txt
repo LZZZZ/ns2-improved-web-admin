@@ -1,0 +1,161 @@
+# Real engine lines from the rig, 09-27 engine (5dc97682bc), 2026-09-28.
+# Everything tickstat/perfmon/bwlimit-related from one log-Server.txt, in order:
+# 30/20 empty, tickstat 10, perfmon cycled, a map change, then 80/40/40 at
+# bwlimit 131072 with one human + 11 bots, bwlimit 10000 (choke), back to 131072.
+# Input for tickstat-harness.lua. Lines starting '# ' are comments.
+Finished loading 'maps/ns2_summit.level'
+] tickstat 10
+tickstat: on
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.55 p99 34.10 p999 34.30 max 34.28 ms | late max 1.04 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.06 ms (n=1801) | busy 19.2% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.30 p99 34.10 p999 34.20 max 34.17 ms | late max 0.99 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1800 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.06 ms (n=1800) | busy 18.4% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.99 target 30 | int p50 33.55 p99 34.05 p999 34.10 max 34.09 ms | late max 1.00 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1801 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.05 ms (n=1801) | busy 19.1% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.08 target 30 | int p50 33.55 p99 34.05 p999 34.20 max 34.17 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1801) | busy 19.1% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] tickstat
+tickstat: on
+] perfmon
+perfmon: tick jitter avg 0.49ms max 0.97ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 69.637978 : monitoringActive true
+] perfmon
+perfmon: tick jitter avg 0.53ms max 0.97ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 71.638489 : monitoringActive true (detailed)
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.55 p99 34.10 p999 34.15 max 34.13 ms | late max 1.00 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1801 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1801) | busy 19.1% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.99 target 30 | int p50 33.60 p99 34.10 p999 34.25 max 34.24 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.05 ms (n=1801) | busy 19.0% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.55 p99 34.15 p999 34.25 max 34.21 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1803 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1800) | busy 19.0% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.50 p99 34.15 p999 34.20 max 34.18 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1803 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.05 ms (n=1801) | busy 18.8% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.60 p99 34.00 p999 34.05 max 34.03 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1801) | busy 19.1% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.60 p99 34.00 p999 34.25 max 34.21 ms | late max 1.00 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1800 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.15 ms (n=1800) | busy 19.2% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.60 p99 34.05 p999 34.25 max 34.22 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1800) | busy 19.2% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.99 target 30 | int p50 33.60 p99 34.15 p999 34.20 max 34.16 ms | late max 1.08 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1804 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1801) | busy 19.3% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] perfmon 0
+perfmon: tick jitter avg 0.47ms max 0.93ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 150.438278 : monitoringActive true (detailed)[spam]
+] perfmon 0
+perfmon: tick jitter avg 0.50ms max 0.94ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 152.437912 : monitoringActive false
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.60 p99 34.10 p999 34.15 max 34.15 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1801 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1800) | busy 19.2% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] perfmon 1
+perfmon: tick jitter avg 0.56ms max 0.98ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 154.437958 : monitoringActive true
+] perfmon 3
+perfmon: tick jitter avg 0.52ms max 0.99ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 156.438477 : monitoringActive true (detailed)
+] perfmon off
+perfmon: tick jitter avg 0.45ms max 0.94ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 158.437897 : monitoringActive true (detailed)[spam]
+TICKSTAT| win 10.0 s hz 30.08 target 30 | int p50 33.55 p99 34.10 p999 34.30 max 34.29 ms | late max 1.11 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1803 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1801) | busy 19.4% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] perfmon
+perfmon: tick jitter avg 0.52ms max 0.99ms (n=30)
+perfmon: snapshot write avg 0.000ms max 0.000ms (n=0)
+perfmon: entities skipped 0 / 0 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 0 = idle 0.0% - delivery 0.0% - overload 0.0% (updates 0, warn 0, fail 0)
+Server  : 171.471771 : monitoringActive false
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.60 p99 34.10 p999 34.25 max 34.24 ms | late max 1.00 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1801 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.12 ms (n=1801) | busy 19.2% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] sv_changemap ns2_summit
+Finished loading 'maps/ns2_summit.level'
+TICKSTAT| win 10.0 s hz 27.99 target 30 | int p50 33.60 p99 55.00 p999 250.00 max 664.90 ms | late max 632.12 ms rearm 2 stretch 0.00% gov max 0 | incomplete 0/1425 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1657) | busy 25.9% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.30 p99 34.15 p999 34.25 max 34.24 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1803 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.07 ms (n=1801) | busy 20.4% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.99 target 30 | int p50 33.30 p99 34.15 p999 34.30 max 34.27 ms | late max 0.99 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1801 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.08 ms (n=1800) | busy 19.6% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.60 p99 34.00 p999 34.15 max 34.14 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1803 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1801) | busy 19.3% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 30.00 target 30 | int p50 33.50 p99 34.10 p999 34.20 max 34.17 ms | late max 0.99 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1800 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.05 ms (n=1800) | busy 19.3% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 29.98 target 30 | int p50 33.60 p99 34.05 p999 34.25 max 34.25 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/1802 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.13 ms (n=1801) | busy 19.3% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+bandwidth limit 81920 bytes/sec per player follows sendrate 40; set bwlimit to override
+] bwlimit 131072
+bandwidth limit: 131072 bytes/sec per player
+TICKSTAT| win 10.0 s hz 66.99 target 80 | int p50 12.80 p99 33.85 p999 34.00 max 33.97 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2492 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1928) | busy 24.8% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.99 target 80 | int p50 12.40 p99 13.25 p999 14.30 max 14.26 ms | late max 1.95 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2726 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1982) | busy 26.6% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.99 target 80 | int p50 12.35 p99 13.30 p999 13.35 max 13.31 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2751 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1961) | busy 26.9% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.35 p99 13.30 p999 13.40 max 13.38 ms | late max 1.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2743 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1969) | busy 26.8% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 80.05 target 80 | int p50 12.50 p99 13.30 p999 13.45 max 13.43 ms | late max 1.05 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2745 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1953) | busy 26.5% | humans 0 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.49 target 80 | int p50 12.50 p99 14.15 p999 69.15 max 69.13 ms | late max 58.61 ms rearm 1 stretch 0.00% gov max 0 | incomplete 0/2582 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.14 ms (n=2064) | busy 20.7% | humans 1 bots 0 | snap/s/human 0.00 bytes/s/human 0 | moves/s/human 0.00 moves/s/bot 0.00 injected 0.00% | move ms/tick 0.000 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 0 p99 0 max 0 choked 0.00% | human move ms/tick 0.000 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.90 target 80 | int p50 12.65 p99 14.30 p999 25.00 max 24.96 ms | late max 14.16 ms rearm 1 stretch 0.02% gov max 4 | incomplete 1/2275 late 0 writers 0 moves 1 | wait over p99 2.06 max 2.15 ms (n=2118) | busy 14.4% | humans 1 bots 11 | snap/s/human 0.40 bytes/s/human 1765 | moves/s/human 4.20 moves/s/bot 14.48 injected 0.00% | move ms/tick 0.587 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 3968 p99 9504 max 9489 choked 75.00% | human move ms/tick 0.012 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 16
+TICKSTAT| win 10.0 s hz 79.98 target 80 | int p50 12.50 p99 14.25 p999 14.45 max 14.43 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2313 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.10 ms (n=1565) | busy 38.4% | humans 1 bots 11 | snap/s/human 25.99 bytes/s/human 14999 | moves/s/human 20.59 moves/s/bot 79.98 injected 0.00% | move ms/tick 2.192 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 320 p99 2240 max 2808 choked 0.00% | human move ms/tick 0.075 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.97 target 80 | int p50 12.55 p99 14.15 p999 14.40 max 14.36 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2380 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1575) | busy 36.0% | humans 1 bots 11 | snap/s/human 34.79 bytes/s/human 8155 | moves/s/human 39.99 moves/s/bot 79.97 injected 0.00% | move ms/tick 1.829 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 224 p99 448 max 761 choked 0.00% | human move ms/tick 0.060 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.80 target 80 | int p50 12.55 p99 14.30 p999 45.55 max 45.53 ms | late max 34.65 ms rearm 1 stretch 0.00% gov max 0 | incomplete 0/2412 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.17 ms (n=2007) | busy 27.9% | humans 1 bots 11 | snap/s/human 24.20 bytes/s/human 9209 | moves/s/human 20.70 moves/s/bot 79.81 injected 0.00% | move ms/tick 1.531 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 320 p99 992 max 5739 choked 0.00% | human move ms/tick 0.025 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.99 target 80 | int p50 12.55 p99 14.35 p999 14.40 max 14.39 ms | late max 3.01 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2482 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.05 ms (n=2163) | busy 26.3% | humans 1 bots 11 | snap/s/human 39.90 bytes/s/human 9583 | moves/s/human 40.00 moves/s/bot 79.99 injected 0.00% | move ms/tick 1.377 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 256 p99 448 max 2359 choked 0.00% | human move ms/tick 0.064 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.55 p99 14.40 p999 14.55 max 14.55 ms | late max 2.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2422 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1978) | busy 29.9% | humans 1 bots 11 | snap/s/human 40.00 bytes/s/human 7639 | moves/s/human 40.00 moves/s/bot 80.00 injected 0.00% | move ms/tick 1.382 | spec moves/s 2.20 spec move ms/tick 0.002 | snap bytes p50 192 p99 384 max 2737 choked 0.00% | human move ms/tick 0.061 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] bwlimit 10000
+bwlimit 10000 bytes/sec at sendrate 40 leaves 250 bytes per snapshot, below the 2048 a full game needs: snapshots will choke and arrive late. bwlimit 81920 or more avoids it.
+bandwidth limit: 10000 bytes/sec per player
+TICKSTAT| win 10.0 s hz 79.99 target 80 | int p50 12.60 p99 14.40 p999 14.55 max 14.52 ms | late max 2.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2349 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=2025) | busy 27.3% | humans 1 bots 11 | snap/s/human 38.80 bytes/s/human 5808 | moves/s/human 40.00 moves/s/bot 79.99 injected 0.00% | move ms/tick 1.108 | spec moves/s 77.89 spec move ms/tick 0.042 | snap bytes p50 160 p99 768 max 1835 choked 4.12% | human move ms/tick 0.057 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 11
+TICKSTAT| win 10.0 s hz 79.97 target 80 | int p50 12.55 p99 14.30 p999 14.50 max 14.47 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2315 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1974) | busy 27.9% | humans 1 bots 11 | snap/s/human 32.69 bytes/s/human 4962 | moves/s/human 22.29 moves/s/bot 79.97 injected 0.00% | move ms/tick 1.245 | spec moves/s 85.96 spec move ms/tick 0.059 | snap bytes p50 160 p99 288 max 1324 choked 1.53% | human move ms/tick 0.036 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 7
+client 1: snapshot rate 40.0 -> 26.7/s (29% choked, 24.9 ms to clear each, bwlimit 10000)
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.55 p99 14.15 p999 14.50 max 14.46 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2362 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1729) | busy 30.6% | humans 1 bots 11 | snap/s/human 12.70 bytes/s/human 2276 | moves/s/human 22.00 moves/s/bot 80.00 injected 0.00% | move ms/tick 1.467 | spec moves/s 133.50 spec move ms/tick 0.055 | snap bytes p50 128 p99 896 max 2001 choked 15.75% | human move ms/tick 0.028 | sendbuf drops 0 | rate stepped 1 slowest 26.7/s | creations deferred 31
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.55 p99 14.15 p999 14.45 max 14.44 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2339 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.13 ms (n=1492) | busy 34.7% | humans 1 bots 11 | snap/s/human 26.50 bytes/s/human 6627 | moves/s/human 40.00 moves/s/bot 80.00 injected 0.00% | move ms/tick 1.541 | spec moves/s 16.70 spec move ms/tick 0.006 | snap bytes p50 256 p99 704 max 1005 choked 0.38% | human move ms/tick 0.073 | sendbuf drops 0 | rate stepped 1 slowest 26.7/s | creations deferred 0
+] bwlimit 131072
+bandwidth limit: 131072 bytes/sec per player
+TICKSTAT| win 10.0 s hz 79.98 target 80 | int p50 12.50 p99 14.00 p999 14.50 max 14.47 ms | late max 2.06 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2370 late 0 writers 0 moves 0 | wait over p99 2.04 max 2.05 ms (n=1694) | busy 31.1% | humans 1 bots 11 | snap/s/human 26.19 bytes/s/human 5058 | moves/s/human 39.99 moves/s/bot 79.98 injected 0.00% | move ms/tick 1.416 | spec moves/s 13.90 spec move ms/tick 0.010 | snap bytes p50 192 p99 416 max 1545 choked 1.15% | human move ms/tick 0.069 | sendbuf drops 0 | rate stepped 1 slowest 26.7/s | creations deferred 20
+client 1: snapshot rate 26.7 -> 40.0/s (0% choked, 1.6 ms to clear each, bwlimit 131072)
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.50 p99 14.15 p999 14.60 max 14.56 ms | late max 2.12 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2362 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.09 ms (n=1688) | busy 32.2% | humans 1 bots 11 | snap/s/human 32.80 bytes/s/human 5243 | moves/s/human 40.00 moves/s/bot 80.00 injected 0.00% | move ms/tick 1.476 | spec moves/s 2.30 spec move ms/tick 0.004 | snap bytes p50 160 p99 288 max 2197 choked 0.00% | human move ms/tick 0.065 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 80.06 target 80 | int p50 12.55 p99 14.30 p999 14.50 max 14.49 ms | late max 2.07 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2330 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.07 ms (n=1618) | busy 35.0% | humans 1 bots 11 | snap/s/human 39.98 bytes/s/human 5448 | moves/s/human 40.08 moves/s/bot 80.06 injected 0.00% | move ms/tick 1.547 | spec moves/s 83.66 spec move ms/tick 0.030 | snap bytes p50 160 p99 192 max 323 choked 0.00% | human move ms/tick 0.066 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+TICKSTAT| win 10.0 s hz 79.98 target 80 | int p50 12.55 p99 14.30 p999 14.50 max 14.50 ms | late max 2.39 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2377 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.06 ms (n=1841) | busy 30.9% | humans 1 bots 11 | snap/s/human 40.09 bytes/s/human 8383 | moves/s/human 39.99 moves/s/bot 79.98 injected 0.00% | move ms/tick 1.415 | spec moves/s 71.89 spec move ms/tick 0.023 | snap bytes p50 224 p99 1024 max 2331 choked 0.00% | human move ms/tick 0.064 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] perfmon
+perfmon: tick jitter avg 1.25ms max 2.05ms (n=80)
+perfmon: snapshot write avg 0.031ms max 0.064ms (n=40)
+perfmon: entities skipped 6438 / 13198 (48.8%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 63 = idle 63.0% - delivery 0.0% - overload 0.0% (updates 40, warn 0, fail 0)
+Server  : 261.482971 : monitoringActive true
+TICKSTAT| win 10.0 s hz 79.97 target 80 | int p50 12.50 p99 14.25 p999 14.60 max 14.60 ms | late max 2.31 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2398 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.26 ms (n=1952) | busy 30.2% | humans 1 bots 11 | snap/s/human 39.98 bytes/s/human 7494 | moves/s/human 39.98 moves/s/bot 79.97 injected 0.00% | move ms/tick 1.480 | spec moves/s 80.77 spec move ms/tick 0.061 | snap bytes p50 192 p99 384 max 2956 choked 0.00% | human move ms/tick 0.053 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0
+] perfmon
+perfmon: tick jitter avg 1.36ms max 2.05ms (n=81)
+perfmon: snapshot write avg 0.034ms max 0.048ms (n=40)
+perfmon: entities skipped 6469 / 13244 (48.8%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 65 = idle 65.4% - delivery 0.0% - overload 0.0% (updates 40, warn 0, fail 0)
+Server  : 262.483093 : monitoringActive true (detailed)
+] perfmon
+perfmon: tick jitter avg 1.28ms max 2.18ms (n=80)
+perfmon: snapshot write avg 0.028ms max 0.054ms (n=40)
+perfmon: entities skipped 6591 / 13431 (49.1%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 68 = idle 68.0% - delivery 0.0% - overload 0.0% (updates 40, warn 0, fail 0)
+Server  : 263.482605 : monitoringActive true (detailed)[spam]
+] perfmon
+perfmon: tick jitter avg 1.24ms max 2.06ms (n=80)
+perfmon: snapshot write avg 0.028ms max 0.066ms (n=40)
+perfmon: entities skipped 6570 / 13378 (49.1%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 71 = idle 70.5% - delivery 0.0% - overload 0.0% (updates 40, warn 0, fail 0)
+Server  : 264.482971 : monitoringActive false
+TICKSTAT| win 10.0 s hz 80.00 target 80 | int p50 12.50 p99 14.25 p999 14.60 max 14.59 ms | late max 2.42 ms rearm 0 stretch 0.00% gov max 0 | incomplete 0/2417 late 0 writers 0 moves 0 | wait over p99 2.06 max 2.17 ms (n=1811) | busy 33.4% | humans 1 bots 11 | snap/s/human 40.00 bytes/s/human 7058 | moves/s/human 40.00 moves/s/bot 80.00 injected 0.00% | move ms/tick 1.585 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 192 p99 288 max 1682 choked 0.00% | human move ms/tick 0.053 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 0

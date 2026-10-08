@@ -1,0 +1,17 @@
+{
+  "name": "webadmin-spa-panel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-preact": "1.47.0",
+    "preact": "^10.29.8",
+    "typescript": "^7.0.2",
+    "uplot": "1.6.32",
+    "vite": "^8.2.2"
+  }
+}

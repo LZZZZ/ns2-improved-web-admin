@@ -1,0 +1,56 @@
+{
+  "map": "ns2_tram",
+  "last_id": 9,
+  "capacity": 360,
+  "windows": [
+    {
+      "incomplete": 0,
+      "interp_warns": 0,
+      "interp_fails": 0,
+      "lua_kb": 21019,
+      "players": 0,
+      "time": 1790553325,
+      "entities": 191,
+      "ticks": 601,
+      "score": 0,
+      "tickrate": 60,
+      "quality": 0,
+      "id": 8,
+      "duration_ms": 10017,
+      "worst_tick_ms": 18.4,
+      "idle_pct": 83.1,
+      "moves_pct": 0,
+      "entities_pct": 4,
+      "moves_per_s": 0
+    },
+    {
+      "incomplete": 0,
+      "interp_warns": 0,
+      "interp_fails": 0,
+      "lua_kb": 21153,
+      "players": 0,
+      "time": 1790553335,
+      "entities": 191,
+      "ticks": 602,
+      "score": 0,
+      "tickrate": 60,
+      "quality": 0,
+      "id": 9,
+      "duration_ms": 10027,
+      "worst_tick_ms": 17.5,
+      "idle_pct": 83.1,
+      "moves_pct": 0,
+      "entities_pct": 4,
+      "moves_per_s": 0
+    }
+  ],
+  "config": {
+    "interp_ms": 100,
+    "tickrate": 60,
+    "sendrate": 20,
+    "max_players": 16,
+    "moverate": 26
+  },
+  "window_s": 10,
+  "loaded_at": 1790553243
+}

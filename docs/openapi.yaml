@@ -1,0 +1,2617 @@
+openapi: 3.1.0
+
+info:
+  title: NS2 dedicated server web admin API
+  version: "344+26-09-03"
+  summary: The complete HTTP surface of the stock NS2 web admin, as implemented.
+  description: |
+    Machine-readable companion to [API.md](API.md). Both are read from
+    `ns2/lua/ServerWebInterface.lua` (304 lines, UWE 2012, unchanged in build
+    344 / 2026-09-03) and verified against a live server on 2026-09-05. Every
+    schema here is checked against the committed captures in `fixtures/` by
+    `tools/check-openapi.py`; nothing was guessed or crawled.
+
+    ## One endpoint, not a REST API
+
+    There are no paths, no REST verbs and no status-code vocabulary. Every
+    call is a `GET` or `POST` to `/`, and the action is chosen by the
+    `request` query parameter. The Lua handler is `OnWebRequest(actions)` --
+    it receives the query parameters of a `GET`, or the form body of a
+    `POST` (whose query string is dropped; measured on 09-26), and **never
+    learns the path, the method or any header**, so on a stock server `/`,
+    `/does-not-exist.png` and `/?request=json` all get the same answer. With
+    the mod, a request with no parameters at all gets a page leading to the
+    panel instead (`/#no-parameters`).
+
+    OpenAPI keys operations by path, which this API does not vary, so each
+    action below is keyed by a URL fragment naming its `request` value:
+
+        /#request=getbanlist   ->   GET /?request=getbanlist
+
+    The fragment is documentation, not part of the wire format. The real path
+    is always `/`, and each operation pins its action with a `const` on the
+    `request` parameter. `x-request` on each operation carries the same value
+    for tooling.
+
+    ## Consequences worth knowing before writing a client
+
+    - **There is no 404.** Any path that is not a file under the web root
+      falls through to the default handler and returns `200 application/json`
+      with the full server-state blob -- names, SteamIDs and IP addresses
+      included. A typo in a script path yields a JSON parse error, never a
+      missing-file error. Never use the status code to detect a missing asset.
+    - **There is no directory index.** The panel is at `/index.html`; a bare
+      `/` is the server-state blob.
+    - **Method is not enforced.** Every write also works as a `GET` with
+      query parameters, which is how the shipped panel installs mods
+      (`modbrowser.js:25`). Only `GET` and `POST` reach Lua at all; `PUT` and
+      `DELETE` are refused `405` by the 26-09-03 web server.
+    - **Writes return an empty `200`** whose `Content-Type` is `text/html`,
+      not JSON. There is no success flag and no error body.
+    - **Console commands return nothing.** `sv_kick` against a bogus name and
+      against a real SteamID produce byte-comparable responses; the failure
+      reaches `log-Server.txt` only. This is the single largest gap for a
+      modern panel -- see [CONSTRAINTS.md](CONSTRAINTS.md).
+    - **Types are inconsistent.** On a stock server `cheats`, `devmode` and
+      `isbot` are stringified booleans; `iscomm` and `game_started` are real
+      ones. The mod sends all five as real booleans. `steamid`
+      is a number in server state and in the ban list, but mod ids are hex
+      **strings** everywhere. Do not assume; do not parse mod ids as numbers.
+    - **Player rows carry full IP addresses** over plain HTTP. Mask by
+      default. Never commit a live capture.
+
+servers:
+  - url: http://{host}:{port}
+    description: A dedicated server started with -webadmin
+    variables:
+      host:
+        default: 127.0.0.1
+        description: The -webdomain value, or the server's address.
+      port:
+        default: "8080"
+        description: The -webport value.
+
+security:
+  - digestAuth: []
+
+tags:
+  - name: server
+    description: Server state and console commands.
+  - name: players
+    description: Bans and reserved slots.
+  - name: chat
+    description: The in-game chat ring buffer.
+  - name: performance
+    description: Tickrate and entity-count samples.
+  - name: maps
+    description: Map list and map cycle.
+  - name: mods
+    description: Installed mods and workshop search.
+  - name: static
+    description: The panel's own files, served from the web root.
+  - name: mod
+    description: |
+      Added by the webadmin-spa mod's `lua/ServerWebInterface.lua`. **Absent on
+      a stock server**, where these `request` values are unrecognised and fall
+      through to the server-state blob like any other unknown value -- so a
+      client cannot tell a mod request type from a typo by status code. Detect
+      the mod with `mod_version` in the state blob instead.
+
+paths:
+
+  # ---------------------------------------------------------------- server
+
+  "/#no-parameters":
+    get:
+      tags: [server, mod]
+      operationId: getRoot
+      summary: A request with no parameters at all
+      description: |
+        `/`, a path that is not a file (`/index.htm`, `/missing.png`), `/?`,
+        `/?foo` (a key with no `=` does not reach Lua) and a `POST` with an
+        empty body: the Lua sees an empty parameter table for all of them.
+
+        **Stock:** the server-state blob, as `getServerState`, so the address
+        the boot log prints hands every player's name, Steam id and IP to
+        whoever opens it (CURRENT-UI defect 12).
+
+        **With the mod** *(2026-10-06, CONSTRAINTS item 6)*: a page holding no
+        server data, whose meta refresh leads a browser to `/index.html`. A
+        script asking for state sends `request=json`, as both panels do; a
+        parameter with any value, even empty (`?foo=`), is not this case.
+        The engine passes Lua no headers, so `Accept` cannot choose between
+        the two; and Lua returns only a type and a body, so this cannot be
+        an HTTP redirect.
+      responses:
+        "200":
+          description: The page with the mod; the state blob without.
+          content:
+            text/html:
+              schema: { type: string }
+              examples:
+                mod:
+                  summary: Measured on the rig, 09-27 engine
+                  externalValue: ../fixtures/root-mod.html
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerState" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=json":
+    get:
+      tags: [server]
+      operationId: getServerState
+      x-request: json
+      summary: Full server state (the default response)
+      description: |
+        `GetServerState()`, `ServerWebInterface.lua:78-135`. This is the
+        **fallthrough**: any `request` value that is not one of the eleven
+        recognised actions lands here, as does a request with no `request` at
+        all. The shipped panel sends the literal `request=json`
+        (`rcon.js:21`), which is simply one of the unmatched values. With the
+        mod, a request with no parameters at all is the one exception: see
+        `getRoot`.
+
+        Passing `command` **and** `rcon` runs a console command before the
+        state is built; see `sendConsoleCommand`.
+      parameters:
+        - $ref: "#/components/parameters/RequestJson"
+      responses:
+        "200":
+          description: |
+            Server state. Rendered from live entities, so `uptime`,
+            `frame_rate` and `game_time` drift between any two samples.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerState" }
+              examples:
+                empty:
+                  summary: Idle server, no players
+                  externalValue: ../fixtures/serverstate.json
+                populated:
+                  summary: 12 players, game in progress
+                  externalValue: ../fixtures/serverstate-populated.json
+          x-fixtures:
+            - serverstate.json
+            - serverstate-populated.json
+            - serverstate-rcon.json
+            - serverstate-after-kick.json
+            - serverstate-after-real-kick.json
+            - serverstate-after-mapchange.json
+            - serverstate-shine.json
+            - serverstate-mod.json
+            - serverstate-shine-basecommands.json
+            - serverstate-shine-populated.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#command=Send":
+    get:
+      tags: [server]
+      operationId: sendConsoleCommand
+      x-request: json
+      summary: Run a server console command (no output is returned)
+      description: |
+        `ServerWebInterface.lua:278-280`:
+
+            if actions.command then
+                Shared.ConsoleCommand(actions.rcon)
+            end
+
+        **Both parameters are required.** `command` is only tested for
+        truthiness -- the shipped panel sends the literal `command=Send`
+        (`rcon.js:293`) -- while the command text is read from `rcon`.
+        Sending `rcon` alone does nothing.
+
+        **Nothing is returned.** The response is the ordinary server-state
+        blob, with no success flag and no output. Verified on a live server:
+        `sv_kick <bot name>` (which failed with `No matching player`) and
+        `sv_kick <real steamid>` (which disconnected the player) returned the
+        same status, the same `Content-Type` and the same key set, differing
+        only in fields that drift between any two samples. The successful kick
+        still reported `players_online: 12`, because the response is built
+        before the disconnect completes -- so the outcome cannot be inferred
+        by diffing against the previous poll either. `rcon.js:290` fires the
+        request, ignores the response and refreshes 500 ms later; nothing else
+        is available to it.
+
+        This operation is the same fallthrough as `getServerState`; it is
+        listed separately because it is the whole write surface for kicks,
+        bans, map changes, chat and reserved slots.
+      parameters:
+        - $ref: "#/components/parameters/RequestJson"
+        - name: command
+          in: query
+          required: true
+          description: |
+            Any truthy value. The panel sends `Send`. Its content is never read.
+          schema: { type: string, default: Send }
+          example: Send
+        - name: rcon
+          in: query
+          required: true
+          description: |
+            The console command line, as typed at the server console.
+            Commands the shipped panel issues: `sv_kick`, `sv_ban`, `sv_unban`,
+            `sv_changemap`, `sv_say`, `sv_tsay <team>`, `sv_psay`, `sv_slay`,
+            `sv_eject`, `sv_switchteam`, `sv_reserved_slots`,
+            `sv_add_reserved_slot`, `sv_remove_reserved_slot`, `sv_password`,
+            `sv_cheats`.
+          schema: { type: string }
+          examples:
+            kick: { value: "sv_kick 10000000" }
+            ban: { value: "sv_ban 10000000 30 Griefing" }
+            changemap: { value: "sv_changemap ns2_veil" }
+            say: { value: "sv_say Server restarting in 5 minutes" }
+      responses:
+        "200":
+          description: |
+            Server state, identical in shape to `getServerState`. It reflects
+            neither the success nor the failure of the command.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerState" }
+          x-fixtures:
+            - rcon-kick.json
+            - rcon-kick-success.json
+            - rcon-say.json
+            - rcon-changemap.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # --------------------------------------------------------------- players
+
+  "/#request=getbanlist":
+    get:
+      tags: [players]
+      operationId: getBanList
+      x-request: getbanlist
+      summary: List banned players
+      description: |
+        `GetBannedPlayersList()`, `ServerAdminCommands.lua:494`. Bans are
+        added and removed through the console (`sv_ban`, `sv_unban`); there is
+        no request type for either.
+
+        **Expired bans are never pruned from this list** -- a ban whose `time`
+        has passed keeps being reported even though it no longer blocks
+        anyone. A client that wants a truthful list must filter on
+        `time == 0 or time > now` itself.
+
+        **On a server running Shine's ban plugin the list is Shine's, not
+        vanilla's.** The plugin replaces `GetBannedPlayersList()` a second
+        after load with one built from its own table: `id` becomes a digit
+        string, the order is `pairs()` order and is not stable, and `time`
+        is Shine's `UnbanTime`, which can be a float far beyond any real
+        date for an effectively permanent ban (`6e+24` seen on a real
+        Shine server, 2026-09-27). Shine also redirects `sv_ban`/`sv_unban` to
+        its own commands and rejects banned players in its own connection
+        hook. A client must sort the list itself and accept both id types.
+        The Shine fixture is synthetic, in the measured shape: the only real
+        capture is a production list.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The ban list, empty array when nobody is banned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BanRecord" }
+              examples:
+                empty: { value: [] }
+                populated:
+                  externalValue: ../fixtures/getbanlist-populated.json
+          x-fixtures:
+            - getbanlist.json
+            - getbanlist-populated.json
+            - getbanlist-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getreservedslots":
+    get:
+      tags: [players]
+      operationId: getReservedSlots
+      x-request: getreservedslots
+      summary: Reserved slot count and the ids that hold them
+      description: |
+        `GetReservedSlotData()`, `ServerAdminCommands.lua:595`. Returns `{}`
+        with neither key when the server has no reserved-slot config.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Reserved slot configuration.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReservedSlots" }
+              examples:
+                empty:
+                  externalValue: ../fixtures/getreservedslots.json
+          x-fixtures:
+            - getreservedslots.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=setreservedslotamount":
+    get:
+      tags: [players]
+      operationId: setReservedSlotAmount
+      x-request: setreservedslotamount
+      x-broken: true
+      deprecated: true
+      summary: Set the reserved slot count -- BROKEN, does nothing
+      description: |
+        **This request type has never worked.** `ServerWebInterface.lua:209`
+        calls `SetReservedSlotAmount(actions.amount)`, but the function is
+        declared `SetReservedSlotAmount(client, amount)`
+        (`ServerAdminCommands.lua:614`). The amount arrives as `client`,
+        `amount` is `nil`, `tonumber(nil)` is `nil`, and the guard on line 618
+        rejects the call. The request answers `200` with an empty body and
+        changes nothing.
+
+        Verified both ways on a live server: the API call left `amount` at `0`
+        and logged nothing, while `sv_reserved_slots 3` through the console
+        path set it to `3` and logged `Reserved slot amount set to 3`.
+
+        The fix is one line -- `SetReservedSlotAmount(nil, actions.amount)` --
+        and the mod ships it. Against a stock server, drive reserved slots
+        through `sv_reserved_slots`, `sv_add_reserved_slot` and
+        `sv_remove_reserved_slot` via `sendConsoleCommand` instead.
+
+        Marked `deprecated` here to keep generated clients away from it; the
+        request type is current, merely non-functional.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: amount
+          in: query
+          required: true
+          description: |
+            Slot count, `0 <= amount <= Server.GetMaxPlayers()`. Ignored by the
+            stock build; honoured by the mod's corrected Lua.
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200": { $ref: "#/components/responses/EmptyWrite" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+    post:
+      tags: [players]
+      operationId: setReservedSlotAmountPost
+      x-request: setreservedslotamount
+      deprecated: true
+      summary: Set the reserved slot count -- BROKEN, does nothing (form body)
+      description: |
+        Identical to the `GET` form, but every parameter, `request` included,
+        must be in the form body: a `POST`'s query string never reaches Lua
+        (measured on 09-26). Just as broken. See `setReservedSlotAmount`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [request, amount]
+              properties:
+                request: { const: setreservedslotamount }
+                amount: { type: integer, minimum: 0 }
+      responses:
+        "200": { $ref: "#/components/responses/EmptyWrite" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ------------------------------------------------------------------ chat
+
+  "/#request=getchatlist":
+    get:
+      tags: [chat]
+      operationId: getChatList
+      x-request: getchatlist
+      summary: The last 20 chat messages
+      description: |
+        `ServerWebInterface.lua:176`:
+
+            Server.recentChatMessages and json.encode(...) or "{ }"
+
+        A ring buffer of **20** entries (`Server.lua:74`), each with a
+        monotonically increasing `id` a client can use to detect new messages
+        and gaps. When the buffer does not exist the reply is the literal
+        `{ }` -- an **object**, where every other reply is an array. Handle
+        both shapes.
+
+        This list is also the shipped panel's "console": since console commands
+        return no output, chat is the only server-side text a client can read.
+
+        **With the mod and `since`** *(2026-10-06)*: a `ChatStream` instead,
+        from the mod's own ring of 200, which records every call to
+        `Server.AddChatToHistory` -- player chat, `sv_say`, `sv_tsay` and
+        Shine's `sh_say` -- with a time. Poll with the previous reply's
+        `last_id`, as with `getconsole`. Ids restart from 1 at every map
+        change (both rings are Lua state), so a `last_id` below the cursor
+        means the map changed. Without `since` the mod answers exactly as
+        stock does, because the 2012 panel polls that shape.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: since
+          in: query
+          required: false
+          description: |
+            **Mod only.** Return the mod's entries with an id greater than
+            this; `0` for everything its ring still holds. Ignored by a stock
+            server, and by the mod when it is not a number.
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Chat entries, oldest first.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/ChatMessage" }
+                  - type: object
+                    description: The `{ }` sent when the ring buffer is absent.
+                    additionalProperties: false
+                  - $ref: "#/components/schemas/ChatStream"
+              examples:
+                empty: { value: [] }
+                populated:
+                  externalValue: ../fixtures/getchatlist-player.json
+                noBuffer:
+                  summary: No ring buffer
+                  value: {}
+          x-fixtures:
+            - getchatlist.json
+            - getchatlist-before.json
+            - getchatlist-after.json
+            - getchatlist-player.json
+            - getchatlist-mod.json
+            - getchatlist-mod-since.json
+            - getchatlist-mod-restarted.json
+            - getchatlist-mod-player.json
+            - getchatlist-player-rig.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ----------------------------------------------------------- performance
+
+  "/#request=getperfdata":
+    get:
+      tags: [performance]
+      operationId: getPerfData
+      x-request: getperfdata
+      summary: Up to 30 performance samples
+      description: |
+        `perfDataBuffer:ToTable()`, `ServerWebInterface.lua:174`. A ring buffer
+        of **30** samples taken **once every 60 s** (`kMaxPerfDatas = 30`,
+        `kLogPerfDataRate = 60`), so the window is a half hour and polling
+        faster than once a minute returns the same data.
+        The mod leaves it as it is; its `getperf` serves far more.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Samples, oldest first, at most 30.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 30
+                items: { $ref: "#/components/schemas/PerfSample" }
+              examples:
+                populated:
+                  externalValue: ../fixtures/getperfdata-populated.json
+          x-fixtures:
+            - getperfdata.json
+            - getperfdata-populated.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ------------------------------------------------------------------ maps
+
+  "/#request=getmaplist":
+    get:
+      tags: [maps]
+      operationId: getMapList
+      x-request: getmaplist
+      summary: Maps installed on the server
+      description: |
+        `GetMapList()`, `ServerWebInterface.lua:44`. Every map the server can
+        load, with the workshop mod that provides it -- `"0"` for a stock map.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Installed maps.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MapListEntry" }
+              examples:
+                stock:
+                  externalValue: ../fixtures/getmaplist.json
+                modded:
+                  externalValue: ../fixtures/getmaplist-modded.json
+          x-fixtures:
+            - getmaplist.json
+            - getmaplist-modded.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getmapcycle":
+    get:
+      tags: [maps]
+      operationId: getMapCycle
+      x-request: getmapcycle
+      summary: The current map cycle
+      description: |
+        Stock: `MapCycle_GetMapCycle()` with `ModsIdsToHex` applied to the
+        cycle and to every map entry, `ServerWebInterface.lua:181-190`. That
+        is the copy loaded with the map, not the file rotation reads, so a
+        hand edit of `MapCycle.json` does not show here until the next map --
+        and the copy is shallow, so the read rewrites the live cycle's mod
+        ids to hex (CONSTRAINTS items 12 and 13).
+
+        **With the mod** it reads `config://MapCycle.json` itself, falling
+        back to the in-memory copy only when the file is missing or does not
+        parse, and never mutates the live cycle. Same shape either way.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The map cycle, mod ids hex-encoded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MapCycle" }
+              examples:
+                stock:
+                  externalValue: ../fixtures/getmapcycle.json
+                modded:
+                  externalValue: ../fixtures/getmapcycle-modded.json
+                shine-options:
+                  externalValue: ../fixtures/getmapcycle-shine-options.json
+          x-fixtures:
+            - getmapcycle.json
+            - getmapcycle-before.json
+            - getmapcycle-after.json
+            - getmapcycle-modded.json
+            - getmapcycle-shine-options.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=setmapcycle":
+    post:
+      tags: [maps]
+      operationId: setMapCycle
+      x-request: setmapcycle
+      summary: Replace the map cycle
+      description: |
+        `ServerWebInterface.lua:191-205`. The cycle arrives as a **JSON string
+        in the `data` parameter** -- not as a JSON request body -- is decoded,
+        has `ModIdsFromHex` applied to it and to every map entry, and is
+        written to `config://MapCycle.json` by `MapCycle_SetMapCycle`.
+
+        Whole-document write: there is no way to add or remove a single map.
+        Read the cycle, modify it, send it back.
+
+        Bad JSON logs `setmapcycle web request passed bad json data` and
+        returns without writing -- and, because the handler returns `nil`
+        rather than `""`, that failure looks exactly like success from the
+        client's side. So does a cycle with no `maps` (a Lua error before the
+        write), and a junk mod id is logged and then written anyway
+        (measured, CONSTRAINTS item 13).
+
+        **With the mod** the write is checked first -- `maps` a non-empty
+        list of names or `{map}` objects, `time` a number >= 0, `mode`
+        `order` or `random`, every mod id hex or carrying `:` -- and refused
+        with a reason and nothing written. An accepted cycle is written, the
+        file read back, and returned. Keys the check does not know (Shine's
+        per-map `min`, `max`, `chance`, top-level `groups`) pass through.
+
+        A stock 17-map cycle serialises to **263 bytes**, 249x under the 64 KB
+        request-body cap; the cap is not a practical constraint. Verified to
+        round-trip losslessly.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [request, data]
+              properties:
+                request: { const: setmapcycle }
+                data:
+                  type: string
+                  description: |
+                    A `MapCycle` serialised with `JSON.stringify`. Mod ids must
+                    be hex strings, as `getmapcycle` returns them.
+                  contentMediaType: application/json
+                  contentSchema: { $ref: "#/components/schemas/MapCycle" }
+            example:
+              request: setmapcycle
+              data: '{"time":30,"mode":"order","maps":["ns2_summit","ns2_veil"],"mods":["1e62a2ce"]}'
+      responses:
+        "200":
+          description: |
+            Stock: an empty `text/html` body whatever happened (see
+            `EmptyWrite`). With the mod: JSON, `ok` and either the cycle as
+            the file now holds it or the reason it was refused.
+          content:
+            text/html:
+              schema: { type: string, const: "" }
+            application/json:
+              schema: { $ref: "#/components/schemas/MapCycleWrite" }
+              examples:
+                written:
+                  externalValue: ../fixtures/setmapcycle-ok.json
+                refused:
+                  externalValue: ../fixtures/setmapcycle-refused.json
+          x-fixtures:
+            - setmapcycle-ok.json
+            - setmapcycle-refused.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "503": { $ref: "#/components/responses/Busy" }
+    get:
+      tags: [maps]
+      operationId: setMapCycleGet
+      x-request: setmapcycle
+      summary: Replace the map cycle (query-parameter form)
+      description: |
+        Method is not enforced, so the write works as a `GET` too. Only useful
+        for small cycles and for debugging; the panel posts.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: data
+          in: query
+          required: true
+          description: A `MapCycle` serialised as JSON.
+          schema:
+            type: string
+            contentMediaType: application/json
+            contentSchema: { $ref: "#/components/schemas/MapCycle" }
+      responses:
+        "200": { $ref: "#/components/responses/EmptyWrite" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ------------------------------------------------------------------ mods
+
+  "/#request=getinstalledmodslist":
+    get:
+      tags: [mods]
+      operationId: getInstalledModsList
+      x-request: getinstalledmodslist
+      summary: Mods downloaded to the server (not necessarily loaded)
+      description: |
+        `GetModList()`, `ServerWebInterface.lua:30`. **Installed is not
+        loaded.** A mod appears here within seconds of `installmod`, but it is
+        only mounted when it is in the map cycle's `mods` array *and* the map
+        changes -- verified: setting `mods: ["1e62a2ce"]` and running
+        `sv_changemap` produced `Mounting mod 'Combat Fix'[509780686]`.
+
+        **There is no uninstall.** Nothing in the API removes a downloaded
+        mod, so this list only ever grows.
+
+        The mod adds `active` to each row: mounted now. See the schema.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Installed mods.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InstalledMod" }
+              examples:
+                installed:
+                  externalValue: ../fixtures/getinstalledmodslist.json
+          x-fixtures:
+            - getinstalledmodslist.json
+            - getinstalledmodslist-after-install.json
+            - getinstalledmodslist-modded.json
+            - getinstalledmodslist-active.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=installmod":
+    get:
+      tags: [mods]
+      operationId: installMod
+      x-request: installmod
+      summary: Download a workshop mod
+      description: |
+        `Server.InstallMod(actions.modid)`, `ServerWebInterface.lua:214`. The
+        shipped panel sends this as a `GET` (`modbrowser.js:25`).
+
+        Asynchronous. On stock the empty `200` says only that the request was
+        received: `Server.InstallMod` returns nothing, and drops an id it
+        cannot parse without a word (`zz`, `0` and an empty id leave no log
+        line; `-5` became mod 18446744073709551611, which Steam then reported
+        as not found -- measured on 09-26). **With the mod** the reply is JSON:
+        a malformed id is refused before the call, and an accepted one says
+        whether it was installed already.
+
+        Either way, the only proof of a download is `getinstalledmodslist`: a
+        mod is listed once it is downloaded and unpacked, under its real
+        title, and never before (1.7 s for a 710-byte mod, 3.8 s for 26 MB on
+        the rig). An id Steam does not have never arrives. Re-installing an
+        installed mod checks it and downloads nothing when it is current.
+
+        **Loading a non-whitelisted mod silently unranks the server** -- the
+        log says `Ranking disabled: server has non-whitelisted mods mounted`
+        and `Requesting server ranking be enabled, request success: false`.
+        Removing the mod restores ranking. Nothing in the API surfaces this;
+        a client should warn before installing.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: modid
+          in: query
+          required: true
+          description: |
+            Workshop id as a **hex string**, as `getmods` and
+            `getinstalledmodslist` report it. `1e62a2ce` is workshop item
+            `509780686`.
+          schema: { $ref: "#/components/schemas/ModId" }
+          example: 1e62a2ce
+      responses:
+        "200":
+          description: |
+            Stock: an empty `text/html` body whatever happened (see
+            `EmptyWrite`). With the mod: JSON, `ok` and what was done, or why
+            the id was refused.
+          content:
+            text/html:
+              schema: { type: string, const: "" }
+            application/json:
+              schema: { $ref: "#/components/schemas/InstallModResult" }
+              examples:
+                alreadyInstalled:
+                  externalValue: ../fixtures/installmod-already.json
+                refused:
+                  externalValue: ../fixtures/installmod-refused.json
+          x-fixtures:
+            - installmod-already.json
+            - installmod-refused.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+    post:
+      tags: [mods]
+      operationId: installModPost
+      x-request: installmod
+      summary: Download a workshop mod (form body)
+      description: Identical to the `GET` form. See `installMod`. The panel posts.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [request, modid]
+              properties:
+                request: { const: installmod }
+                modid: { $ref: "#/components/schemas/ModId" }
+      responses:
+        "200":
+          description: As for the `GET` form.
+          content:
+            text/html:
+              schema: { type: string, const: "" }
+            application/json:
+              schema: { $ref: "#/components/schemas/InstallModResult" }
+              examples:
+                installed:
+                  externalValue: ../fixtures/installmod-ok.json
+          x-fixtures:
+            - installmod-ok.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getmods":
+    get:
+      tags: [mods]
+      operationId: getMods
+      x-request: getmods
+      summary: Search the Steam workshop (asynchronous, poll until settled)
+      description: |
+        `ServerWebInterface.lua:217-274`. The Lua handler cannot block, so the
+        first call **starts** `Server.SearchWorshop` (the spelling is UWE's)
+        and returns `{"loading": true}` immediately. Poll the same URL until
+        the reply is something else.
+
+        What the engine does, measured on 09-26 (REQUIREMENTS item 4):
+
+        - **At most 50 hits, and the page is ignored.** Pages 1, 2, 3 and 500
+          of one search were the same 50 items, so there is no paging: a
+          search that finds more shows its first 50 only. The engine logs the
+          total (`numMatching = 2874`) but does not hand it to Lua.
+        - Relevance order: `combat fix` puts Combat Fix first.
+        - The callback gets one table. An empty one means no matches **or a
+          search Steam failed** (`Failed Steam error NoConnection` with the
+          rig offline, answered at once); nothing tells the two apart.
+        - A search answers in 0.3-0.9 s.
+
+        Stock, as vanilla has it:
+
+        - Completed results are cached for **60 s**, keyed by
+          `searchtext .. page` -- so `a` page 11 and `a1` page 1 share a key.
+        - A search still running after **30 s** is treated as timed out and
+          restarted, so a client can poll forever without ever settling.
+        - An empty result is `{"items": []}` (this spec said `{}` until it was
+          measured: dkjson writes an empty table as `[]`).
+        - Omitting `searchtext` is worse than useless: no search is started,
+          so the reply is `{"loading": true}` forever. A `p` that is not a
+          number is a Lua error, answered with an empty `200`.
+
+        **With the mod** (CONSTRAINTS item 2): the loading reply carries
+        `elapsed`; a settled one carries `done`, `page`, `count` and `capped`
+        (50 hits: there may be more); a search with no answer after 30 s is
+        reported once, with `error`, instead of restarting silently; a missing
+        `searchtext` searches for everything; `p` is read as a whole number
+        from 1 to 1000, else 1; the cache key separates text and page. `items`
+        is always present, and the 2012 panel reads only `loading` and
+        `items`, so it is unaffected.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: searchtext
+          in: query
+          required: true
+          description: |
+            Free-text workshop query. Required on stock -- without it no
+            search is ever started and the response never settles. The mod
+            reads a missing one as `""`, everything. Keep it short: a
+            3000-character query failed Digest authentication.
+          schema: { type: string }
+          example: combat
+        - name: p
+          in: query
+          required: false
+          description: |
+            1-based page number. Defaults to 1. **The engine ignores it**
+            (measured): every page is the same first 50 hits.
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200":
+          description: |
+            Either the loading sentinel, a page of results, or `{}` for an
+            empty result. All three are `200 application/json`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkshopSearchResult" }
+              examples:
+                loading:
+                  summary: First call, and every call until the search settles
+                  value: { loading: true }
+                settled:
+                  summary: A settled page (50 items)
+                  externalValue: ../fixtures/getmods-settled.json
+                emptyResult:
+                  summary: No matches, or a search Steam failed -- no error either way
+                  value: { items: [] }
+                modSettled:
+                  summary: With the mod, six hits
+                  externalValue: ../fixtures/getmods-mod-settled.json
+                modTimedOut:
+                  summary: With the mod, a search with no answer after 30 s
+                  value: { done: true, page: 1, items: [], count: 0,
+                           error: "The workshop search had no answer after 30 s." }
+          x-fixtures:
+            - getmods-first.json
+            - getmods-settled.json
+            - getmods-mod-loading.json
+            - getmods-mod-settled.json
+            - getmods-mod-capped.json
+            - getmods-mod-empty.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ------------------------------------------------------------------- mod
+
+  "/#request=runcommand":
+    get:
+      tags: [mod, server]
+      operationId: runCommand
+      x-request: runcommand
+      x-requires-mod: true
+      summary: Run a console command and return what it printed
+      description: |
+        **Mod only.** What `sendConsoleCommand` should have been.
+
+        The mod wraps `ServerAdminPrint` (`core/lua/ServerAdmin.lua:156`) and
+        `Shared.Message`, both plain writable globals that nobody aliases
+        locally, and tees every line into a ring buffer.
+        `Shared.ConsoleCommand` is synchronous, so by the time it returns the
+        command's own output is already captured and can be returned with it.
+
+        Reading the result:
+
+        - `dispatched: true` means the command was created by
+          `CreateServerAdminCommand` and ran -- proven by the audit line the
+          game emits before every such command. `false` means either a plain
+          console command such as `killall`, or no such command; **the server
+          does not distinguish those two and neither should a client.**
+        - `lines` is what it printed, in order, each tagged with where it came
+          from: `audit` for the dispatch receipt, `admin` for
+          `ServerAdminPrint`, `server` for `Shared.Message`.
+        - **An empty `lines` with `dispatched: true` is normal and is not
+          failure.** A successful `sv_kick` prints nothing at all -- only its
+          failure branch calls `ServerAdminPrint`
+          (`ServerAdminCommands.lua:172`) -- and `sv_cheats` reports nothing
+          either way. Show "ran, no output", never "succeeded".
+
+        Only the synchronous call is captured. Anything printed after it
+        returns lands in the buffer and comes back through `getConsole`.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: cmd
+          in: query
+          required: true
+          description: The command line, as typed at the server console.
+          schema: { type: string }
+          examples:
+            kick: { value: "sv_kick 10000000" }
+            slots: { value: "sv_reserved_slots 3" }
+      responses:
+        "200":
+          description: The command ran. What it said, if anything, is in `lines`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandResult" }
+              examples:
+                failed:
+                  summary: A kick that matched nobody -- the case the stock API hides
+                  value:
+                    cmd: sv_kick NoSuchPlayer
+                    dispatched: true
+                    elapsed: 0
+                    last_id: 17
+                    lines:
+                      - { id: 16, time: 1788642719, src: audit, text: "sv - Admin - 0: : STEAM_0:0:0: sv_kick" }
+                      - { id: 17, time: 1788642719, src: admin, text: "No matching player" }
+                unknown:
+                  summary: No such command -- nothing is printed anywhere
+                  value: { cmd: sv_nonsense, dispatched: false, elapsed: 0, lines: [], last_id: 17 }
+          x-fixtures:
+            - runcommand-failed.json
+            - runcommand-unknown.json
+            - runcommand-slots.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+    post:
+      tags: [mod, server]
+      operationId: runCommandPost
+      x-request: runcommand
+      x-requires-mod: true
+      summary: Run a console command (form body)
+      description: Identical to the `GET` form. See `runCommand`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [request, cmd]
+              properties:
+                request: { const: runcommand }
+                cmd: { type: string }
+      responses:
+        "200":
+          description: The command ran.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommandResult" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getconsole":
+    get:
+      tags: [mod, server]
+      operationId: getConsole
+      x-request: getconsole
+      x-requires-mod: true
+      summary: Console output since a cursor
+      description: |
+        **Mod only.** The same capture that feeds `runCommand`, read as a
+        stream: everything printed through `ServerAdminPrint` or
+        `Shared.Message` since line `since`, whoever caused it. A command run
+        from the game console, or by the 2012 panel through the legacy
+        `command`/`rcon` path, appears here too.
+
+        Poll with the `last_id` of the previous reply. `dropped` counts lines
+        that fell out of the 500-entry ring before anyone read them, so a
+        client can say "some output was missed" rather than silently skipping
+        it.
+
+        **Not persistent.** The buffer is Lua state and Lua state is rebuilt on
+        every map change, so the stream restarts from nothing when the map
+        changes. Durable history is the log tail's job, not this one.
+
+        Engine chatter does not appear: an idle server produced zero lines over
+        75 s, because the periodic messages in `log-Server.txt` are written
+        engine-side and never pass through Lua.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: since
+          in: query
+          required: false
+          description: |
+            Return lines with an id greater than this. Omit or `0` for
+            everything the buffer still holds.
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Console lines, oldest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsoleStream" }
+          x-fixtures:
+            - getconsole.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getlog":
+    get:
+      tags: [mod, server]
+      operationId: getLog
+      x-request: getlog
+      x-requires-mod: true
+      summary: The engine's log, since a byte offset
+      description: |
+        **Mod only.** `log-Server.txt`, the engine's own log, read through
+        `config://` -- which reaches it only when the engine writes it into the
+        config directory: `-logdir` equal to `-config_path`, or neither flag
+        (the default layout). Otherwise the reply says
+        `source: none` and why, and the console buffer (`getConsole`) is what
+        there is. See REQUIREMENTS.md item 7.
+
+        It holds what never passes through Lua -- connects and auth, engine
+        errors, `Script tracing`, Shine's chat and command lines -- and it
+        **outlives a map change**, unlike the console buffer: the file is the
+        engine's, not Lua state. It is served **verbatim**: IPs, Steam ids and
+        chat included (by design, 2026-09-28).
+
+        With no cursor, the last `tail_bytes` (64 KB), starting at a line.
+        Poll with `since` = the previous `to` and `file` = the previous
+        `file_id`; page back with `before` = the first line's `off`. Only
+        complete lines are served: a line the engine has not finished is held
+        until it has. A reply carries at most `max_bytes` (64 KB); `more`
+        says to ask again at once. An idle poll reads nothing.
+
+        `reset` replaces the cursor: `new_file` when the header's Date and
+        Time differ from `file` (a restart moved the old log to
+        `log-Server.old.txt`), `truncated` when the file is shorter than the
+        cursor. The reply is then a fresh tail.
+
+        The first `getLog` after each map load prints one line to the log,
+        `webadmin-spa: checking that config://log-Server.txt is this server's
+        log (<n>)`, and looks for it in the file: a copy an earlier run left
+        in the config directory opens just as well and never grows. Then the
+        reply is `source: none` with `stale: true`.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: since
+          in: query
+          required: false
+          description: Byte offset to read from, the previous reply's `to`.
+          schema: { type: integer, minimum: 0 }
+        - name: before
+          in: query
+          required: false
+          description: |
+            Byte offset to page back from, the first line's `off`. Up to
+            `tail_bytes` before it, starting at a line. Ignored with `since`.
+          schema: { type: integer, minimum: 0 }
+        - name: file
+          in: query
+          required: false
+          description: |
+            The `file_id` the cursor belongs to. A different one is a
+            `new_file` reset.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lines of the log, oldest first, or why there are none.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/LogPage"
+                  - $ref: "#/components/schemas/LogUnavailable"
+          x-fixtures:
+            - getlog-rig-tail.json
+            - getlog-rig-since.json
+            - getlog-rig-reset.json
+            - getlog-rig-stale.json
+            - getlog-none.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getperf":
+    get:
+      tags: [mod, performance]
+      operationId: getPerf
+      x-request: getperf
+      x-requires-mod: true
+      summary: Performance windows since a cursor
+      description: |
+        **Mod only.** What `perfmon` logs, served. The engine completes a
+        `ServerPerformanceData` about once a second
+        (`Shared.GetServerPerformanceData()`); the mod accumulates them into
+        windows of `window_s` seconds (10) and keeps `capacity` of them (360,
+        an hour). Each window adds the tickrate counted from `UpdateServer`
+        calls and the longest single tick, because the engine's own tick
+        interval is whole milliseconds (16 at tickrate 60, read as 62.5).
+        Measured on the rig; see REQUIREMENTS.md item 10.
+
+        Poll with the `last_id` of the previous reply. **Paged**: a reply
+        holds at most 60 windows past `since`, and `engine` at most 60
+        records past `esince` across its three lists, oldest first; `more`
+        (and `engine.more`) is `true` while the server holds more past
+        `last_id`, and a client asks again at once. An hour in one reply
+        cost most of a tick at 80 to encode (SERVER-COST.md).
+
+        **Not persistent**: the
+        buffer is Lua state, rebuilt at every map change, so the ids restart
+        from 1 and `loaded_at` moves. A client that sees `loaded_at` change
+        knows a map change happened and that windows between its last poll and
+        the change are gone.
+
+        `engine` carries what the engine prints only to `log-Server.txt`:
+        `tickstat` lines, snapshot rate steps, a bwlimit warning and the
+        `perfmon:` block, found by a scan of the log every `scan_s` seconds
+        and read with a cursor of their own (`esince`). Same lifetime as the
+        windows. Measured on the rig's 09-27 engine; REQUIREMENTS.md item 10.
+
+        Vanilla `getperfdata` is unchanged beside it, for the 2012 panel.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: since
+          in: query
+          required: false
+          description: |
+            Return windows with an id greater than this, at most 60. Omit
+            or `0` to start from the oldest the buffer still holds.
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: esince
+          in: query
+          required: false
+          description: |
+            Return `engine` records with an id greater than this, at most
+            60. Omit or `0` to start from the oldest held.
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Windows, oldest first, and the rates the server runs at.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PerfReport" }
+              examples:
+                rig:
+                  externalValue: ../fixtures/getperf-rig.json
+                populated:
+                  externalValue: ../fixtures/getperf-rig-populated.json
+                tickstat:
+                  externalValue: ../fixtures/getperf-rig-tickstat.json
+          x-fixtures:
+            - getperf-rig.json
+            - getperf-rig-since.json
+            - getperf-rig-populated.json
+            - getperf-rig-tickstat.json
+            - getperf-rig-tickstat-off.json
+            - getperf-rig-perfmon.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getbans":
+    get:
+      tags: [mod, players]
+      operationId: getBans
+      x-request: getbans
+      x-requires-mod: true
+      summary: The bans in force, from whichever table decides them
+      description: |
+        **Mod only.** Where `getbanlist` is `GetBannedPlayersList()` as it
+        stands, this reads the table that actually decides who is banned:
+        Shine's own when its ban plugin is on, which keeps who banned, when
+        and for how long -- all of which `GetBannedPlayersList()` throws
+        away -- and vanilla's otherwise.
+
+        Normalized so a client need not know which it got: numeric ids,
+        expired bans left out, a `permanent` flag in place of a sentinel
+        time, a stable order, and the server's clock as `now`.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Bans in force, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BanList" }
+          x-fixtures:
+            - getbans.json
+            - getbans-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getrecentplayers":
+    get:
+      tags: [mod, players]
+      operationId: getRecentPlayers
+      x-request: getrecentplayers
+      x-requires-mod: true
+      summary: Players seen in the last 24 hours, connected or not
+      description: |
+        **Mod only.** Every human seen in the last `window` seconds, at most
+        `capacity` of them, so a player who has left can still be found and
+        banned. Bots are never recorded.
+
+        The list outlives a map change, which rebuilds all Lua state: it is
+        kept in `config://webadmin-spa/recent-players-{a,b}.json`, saved
+        alternately so a torn write loses one save rather than the list.
+        `storage` says how the load went and whether saves are working.
+
+        `connected` is read off the live player list at request time. A
+        connected player's `last_seen` is `now`.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Recent players, most recently seen first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecentPlayers" }
+          x-fixtures:
+            - getrecentplayers.json
+            - getrecentplayers-rig.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getmapvote":
+    get:
+      tags: [mod, maps]
+      operationId: getMapVote
+      x-request: getmapvote
+      x-requires-mod: true
+      summary: What Shine's mapvote will do with the map cycle
+      description: |
+        **Mod only.** `enabled: false` and nothing else when Shine's mapvote
+        plugin is not on. When it is:
+
+        - `maps_from_cycle`: the vote takes its options from the cycle
+          (`GetMapsFromMapCycle`). Otherwise it uses its own map list and the
+          cycle's maps are not what players vote on.
+        - `options`: the maps the vote offers **now**. The plugin reads the
+          cycle once, at map load, so after a `setmapcycle` this lags the
+          file until the next map (measured, CONSTRAINTS item 13).
+        - `round_limit`: rounds before the map ends, `0` for none. When set,
+          it ends the map instead of the cycle's `time`, and `mode` plays no
+          part either way.
+        - `next_map`: `Plugin:GetNextMap()`, the vote's winner if there is
+          one, else the next option after the current map. Absent when the
+          plugin could not say.
+
+        `getmapvote-off.json` is synthetic (`{"enabled": false}`); the Shine
+        one is the rig's, on a Shine config.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The mapvote plugin's view of the cycle.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MapVote" }
+          x-fixtures:
+            - getmapvote-off.json
+            - getmapvote-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getwhitelist":
+    get:
+      tags: [mod]
+      operationId: getWhitelist
+      x-request: getwhitelist
+      x-requires-mod: true
+      summary: The ranked-mod whitelist, as the server last read it from Steam
+      description: |
+        **Mod only.** A mod not on the whitelist turns ranking off. The engine
+        reads the list at boot, as the "Required items" of an unlisted Workshop
+        item, and gives Lua no way to see it, so the mod reads the item's
+        public page itself (CONSTRAINTS.md item 17). Ids are **decimal** workshop ids, as
+        Steam spells them, not the hex the rest of the API uses.
+
+        - The first request with no copy, or a copy more than an hour old,
+          starts a read and answers `fetching: true`; the read takes about
+          2 s (two pages, one after the other). A copy is kept in
+          `config://webadmin-spa/whitelist.json`, so a map change does not
+          read Steam again.
+        - `whitelist`, `hotfix` and `read_at` are present together, when there
+          is a copy. `hotfix` are the hotfix mods, which the engine never
+          checks: they count as whitelisted.
+        - `error` says why the last read failed (Steam unreachable, an HTTP
+          status, a page with no list). The mod then waits 5 minutes before
+          reading again, and keeps serving any older copy meanwhile. With no
+          known whitelist for the server's hotfix list, `branch` is absent
+          and so is everything but `now` and `error`.
+        - `hotfix_list_id` is what `ModServices.GetHotfixListModId()` returns:
+          2633436686 on the live branch, 2708090797 on beta.
+
+        `getwhitelist-fetching.json` and `getwhitelist-rig.json` are the rig's
+        first and second answer (2026-10-08). `getwhitelist-failed.json` is
+        synthetic, with curl's message for an unknown host as the rig's probe
+        recorded it.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The whitelist, or that it is being read, or why not.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Whitelist" }
+          x-fixtures:
+            - getwhitelist-fetching.json
+            - getwhitelist-rig.json
+            - getwhitelist-failed.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  # ---------------------------------------------------------------- static
+
+  /index.html:
+    get:
+      tags: [static]
+      operationId: getPanel
+      summary: The admin panel itself
+      description: |
+        `Shared.SetWebRoot("web")` (`ServerWebInterface.lua:25`) serves
+        `ns2/web/` -- or a mod's `web/`, which shadows it. Files under the
+        root are returned with a guessed content type (`.js` as the obsolete
+        `application/x-javascript`).
+
+        `/index.html` is documented in `Dedicated_Server_Usage.txt:118`, but
+        the server's own boot line is `Web server running at <host>:<port>`
+        with no path -- and a bare `/` is not a directory index, it is the
+        server-state blob. Anything not on disk falls through to the JSON
+        handler with `200`, so **a missing asset never looks like a 404**.
+      responses:
+        "200":
+          description: The panel.
+          content:
+            text/html:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+components:
+
+  securitySchemes:
+    digestAuth:
+      type: http
+      scheme: digest
+      description: |
+        HTTP Digest, MD5, handled by the engine (`ComputePasswordDigest` in
+        `server_linux`), never by Lua. The realm is the `-webdomain` value, or
+        `localhost` when unset. Credentials come from `-webuser` / `-webpassword`.
+
+        Measured on the 26-09-03 build:
+
+        - A nonce is **reusable** for its lifetime as long as the client
+          increments `nc` -- ordinary RFC 7616 behaviour.
+        - Replaying an already-used `nc` is refused `401` with `stale="true"`.
+        - The nonce expires on **age, not idleness**: polled every 2 s, one
+          nonce took 150 requests and was refused at **301 s**, `nc` having
+          reached `00000097`. The refusal carries a fresh nonce, and the next
+          request signed with it returns `200`.
+        - 10 failed logins per address per minute earns a **1 minute
+          lockout** -- back off on `401`, never retry-loop bad credentials.
+
+        A browser absorbs all of this. Verified in headless Chrome: a
+        `fetch()` poll left running 480 s at a 2 s cadence made 240 requests,
+        all `200`, across a nonce expiry, with no prompt and no `401` visible
+        to DevTools. **A polling panel needs no re-authentication logic of its
+        own.**
+
+        Still plain HTTP.
+
+  parameters:
+    RequestConst:
+      name: request
+      in: query
+      required: true
+      description: The action selector. Pinned to this operation's value.
+      schema: { type: string }
+    RequestJson:
+      name: request
+      in: query
+      required: false
+      description: |
+        Any value that is not one of the eleven recognised actions, or no value at
+        all, reaches the default handler. The panel sends `json` by convention.
+      schema: { type: string, default: json }
+
+  responses:
+    EmptyWrite:
+      description: |
+        Accepted. Lua returns nothing for a write, so the engine sends an empty
+        `200` whose `Content-Type` is `text/html` -- not JSON. There is no
+        success flag, no error and no body to parse; the only way to confirm a
+        write is to read the state back.
+      content:
+        text/html:
+          schema: { type: string, const: "" }
+      headers:
+        Content-Length: { schema: { type: integer, const: 0 } }
+
+    DigestChallenge:
+      description: |
+        Digest challenge. `stale="true"` means the credentials were fine and
+        only the nonce was old -- a browser retries silently. Repeated genuine
+        failures trigger a one-minute per-address lockout after 10 in a minute.
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+          example: Digest qop="auth", realm="127.0.0.1", nonce="…", stale="true"
+
+    ForeignOrigin:
+      description: |
+        Refused: the request carried an `Origin` header that does not match
+        `Host`. Compared against the `Host` header, not against `-webdomain`.
+        `Origin: null` is refused too; a request with no `Origin` at all is
+        accepted. **This is why a Vite dev server on `:5173` cannot talk to a
+        real game server** -- develop against `mock/server.js`.
+
+        With **no login configured** (09-25 and later), a `Host` that is
+        neither `localhost` nor an IP literal is refused `403` as well,
+        static files included. See CONSTRAINTS.md, "The Host rule".
+
+    BodyTooLarge:
+      description: |
+        Request body over the 64 KB cap, or a malformed `Content-Length`. The
+        cap is measured; this exact status is not -- an over-cap body was never
+        captured from a real server. Treat it as a refusal either way.
+
+    Busy:
+      description: |
+        The request gave up after 30 s. This is the shape of a busy server, not
+        a hard failure -- retry with backoff rather than surfacing an error.
+
+  schemas:
+
+    SteamId:
+      type: integer
+      description: |
+        Steam id as the engine reports it (`client:GetUserId()`). `0` for bots.
+        A number here, unlike mod ids, which are hex strings.
+      examples: [10000000, 0]
+
+    ModId:
+      type: string
+      pattern: "^[0-9a-f]+$"
+      description: |
+        A workshop id, lowercase hex, no `0x` prefix. JSON has no 64-bit
+        integers, so the server converts with `string.format("%x", id)` on the
+        way out and `tonumber64("0x"..mod)` on the way back in. **Round-trip it
+        as a string; never parse it as a number.** `1e62a2ce` is workshop item
+        `509780686`. `"0"` means "no mod" in `getmaplist`.
+      examples: ["1e62a2ce", "0"]
+
+    TeamNumber:
+      type: integer
+      description: |
+        `0` ready room, `1` marines, `2` aliens, `3` spectators
+        (`Globals.lua:119-122`).
+      enum: [0, 1, 2, 3]
+
+    StringBool:
+      type: string
+      enum: ["true", "false"]
+      description: |
+        A boolean that crossed the wire as a string, via `tostring()`. Compare
+        against `"true"`, never for truthiness -- `"false"` is truthy in JS.
+
+    WireBool:
+      description: |
+        A stock server sends a `StringBool` (`tostring()`); the mod's Lua
+        sends a real boolean (CONSTRAINTS item 4). A client reading both
+        compares against `true` and `"true"`, never for truthiness.
+      oneOf:
+        - { type: boolean }
+        - { $ref: "#/components/schemas/StringBool" }
+
+    Player:
+      type: object
+      description: One connected player, from `GetServerState()`, lines 90-104.
+      required:
+        [name, steamid, isbot, team, iscomm, score, kills, assists, deaths,
+         resources, ping, ipaddress]
+      properties:
+        name: { type: string }
+        steamid: { $ref: "#/components/schemas/SteamId" }
+        isbot:
+          allOf: [{ $ref: "#/components/schemas/WireBool" }]
+          description: |
+            Stock: `tostring(client:GetIsVirtual())` -- a **string**, while
+            `iscomm` beside it is a real boolean. The mod sends a boolean.
+        team: { $ref: "#/components/schemas/TeamNumber" }
+        iscomm: { type: boolean, description: "A real boolean, unlike stock's `isbot`." }
+        score: { type: integer }
+        kills: { type: integer }
+        assists: { type: integer }
+        deaths: { type: integer }
+        resources: { type: number }
+        ping: { type: integer }
+        ipaddress:
+          type: string
+          description: |
+            **The player's full IP address**, served over plain HTTP to anyone
+            who can authenticate. Mask by default and reveal per row on
+            request. Live captures must never be committed -- the fixtures in
+            this repo are redacted to `0.0.0.0`.
+          examples: ["0.0.0.0"]
+        gagged:
+          type: boolean
+          description: |
+            **Mod only, under Shine's basecommands plugin**: muted with
+            `sh_gag`, read through the plugin's `IsClientGagged`, which also
+            expires a timed gag. Absent otherwise.
+        familyshared:
+          type: boolean
+          description: |
+            **Mod only, on the 09-26+ beta engine**
+            (`Server.GetIsFamilyShared`): playing a Steam Family Shared copy.
+            Bots, the listen host and LAN players always read false (the
+            engine's CHANGELOG). Absent on an engine without the function,
+            or when it errors.
+        owner_steamid:
+          allOf: [{ $ref: "#/components/schemas/SteamId" }]
+          description: |
+            **Mod only, beta engine**, and only with `familyshared: true`:
+            `Server.GetOwnerUserId`, the account that owns the game.
+        moves_rejected_time:
+          type: number
+          description: |
+            **Mod only, beta engine**
+            (`ServerClient:GetMovesRejectedTimeCredit`): moves rejected for
+            time credit, "usually a modified client" (CHANGELOG). Measured
+            2026-10-06: an unmodified 09-28 client on the 09-27 rig, idle and
+            minimized most of the time, climbed about 6/s, dropped once (75
+            to 45) and restarted at a map change -- not a monotonic count,
+            and not rare.
+        moves_rejected_other:
+          type: number
+          description: |
+            **Mod only, beta engine** (`ServerClient:GetMovesRejectedOther`):
+            moves rejected for anything else; "a poor connection can also
+            cause these" (CHANGELOG).
+        skill:
+          type: number
+          description: |
+            **Mod only.** `ScoringMixin:GetPlayerSkill()`: the Hive skill the
+            server ranks and balances with (under UWE Hotfix 344, read from
+            Steam User Stats). Absent for a player without ScoringMixin.
+            `-1`, with all three below, when the server holds none: every
+            bot, on the rig. Matched what Steam User Stats holds for a human
+            on the rig (2026-10-07).
+        skill_offset:
+          type: number
+          description: |
+            **Mod only.** `GetPlayerSkillOffset()`: marines play at `skill +
+            skill_offset`, aliens at `skill - skill_offset`.
+        comm_skill:
+          type: number
+          description: "**Mod only.** `GetCommanderSkill()`: commander skill."
+        comm_skill_offset:
+          type: number
+          description: |
+            **Mod only.** `GetCommanderSkillOffset()`, applied to `comm_skill`
+            the same way.
+        skill_tier:
+          type: integer
+          minimum: -2
+          maximum: 7
+          description: |
+            **Mod only.** `ScoringMixin:GetSkillTier()`: the tier the game
+            draws the scoreboard's skill badge for. `-1` a bot, `-2` no
+            skill, `0` a rookie (level 10 or below), else 1-7 from `skill`
+            less `25 / sqrt(adagrad sum)`, the server's uncertainty, banded
+            at 300, 750, 1400, 2100, 2900 and 4100 (`GetPlayerSkillTier`).
+            Not team-relative, unlike the scoreboard's own badge. The game
+            keeps its first answer for the rest of the map; the mod puts back
+            whatever was kept, so asking changes nothing. Absent with `skill`,
+            or when `GetSkillTier()` errors.
+
+    ServerState:
+      type: object
+      description: |
+        `GetServerState()`, `ServerWebInterface.lua:78-135`. Also the response
+        to every unrecognised request, to a console command, and to any path
+        that is not a file on disk.
+      required:
+        [webdomain, webport, cheats, devmode, map, players_online, marines,
+         aliens, uptime, player_list, marine_res, alien_res, server_name,
+         frame_rate, game_started, game_time]
+      properties:
+        webdomain:
+          type: string
+          description: Substituted by the engine from `[[webdomain]]`.
+        webport:
+          type: string
+          description: Substituted from `[[webport]]`. A **string**.
+          examples: ["8080"]
+        cheats: { $ref: "#/components/schemas/WireBool" }
+        devmode: { $ref: "#/components/schemas/WireBool" }
+        map: { type: string, examples: [ns2_summit] }
+        players_online:
+          type: integer
+          description: |
+            Player entity count. Rendered before a disconnect completes, so a
+            successful kick can still be reflected here -- verified: a kick
+            that worked still reported 12.
+        marines: { type: integer }
+        aliens: { type: integer }
+        uptime: { type: integer, description: "Seconds, `math.floor(Shared.GetTime())`." }
+        player_list:
+          type: array
+          items: { $ref: "#/components/schemas/Player" }
+        marine_res: { type: number }
+        alien_res: { type: number }
+        server_name: { type: string }
+        frame_rate: { type: number, description: "Current server tickrate." }
+        game_started: { type: boolean, description: "A real boolean." }
+        game_time:
+          type: integer
+          description: Seconds since round start, `0` when no round is running.
+        mod_version:
+          type: string
+          description: |
+            **Mod only.** The version of the webadmin-spa Lua serving this
+            request. Absent on a stock server, which is the supported way to
+            tell the two apart -- a panel should read this once and say plainly
+            what is unavailable rather than offering features that cannot work.
+          examples: ["0.1.0"]
+        max_players:
+          type: integer
+          description: |
+            **Mod only.** `Server.GetMaxPlayers()`. The reserved slot amount
+            must not exceed it: `sv_reserved_slots` silently ignores a larger
+            value.
+          examples: [16]
+        map_loaded_at:
+          type: integer
+          description: |
+            **Mod only.** When the current map loaded, Unix seconds
+            (`Shared.GetSystemTime()` as the Lua VM starts, the same stamp
+            as `getperf`'s `loaded_at`). The VM is rebuilt at every map
+            change, so it is the last map change's time, from the server
+            rather than from whenever a panel noticed.
+          examples: [1791403505]
+        ranking_active:
+          type: boolean
+          description: |
+            **Mod only.** `Server.GetIsRankingActive()`: whether the engine
+            counts this server's rounds for ranking. It turns ranking on by
+            itself when the server is not hidden, is dedicated, has no cheats
+            or Lua hot reloading, has at most 5 spectator slots and 12 to 20
+            player slots, and every mounted mod is whitelisted (CONSTRAINTS
+            item 18). So it should be `false` wherever this mod is mounted
+            until the mod is whitelisted. Absent when the call is missing or
+            errors.
+          examples: [false]
+        shine:
+          $ref: "#/components/schemas/ShineState"
+
+    ShineState:
+      type: object
+      description: |
+        **Mod only, and only when Shine is loaded** -- the key is absent
+        otherwise. Whether each Shine plugin that replaces vanilla behaviour
+        is enabled, read per request with `Shine:IsExtensionEnabled`, so a
+        plugin loaded or unloaded at runtime shows up at once.
+
+        - `ban`: Shine owns the ban list and redirects `sv_ban`/`sv_unban`.
+          Ban with `sh_banid`, unban with `sh_unban`: an `sv_ban` of an id
+          that is not connected reports success but lands only in the
+          vanilla list, which is not enforced (measured 2026-09-27).
+        - `reservedslots`: Shine sets the reserved slot count and grants
+          access by the `sh_reservedslot` permission; the vanilla id list is
+          not what is enforced.
+        - `mapvote`: Shine decides the next map.
+        - `basecommands` *(2026-10-06; absent from older mods)*: Shine's
+          `sh_gag`/`sh_ungag` exist, the only mute there is -- the game has
+          no mute command, and the 2012 panel's `sv_mute` never existed
+          (CURRENT-UI defect 18). Each player then carries `gagged`.
+      required: [ban, reservedslots, mapvote]
+      properties:
+        ban: { type: boolean }
+        reservedslots: { type: boolean }
+        mapvote: { type: boolean }
+        basecommands: { type: boolean }
+      examples:
+        - { ban: true, reservedslots: false, mapvote: true, basecommands: true }
+
+    BanEntry:
+      type: object
+      description: |
+        One ban in force, as `getbans` reports it: the same record whether
+        vanilla or Shine owns the list, with Shine's extra fields when it
+        does.
+      required: [id, name, reason, permanent]
+      properties:
+        id: { $ref: "#/components/schemas/SteamId" }
+        name:
+          type: string
+          description: |
+            `Unknown` (vanilla) or `<unknown>` (Shine) when the id was banned
+            while not connected. Under Shine with the mod, such a ban is
+            stored under the name the recent-players list last saw, when the
+            player is in it.
+        reason:
+          type: string
+          description: '`None provided` (vanilla) or `No reason given.` (Shine) when none was given.'
+        permanent:
+          type: boolean
+          description: |
+            True for an expiry of `0`, **and** for one more than 100 years
+            away -- Shine stores `6e+24` for some permanent bans.
+        expires:
+          type: integer
+          description: Unix seconds. Absent when `permanent`.
+        issued: { type: integer, description: "**Shine only.** Unix seconds." }
+        duration:
+          type: number
+          description: |
+            **Shine only.** Seconds, `0` for permanent. Can be a float far
+            beyond any real span (`6e+24`).
+        banned_by:
+          type: string
+          description: '**Shine only.** `Console` when banned from the web admin or the console.'
+
+    BanList:
+      type: object
+      required: [source, now, bans]
+      properties:
+        source:
+          type: string
+          enum: [vanilla, shine]
+          description: Which table the bans were read from.
+        now:
+          type: integer
+          description: |
+            The server's clock, in unix seconds. Measure time left against
+            this, not against the browser's clock.
+        bans:
+          type: array
+          description: |
+            Bans in force only, newest first: Shine's by `issued`, vanilla's
+            in reverse file order (vanilla appends).
+          items: { $ref: "#/components/schemas/BanEntry" }
+
+    RecentPlayer:
+      type: object
+      description: |
+        One player seen recently. `steamid` and `ipaddress` are spelled as in
+        `Player`, on purpose.
+      required:
+        [steamid, name, names, ipaddress, first_seen, last_seen, played, connected]
+      properties:
+        steamid: { $ref: "#/components/schemas/SteamId" }
+        name: { type: string, description: "The name last seen. Empty until the first one is." }
+        names:
+          type: array
+          description: Former names, newest first, at most 5.
+          items: { type: string }
+        ipaddress:
+          type: string
+          description: |
+            **The player's full IP address** at their last connection, also
+            written to the file under `config://`. Empty when the engine did
+            not report one. Redacted in the fixtures.
+          examples: ["0.0.0.0"]
+        first_seen: { type: integer, description: "Unix seconds, within the window." }
+        last_seen: { type: integer, description: "Unix seconds. `now` while connected." }
+        played:
+          type: number
+          description: Seconds connected within the window, summed over sessions.
+        connected: { type: boolean }
+
+    RecentPlayers:
+      type: object
+      required: [now, window, capacity, storage, players]
+      properties:
+        now:
+          type: integer
+          description: The server's clock, in unix seconds.
+        window:
+          type: integer
+          description: How far back the list reaches, in seconds (86400).
+        capacity:
+          type: integer
+          description: At most this many players are kept (100); the oldest go first.
+        storage:
+          type: object
+          required: [loaded]
+          properties:
+            loaded:
+              type: string
+              enum: [ok, fallback, empty, unreadable]
+              description: |
+                How this map's load went. `fallback`: the newest save was torn
+                and the one before it was used. `empty`: no file yet.
+                `unreadable`: both saves were torn, so the list started empty.
+            saved_at:
+              type: integer
+              description: Unix seconds of the last successful save. Absent before the first.
+            error:
+              type: string
+              description: |
+                Why the last save failed. Absent while saves work. When present,
+                the list will not survive the next map change.
+        players:
+          type: array
+          description: Most recently seen first.
+          items: { $ref: "#/components/schemas/RecentPlayer" }
+
+    BanRecord:
+      type: object
+      required: [name, id, reason, time]
+      properties:
+        name: { type: string }
+        id:
+          description: |
+            A number from vanilla; a digit string when Shine's ban plugin
+            has replaced the list. Compare as numbers.
+          oneOf:
+            - { $ref: "#/components/schemas/SteamId" }
+            - { type: string, pattern: "^[0-9]+$" }
+        reason: { type: string }
+        time:
+          type: number
+          description: |
+            Unix timestamp at which the ban expires; **`0` means permanent**.
+            Expired bans are never pruned from the list -- filter client-side.
+            An integer from vanilla. Under Shine it can be a float far beyond
+            any real date (`6e+24` seen) for an effectively permanent ban.
+      examples:
+        - { name: Skulkovich, id: 10000000, reason: Griefing, time: 1788620201 }
+        - { name: Onosaurus, id: "10000001", reason: Griefing, time: 0 }
+
+    ReservedSlotEntry:
+      type: object
+      required: [name, id]
+      properties:
+        name: { type: string, description: '`"None"` when added without one.' }
+        id: { $ref: "#/components/schemas/SteamId" }
+
+    ReservedSlots:
+      type: object
+      description: |
+        `GetReservedSlotData()`. Both keys are absent when the server has no
+        reserved-slot config, so the reply can be `{}`.
+
+        Slots are keyed by **name** on the server, so adding a slot under a
+        name that is already present replaces that slot.
+      properties:
+        amount: { type: integer, minimum: 0 }
+        ids:
+          type: array
+          items: { $ref: "#/components/schemas/ReservedSlotEntry" }
+        shine:
+          type: object
+          description: |
+            **Mod only**, and only while Shine's reservedslots plugin is on.
+            Then Shine sets the count (`sh_setresslots`) and grants access by
+            permission, so `amount` and `ids` are not what is enforced.
+          required: [slots]
+          properties:
+            slots: { type: integer, minimum: 0 }
+
+    ChatMessage:
+      type: object
+      required: [id, message, player, steamId, team, teamOnly]
+      properties:
+        id:
+          type: integer
+          description: |
+            Increasing within a map: the counter is Lua state, so it restarts
+            from 1 at every map change. Poll for ids higher than the last seen;
+            a jump means messages fell out of the 20-entry buffer.
+        message: { type: string }
+        player: { type: string }
+        steamId:
+          allOf: [{ $ref: "#/components/schemas/SteamId" }]
+          description: |
+            Camel-cased here, `steamid` in `player_list` and `id` in a ban
+            record -- three spellings for the same value.
+        team: { $ref: "#/components/schemas/TeamNumber" }
+        teamOnly: { type: boolean }
+
+    ChatEntry:
+      type: object
+      description: One entry of the mod's chat ring. **Mod only.**
+      required: [id, time, message, player, steamId, team, teamOnly]
+      additionalProperties: false
+      properties:
+        id: { type: integer, description: "Increasing within a map, from 1." }
+        time: { type: integer, description: "`Shared.GetSystemTime()`, unix seconds, when it was recorded." }
+        message: { type: string }
+        player: { type: string, description: "`Admin` for sv_say and sv_tsay." }
+        steamId: { $ref: "#/components/schemas/SteamId" }
+        team:
+          allOf: [{ $ref: "#/components/schemas/TeamNumber" }]
+          description: The team it was said to; 0 for sv_say.
+        teamOnly: { type: boolean }
+
+    ChatStream:
+      type: object
+      description: A page of the mod's chat ring, from `getchatlist&since=`. **Mod only.**
+      required: [entries, last_id, dropped, buffer_size]
+      additionalProperties: false
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/ChatEntry" }
+        last_id: { type: integer, description: "Pass as `since` on the next poll." }
+        dropped:
+          type: integer
+          description: Entries that fell out of the ring before being read, this map.
+        buffer_size: { type: integer, description: "Ring capacity, 200." }
+
+    PerfSample:
+      type: object
+      required: [players, tickrate, time, ent_count]
+      properties:
+        players: { type: integer }
+        tickrate: { type: number }
+        time: { type: integer, description: '`Shared.GetSystemTime()`, a unix timestamp.' }
+        ent_count: { type: integer, description: "All entities, not just players." }
+
+    PerfReport:
+      type: object
+      required: [window_s, capacity, loaded_at, map, windows, last_id]
+      properties:
+        window_s: { type: integer, description: Seconds of engine samples per window. }
+        capacity: { type: integer, description: Windows kept; the oldest is dropped. }
+        loaded_at:
+          type: integer
+          description: |
+            `Shared.GetSystemTime()` when this Lua VM loaded, i.e. the map
+            load. A different value means the ids restarted.
+        map: { type: string }
+        config:
+          type: object
+          description: |
+            The rates the server runs at now, from the engine's latest sample.
+            A runtime `tickrate`, `sendrate`, `moverate` or `interp` shows at
+            once. Absent until the engine's first sample after a map load.
+          required: [tickrate, moverate, sendrate, interp_ms, max_players]
+          properties:
+            tickrate: { type: integer }
+            moverate: { type: integer }
+            sendrate: { type: integer }
+            interp_ms: { type: integer }
+            max_players: { type: integer }
+            bw_limit:
+              type: integer
+              description: |
+                `Server.GetBwLimit()`: bytes a second per player. 09-27 engine
+                and later; follows a runtime `bwlimit`. Absent on older ones.
+        windows:
+          type: array
+          items: { $ref: "#/components/schemas/PerfWindow" }
+        last_id:
+          type: integer
+          description: |
+            The last window in this reply when `more`, else the newest
+            window's id; 0 before the first. Poll again with `since=<last_id>`.
+        more:
+          type: boolean
+          description: |
+            More windows are held past `last_id`: ask again at once. Absent
+            from a mod that predates paging, which sends every window.
+        engine: { $ref: "#/components/schemas/PerfEngine" }
+
+    PerfEngine:
+      type: object
+      description: |
+        The engine's own lines from `log-Server.txt`. Every record is stamped
+        with the scan that found it (`time`, unix seconds): the lines carry no
+        time of their own. One id sequence across all three lists. Absent
+        from replies of a mod that predates it.
+      required: [source, path, scan_s, last_id, now, tickstats, perfmon, events]
+      properties:
+        now: { type: integer, description: "The server's clock, `Shared.GetSystemTime()`." }
+        source:
+          type: string
+          enum: [log, none]
+          description: "`none` when the log is not readable here, or is a stale copy."
+        path: { type: string }
+        error: { type: string, description: Why the log could not be read. }
+        stale: { type: boolean, description: The file opens but this server is not writing it. }
+        scan_s: { type: integer, description: Seconds between scans. }
+        last_id:
+          type: integer
+          description: |
+            Poll again with `esince=<last_id>`. The last record in this reply
+            when `more`, else the newest.
+        more:
+          type: boolean
+          description: |
+            More records are held past `last_id`, at most 60 a reply across
+            the three lists. Absent from a mod that predates paging.
+        tickstat_last_at:
+          type: integer
+          description: When the newest `TICKSTAT` line was found. Absent when none was since the map load.
+        tickstat_said:
+          type: object
+          description: "The last `tickstat: on|off` the command printed, when seen since the map load."
+          required: [text, time]
+          properties:
+            text: { type: string }
+            time: { type: integer }
+        tickstats:
+          type: array
+          items: { $ref: "#/components/schemas/Tickstat" }
+        perfmon:
+          type: array
+          items: { $ref: "#/components/schemas/PerfmonBlock" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/EngineEvent" }
+
+    Tickstat:
+      type: object
+      description: |
+        One `TICKSTAT|` line, field for field. A segment the parser does not
+        know is counted in `unparsed` and its fields are absent.
+      required: [id, time, unparsed]
+      properties:
+        id: { type: integer }
+        time: { type: integer }
+        unparsed: { type: integer }
+        win_s: { type: number, description: Seconds the line covers. }
+        hz: { type: number, description: Ticks delivered per second. }
+        target: { type: integer, description: The configured tickrate. }
+        int_p50_ms: { type: number, description: Tick spacing, median. }
+        int_p99_ms: { type: number }
+        int_p999_ms: { type: number }
+        int_max_ms: { type: number }
+        late_max_ms: { type: number }
+        rearm: { type: integer }
+        stretch_pct: { type: number, description: Share of ticks the server stretched. }
+        gov_max: { type: integer }
+        incomplete: { type: integer }
+        incomplete_of: { type: integer }
+        late: { type: integer }
+        writers: { type: integer }
+        moves: { type: integer }
+        wait_p99_ms: { type: number }
+        wait_max_ms: { type: number }
+        wait_n: { type: integer }
+        busy_pct: { type: number }
+        humans: { type: integer }
+        bots: { type: integer }
+        snaps_per_s_human: { type: number }
+        bytes_per_s_human: { type: number }
+        moves_per_s_human: { type: number }
+        moves_per_s_bot: { type: number }
+        injected_pct: { type: number }
+        move_ms_tick: { type: number }
+        spec_moves_per_s: { type: number }
+        spec_move_ms_tick: { type: number }
+        snap_p50_bytes: { type: number }
+        snap_p99_bytes: { type: number, description: "Size `bwlimit` from this: at least p99 x sendrate." }
+        snap_max_bytes: { type: integer }
+        choked_pct: { type: number, description: Share of updates held back by bwlimit. }
+        human_move_ms_tick: { type: number }
+        sendbuf_drops: { type: integer }
+        rate_stepped: { type: integer, description: Players whose update rate was lowered. }
+        slowest_rate: { type: number, description: The lowest update rate a player was at. }
+        creations_deferred: { type: integer }
+
+    PerfmonBlock:
+      type: object
+      description: |
+        The engine's `perfmon:` block, printed only when `perfmon` is typed. It
+        covers the last second.
+      required: [id, time]
+      properties:
+        id: { type: integer }
+        time: { type: integer }
+        jitter_avg_ms: { type: number }
+        jitter_max_ms: { type: number }
+        jitter_n: { type: integer }
+        snapshot_write_avg_ms: { type: number }
+        snapshot_write_max_ms: { type: number }
+        snapshot_write_n: { type: integer }
+        entities_skipped: { type: integer }
+        entities_total: { type: integer }
+        entities_skipped_pct: { type: number }
+        rejected_time_credit: { type: integer }
+        rejected_other: { type: integer }
+        rewound_missing: { type: integer }
+        score: { type: integer }
+        idle_pct: { type: number }
+        delivery_pct: { type: number }
+        overload_pct: { type: number }
+        updates: { type: integer }
+        warn: { type: integer }
+        fail: { type: integer }
+
+    EngineEvent:
+      oneOf:
+        - type: object
+          description: "`client N: snapshot rate A -> B/s (...)`: a player's update rate stepped."
+          required: [id, time, kind, client, from_rate, to_rate, choked_pct, clear_ms, bwlimit]
+          properties:
+            id: { type: integer }
+            time: { type: integer }
+            kind: { const: rate }
+            client: { type: integer, description: A slot number, not an identity. }
+            from_rate: { type: number }
+            to_rate: { type: number }
+            choked_pct: { type: number }
+            clear_ms: { type: number }
+            bwlimit: { type: integer }
+        - type: object
+          description: The engine's warning that bwlimit leaves too few bytes per snapshot.
+          required: [id, time, kind, bwlimit, sendrate, per_snapshot, needed, suggested]
+          properties:
+            id: { type: integer }
+            time: { type: integer }
+            kind: { const: bwlimit_low }
+            bwlimit: { type: integer }
+            sendrate: { type: integer }
+            per_snapshot: { type: integer }
+            needed: { type: integer }
+            suggested: { type: integer, description: The bwlimit the engine says avoids it. }
+
+    PerfWindow:
+      type: object
+      required: [id, time, duration_ms, ticks, tickrate, worst_tick_ms, players,
+                 score, quality, idle_pct, moves_pct, entities_pct, moves_per_s,
+                 entities, incomplete, interp_warns, interp_fails, lua_kb]
+      properties:
+        id: { type: integer }
+        time: { type: integer, description: "`Shared.GetSystemTime()` when the window closed." }
+        duration_ms: { type: integer, description: The engine samples' total duration. }
+        ticks: { type: integer, description: "`UpdateServer` calls in the window." }
+        tickrate: { type: number, description: "`ticks` over the window's real duration." }
+        worst_tick_ms: { type: number, description: The longest single tick. }
+        players: { type: integer }
+        score:
+          type: integer
+          description: |
+            The engine's performance score, -99 to 100, higher better; perfmon
+            colours it green from 10, yellow from 0, orange from -10, red
+            below. 0 with nobody on the server, where it means nothing.
+        quality: { type: integer, description: "0-100; 0 with nobody on the server." }
+        idle_pct: { type: number }
+        moves_pct: { type: number, description: Share of the window spent on player moves. }
+        entities_pct: { type: number, description: Share spent updating other entities. }
+        moves_per_s: { type: number }
+        move_ms: { type: number, description: Average cost of one move. Absent with no moves. }
+        entities: { type: integer, description: Average entity count. }
+        incomplete: { type: integer, description: "`GetIncompleteCount()` over the window." }
+        interp_warns:
+          type: integer
+          description: Late updates to a player (interval > 0.75 x interp), counted over the window.
+        interp_fails:
+          type: integer
+          description: Updates at or past interp, counted over the window. Should stay 0.
+        lua_kb: { type: integer, description: "`collectgarbage(\"count\")`: the Lua heap." }
+
+    InstalledMod:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: "#/components/schemas/ModId" }
+        name:
+          type: string
+          description: |
+            The workshop title. For a mod the server holds no details of, the
+            engine gives its decimal workshop id instead (`"1423731186"` on the
+            rig, a download that never completed).
+        active:
+          type: boolean
+          description: |
+            **Mod only.** Mounted now. Fixed when the map loads: the cycle's
+            global `mods`, the loaded map's own `mods`, and two hotfix mods
+            (UWE Hotfix 344, NSL Badges) that the engine mounts with no cycle
+            entry. A cycle edit changes it only at the next map change.
+            Measured on the 09-26 rig with Shine and 23 mods.
+
+    MapListEntry:
+      type: object
+      required: [name, modId]
+      properties:
+        name: { type: string, examples: [ns2_summit] }
+        modId:
+          allOf: [{ $ref: "#/components/schemas/ModId" }]
+          description: '`"0"` for a stock map, otherwise the mod that provides it.'
+
+    MapCycleEntry:
+      description: |
+        Either a bare map name, or an object naming the mods that map needs.
+        The shipped panel writes the object form only when a map's `modId` is
+        not already in the cycle-wide `mods` array (`mapcycle.js:123-138`).
+      oneOf:
+        - type: string
+          examples: [ns2_summit]
+        - type: object
+          required: [map]
+          description: |
+            Shine's mapvote reads further keys here (`min`, `max`, `chance`,
+            `percent`, `time`, `rounds`, ...). The game ignores them and the
+            mod passes them through; a client must keep them.
+          additionalProperties: true
+          properties:
+            map: { type: string }
+            mods:
+              type: array
+              items: { $ref: "#/components/schemas/ModId" }
+
+    MapCycle:
+      type: object
+      description: |
+        `config://MapCycle.json` with mod ids hex-encoded. Read it, edit it and
+        write the whole document back with `setmapcycle`; there is no partial
+        update. A stock 17-map cycle is 263 bytes.
+
+        `ModIdsFromHex` **skips any string containing `:`**, which is how an
+        entry can name a non-workshop source and survive the round trip.
+
+        Other keys are allowed and must survive a round trip: Shine's mapvote
+        reads map `groups` from here, for one. The 2012 panel rebuilds the
+        cycle from its own fields on every save and drops them.
+      additionalProperties: true
+      properties:
+        maps:
+          type: array
+          items: { $ref: "#/components/schemas/MapCycleEntry" }
+        time:
+          type: number
+          description: Minutes before the cycle advances.
+        mode:
+          type: string
+          description: |
+            `order` plays the list in sequence; `random` shuffles. The panel
+            writes only these two (`mapcycle.js:117`).
+          examples: [order, random]
+        mods:
+          type: array
+          description: Mods mounted for the whole cycle, hex ids.
+          items: { $ref: "#/components/schemas/ModId" }
+        groups:
+          type: array
+          description: Shine's mapvote map groups. Opaque to the game.
+
+    MapCycleWrite:
+      description: The mod's answer to `setmapcycle`.
+      oneOf:
+        - type: object
+          required: [ok, cycle]
+          additionalProperties: false
+          properties:
+            ok: { const: true }
+            cycle:
+              allOf: [{ $ref: "#/components/schemas/MapCycle" }]
+              description: '`config://MapCycle.json` read back after the write, hex-encoded.'
+        - type: object
+          required: [ok, error]
+          additionalProperties: false
+          properties:
+            ok: { const: false }
+            error:
+              type: string
+              description: 'Why nothing was written, e.g. `mods[1] is not a hex mod id: zzzz`.'
+
+    MapVote:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        maps_from_cycle: { type: boolean }
+        round_limit: { type: integer, minimum: 0 }
+        next_map: { type: string }
+        options:
+          type: array
+          items: { type: string }
+
+    Whitelist:
+      type: object
+      required: [now]
+      additionalProperties: false
+      properties:
+        now: { type: integer, description: "The server's clock, Unix seconds." }
+        hotfix_list_id: { $ref: "#/components/schemas/DecimalWorkshopId" }
+        branch: { type: string, enum: [live, beta] }
+        whitelist_id: { $ref: "#/components/schemas/DecimalWorkshopId" }
+        fetching: { type: boolean }
+        error: { type: string }
+        read_at: { type: integer, description: "When the lists were read, Unix seconds." }
+        whitelist:
+          type: array
+          items: { $ref: "#/components/schemas/DecimalWorkshopId" }
+        hotfix:
+          type: array
+          items: { $ref: "#/components/schemas/DecimalWorkshopId" }
+
+    DecimalWorkshopId:
+      type: string
+      pattern: "^[0-9]+$"
+      description: A workshop id in decimal, as in a Steam URL.
+      examples: ["2909200101"]
+
+    WorkshopItem:
+      type: object
+      description: One workshop search hit, as `Server.SearchWorshop` returns it.
+      required:
+        [id, title, description, authorid, filesize, tags, steamresult,
+         childcount, thumbnailurl, version]
+      properties:
+        id:
+          allOf: [{ $ref: "#/components/schemas/ModId" }]
+          description: Hex-encoded on the way out, line 260. Feed it to `installmod`.
+        title: { type: string }
+        description: { type: string, description: "Steam BBCode, not HTML. Escape before rendering." }
+        authorid:
+          type: string
+          description: |
+            The author's 64-bit SteamID64, as a **string** -- unlike `steamid`
+            in `player_list`, which is a number.
+          examples: ["76561197980112344"]
+        filesize: { type: integer, description: "Bytes." }
+        tags: { type: string, description: "Comma-separated, possibly empty." }
+        steamresult: { type: integer, description: "Steam's own result code; `1` is OK." }
+        childcount: { type: integer }
+        thumbnailurl:
+          type: string
+          format: uri
+          description: |
+            An `images.steamusercontent.com` URL -- **off-server and HTTPS**,
+            on a panel served over plain HTTP. On an isolated network these do
+            not load; the client should tolerate broken thumbnails.
+        version: { type: integer, description: "Unix timestamp of the item's last update." }
+
+    ConsoleLine:
+      type: object
+      description: |
+        One captured line. **Mod only.**
+      required: [id, time, src, text]
+      properties:
+        id:
+          type: integer
+          description: |
+            Increasing within one map. Poll `getConsole` with the last id seen;
+            a gap larger than expected means lines were dropped.
+        time: { type: integer, description: "Unix seconds, `Shared.GetSystemTime()`." }
+        src:
+          type: string
+          enum: [audit, admin, server]
+          description: |
+            `audit` the dispatch receipt the game emits before every command
+            created by `CreateServerAdminCommand`; `admin` a line printed
+            through `ServerAdminPrint`; `server` one printed through
+            `Shared.Message`. A console should show `admin` and `server` and
+            can hide `audit`.
+        text: { type: string }
+
+    CommandResult:
+      type: object
+      description: |
+        The result of `runCommand`. **Mod only.**
+      required: [cmd, dispatched, lines]
+      properties:
+        cmd: { type: string, description: "The command line as sent." }
+        dispatched:
+          type: boolean
+          description: |
+            The command was dispatched as an admin command, proven by its audit
+            line. `false` means a plain console command or no such command --
+            indistinguishable on the server side.
+        elapsed:
+          type: number
+          description: Seconds inside `Shared.ConsoleCommand`. Effectively zero.
+        lines:
+          type: array
+          description: |
+            What it printed. **Empty is not failure** -- a successful `sv_kick`
+            prints nothing.
+          items: { $ref: "#/components/schemas/ConsoleLine" }
+        last_id: { type: integer, description: "Cursor for a following `getConsole`." }
+
+    ConsoleStream:
+      type: object
+      description: |
+        A page of the console buffer. **Mod only.**
+      required: [lines, last_id]
+      properties:
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ConsoleLine" }
+        last_id: { type: integer, description: "Pass as `since` on the next poll." }
+        dropped:
+          type: integer
+          description: Lines that fell out of the ring buffer before being read.
+        filtered:
+          type: integer
+          description: |
+            Lines dropped at capture as engine noise. Zero in practice -- the
+            filter list is empty because an idle server produced nothing to
+            filter.
+        buffer_size: { type: integer, description: "Ring capacity, 500." }
+
+    LogLine:
+      type: object
+      description: One line of the log, without its newline. **Mod only.**
+      # Quoted: YAML 1.1 reads a bare `off` as the boolean false.
+      required: ["off", text]
+      additionalProperties: false
+      properties:
+        "off":
+          type: integer
+          minimum: 0
+          description: |
+            Byte offset of the line in the file: unique within a file, so a
+            client merges replies by it. Bytes, not characters.
+        text:
+          type: string
+          description: |
+            Verbatim, a trailing CR dropped. The engine writes bytes, not
+            necessarily UTF-8; what is not valid UTF-8 arrives as such and a
+            browser decodes it to U+FFFD.
+
+    LogPage:
+      type: object
+      description: A stretch of `log-Server.txt`. **Mod only.**
+      required: [source, path, file_id, size, from, to, lines, more, at_start,
+                 tail_bytes, max_bytes]
+      additionalProperties: false
+      properties:
+        source: { const: file }
+        path: { type: string, description: "`config://log-Server.txt`." }
+        file_id:
+          type: string
+          description: |
+            The header's Date and Time, e.g. `09/28/2026 02:50:11 AM`; empty
+            for a file without the header. Pass back as `file`.
+        size: { type: integer, minimum: 0, description: "The file's size now, in bytes." }
+        from: { type: integer, minimum: 0, description: "Offset of the first byte served." }
+        to:
+          type: integer
+          minimum: 0
+          description: |
+            Offset after the last complete line served: the next `since`.
+            Below `size` when a line is still being written or `more` is set.
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/LogLine" }
+        more: { type: boolean, description: "Stopped at `max_bytes`; ask again at once." }
+        at_start: { type: boolean, description: "`from` is 0: nothing earlier to page to." }
+        reset:
+          type: string
+          enum: [new_file, truncated]
+          description: The cursor did not fit this file; this reply is a fresh tail.
+        tail_bytes: { type: integer, description: "What a tail or a page back reads, 65536." }
+        max_bytes: { type: integer, description: "The most one reply serves: 65536, 262144 before 2026-10-08." }
+
+    LogUnavailable:
+      type: object
+      description: |
+        The log cannot be read: the engine writes it outside the config
+        directory, so the file does not open -- or a file opens that the
+        engine is not writing (`stale`). **Mod only.**
+      required: [source, path, error]
+      additionalProperties: false
+      properties:
+        source: { const: none }
+        path: { type: string }
+        stale:
+          type: boolean
+          description: |
+            The file opened but is not this server's log: a line the mod
+            printed (once per map load, on the first `getLog`) did not reach
+            it. A copy an earlier run left with `-logdir` pointing at the
+            config directory. Absent otherwise.
+        error: { type: string, description: "What `io.open` said, or why the file is stale." }
+
+    WorkshopSearchResult:
+      description: |
+        Two shapes on one status code: still loading, or settled. On stock a
+        failed search is indistinguishable from a slow one (it restarts) or
+        from an empty one (Steam's failure comes back as no items). With the
+        mod, a search with no answer after 30 s settles with `error`.
+      oneOf:
+        - type: object
+          title: Loading
+          required: [loading]
+          additionalProperties: false
+          properties:
+            loading: { type: boolean, const: true }
+            elapsed:
+              type: number
+              description: Seconds since this search started. **Mod only.**
+        - type: object
+          title: Settled
+          required: [items]
+          additionalProperties: false
+          properties:
+            items:
+              type: array
+              maxItems: 50
+              description: |
+                At most 50: the engine hands over no more, whatever the page.
+                Empty for no matches and for a search Steam failed alike.
+              items: { $ref: "#/components/schemas/WorkshopItem" }
+            done: { const: true, description: "**Mod only.**" }
+            page: { type: integer, minimum: 1, description: "The page asked for. **Mod only.**" }
+            count: { type: integer, minimum: 0, description: "`items` length. **Mod only.**" }
+            capped:
+              type: boolean
+              description: |
+                50 hits: the search may have found more than it returned.
+                **Mod only**; absent when `error` is set.
+            error:
+              type: string
+              description: |
+                The search had no answer after 30 s. Reported once; the next
+                request starts a fresh search. **Mod only.**
+
+    InstallModResult:
+      description: The mod's answer to `installmod`.
+      oneOf:
+        - type: object
+          required: [ok, id, already_installed]
+          additionalProperties: false
+          properties:
+            ok: { const: true }
+            id:
+              allOf: [{ $ref: "#/components/schemas/ModId" }]
+              description: The id as sent to `Server.InstallMod`, lower case, no leading zeros.
+            already_installed:
+              type: boolean
+              description: |
+                It was in `getinstalledmodslist` already. The engine then checks
+                it for an update and downloads nothing if it is current.
+        - type: object
+          required: [ok, error]
+          additionalProperties: false
+          properties:
+            ok: { const: false }
+            error:
+              type: string
+              description: 'Why nothing was sent to the engine, e.g. `Not a hex workshop id: zz`.'
+

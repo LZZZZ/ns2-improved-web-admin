@@ -1,0 +1,18 @@
+{
+  "webport": "8080",
+  "marines": 0,
+  "cheats": "false",
+  "devmode": "false",
+  "players_online": 0,
+  "uptime": 11,
+  "player_list": [],
+  "marine_res": 60,
+  "alien_res": 60,
+  "server_name": "Example NS2 Server",
+  "frame_rate": 30.027050018311,
+  "game_started": false,
+  "game_time": 0,
+  "aliens": 0,
+  "webdomain": "127.0.0.1",
+  "map": "ns2_summit"
+}

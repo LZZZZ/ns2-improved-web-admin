@@ -1,0 +1,76 @@
+{
+  "now": 1790514202,
+  "window": 86400,
+  "capacity": 100,
+  "storage": {
+    "loaded": "ok",
+    "saved_at": 1790514172
+  },
+  "players": [
+    {
+      "steamid": 10000020,
+      "name": "Gorgeous",
+      "names": [
+        "Gorge Us",
+        "gorgeous_1"
+      ],
+      "ipaddress": "192.0.2.10",
+      "first_seen": 1790507002,
+      "last_seen": 1790513902,
+      "played": 1820,
+      "connected": false
+    },
+    {
+      "steamid": 10000021,
+      "name": "Marine Alpha",
+      "names": [],
+      "ipaddress": "198.51.100.21",
+      "first_seen": 1790505202,
+      "last_seen": 1790507002,
+      "played": 1780,
+      "connected": false
+    },
+    {
+      "steamid": 10000011,
+      "name": "Onosaurus",
+      "names": [],
+      "ipaddress": "203.0.113.11",
+      "first_seen": 1790491202,
+      "last_seen": 1790492602,
+      "played": 900,
+      "connected": false
+    },
+    {
+      "steamid": 10000022,
+      "name": "Fadeaway Jr",
+      "names": [
+        "NoobSlayer"
+      ],
+      "ipaddress": "192.0.2.22",
+      "first_seen": 1790434202,
+      "last_seen": 1790442202,
+      "played": 5400,
+      "connected": false
+    },
+    {
+      "steamid": 10000024,
+      "name": "Commander <Cee>",
+      "names": [],
+      "ipaddress": "198.51.100.24",
+      "first_seen": 1790432202,
+      "last_seen": 1790435202,
+      "played": 2600,
+      "connected": false
+    },
+    {
+      "steamid": 10000023,
+      "name": "",
+      "names": [],
+      "ipaddress": "",
+      "first_seen": 1790431402,
+      "last_seen": 1790431412,
+      "played": 10,
+      "connected": false
+    }
+  ]
+}

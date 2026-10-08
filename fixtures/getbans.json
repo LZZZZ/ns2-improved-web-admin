@@ -1,0 +1,19 @@
+{
+  "source": "vanilla",
+  "now": 1790514202,
+  "bans": [
+    {
+      "name": "Unknown",
+      "id": 99999992,
+      "reason": "webadmin-spa fixture capture, permanent",
+      "permanent": true
+    },
+    {
+      "reason": "webadmin-spa fixture capture",
+      "permanent": false,
+      "name": "Unknown",
+      "id": 99999991,
+      "expires": 1790600601
+    }
+  ]
+}

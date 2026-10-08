@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "player": "Admin",
+      "time": 1791322301,
+      "id": 1,
+      "team": 0,
+      "teamOnly": false,
+      "steamId": 0,
+      "message": "rig hello all"
+    },
+    {
+      "player": "Admin",
+      "time": 1791322301,
+      "id": 2,
+      "team": 1,
+      "teamOnly": true,
+      "steamId": 0,
+      "message": "rig marines only"
+    }
+  ],
+  "buffer_size": 200,
+  "dropped": 0,
+  "last_id": 2
+}

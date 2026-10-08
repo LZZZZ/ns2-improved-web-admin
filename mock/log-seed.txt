@@ -1,0 +1,74 @@
+[{t}] Main : Filesystem initialized, cache enabled
+Build 344.100 (9beedad4ba, beta)
+Linux
+Server tickrate 60, client sendrate 60, bandwidth limit per player 131072
+Socket buffers: 524288 bytes receive, 524288 bytes send (as reported by the kernel)
+Connected to Steam servers after 1.1 seconds
+Max active zip jobs set to 6
+ModServicesServer::Initialize()
+ModServicesServer initialized to AppID: 4920
+	 Passed '/srv/ns2/mods/' as mod-storage directory
+InitializeInstalledMods: Found 4 ModIDs from mod cache and steam directories
+	 Adding Mod Shine Administration[117887554]
+	 Adding Mod UWE Hotfix 344[3558697165]
+	 Adding Mod NSL Badges[2899635443]
+	 Adding Mod webadmin-spa[509780686]
+ModServicesServer Initialized
+Mod : Mounting Extension d41d68cd
+Mod : Mounting Extension acd4ecf3
+Web server running at 127.0.0.1:8080
+Finished Installing Mods
+Mod webadmin-spa[509780686] is not whitelisted
+Server has non whitelisted mods
+[{t}] Worker 00 : Mounting mod 'NSL Badges'[2899635443] from /srv/ns2/mods/content/4920/2899635443/
+[{t}] Worker 00 : Mounting mod 'UWE Hotfix 344'[3558697165] from /srv/ns2/mods/content/4920/3558697165/
+Script profiling zones are off (pass -luazones to profile script functions)
+Loading config://ServerConfig.json
+Loading config://ServerAdmin.json
+Loading config://BannedPlayers.json
+Loading config://MapCycle.json
+[{t}] Worker 00 : Error: Ranking disabled: server has non-whitelisted mods mounted
+Requesting server ranking be enabled, request success: false
+Consistency check hash table generation took 0 seconds
+Server  : 0.000000 : INFO: LuaJIT setup: maxtrace=20,000, maxmcode=35,000
+[{t}] Worker 00 : Loading 'maps/ns2_summit.level'
+[{t}] Worker 09 : Error: Unable to open 'models/bootcamp/invisible.material' (usage 0x1)
+Loading pathing mesh for level maps/ns2_summit.level
+Finished loading 'maps/ns2_summit.level'
+Server  : 0.033182 : Reset AI TeamBrain for Marines
+Server  : 0.033182 : Reset AI TeamBrain for Aliens
+[{t}] Main : Script tracing throttled: 3.02 ms spent compiling Lua traces this frame exceeds the 3.00 ms limit, so the JIT was disabled for the rest of the frame. Persistent throttling means scripts are thrashing the trace cache and are running interpreted.
+@@ round @@
+Client connecting (0.0.0.0:27005)
+BeginAuthSession succeeded for steam user 76561197970265728
+AuthTicketResponse(76561197970265728): authentication succeeded
+Client connected (0.0.0.0)
+[{clock}]Client Authed. Steam ID: 10000000
+Skulkovich connected.
+[{t}] Main : Script tracing: 415.1 ms compiling Lua traces over the last 30 s, worst frame 4.65 ms, 8 frame(s) hit the 3.00 ms limit.
+[{t}] Main : Script tracing aborts: 684 over the last 30 s (BLACKL x447, TRACEOV x89, TRACEUV x69, LLEAVE x31, LINNER x23, NYIBC x13, NYIRETL x11, DOWNREC x1), 23 bytecode(s) blacklisted for good.
+[{clock}]Chat All - Skulkovich: gg, one more?
+[{clock}]Skulkovich[10000000] ran command sh_voterandom with no arguments.
+Client connecting (0.0.0.0:48001)
+BeginAuthSession succeeded for steam user 76561197970265729
+AuthTicketResponse(76561197970265729): authentication succeeded
+Client connected (0.0.0.0)
+[{clock}]Client Authed. Steam ID: 10000001
+Onosaurus connected.
+[{clock}]Onosaurus was killed by Skulkovich
+Onosaurus is now known as Jösé Onosaurus.
+[{clock}]Chat Team 1 - Jösé Onosaurus: need a medpack at the ♥ node
+[{clock}]Chat Team - Skulkovich: hive 2, go
+perfmon: tick jitter avg 0.58ms max 0.95ms (n=60)
+perfmon: snapshot write avg 0.031ms max 0.118ms (n=60)
+perfmon: entities skipped 0 / 1200 (0.0%)
+perfmon: moves rejected: time credit 0, other 0
+perfmon: moves rewound with missing snapshots 0 (since map load)
+perfmon: score 18 = idle 71.2% - delivery 2.1% - overload 0.0% (updates 1800, warn 0, fail 0)
+TICKSTAT| win 10.0 s hz 79.90 target 80 | int p50 12.65 p99 14.30 p999 25.00 max 24.96 ms | late max 14.16 ms rearm 1 stretch 0.02% gov max 4 | incomplete 1/2275 late 0 writers 0 moves 1 | wait over p99 2.06 max 2.15 ms (n=2118) | busy 14.4% | humans 1 bots 11 | snap/s/human 0.40 bytes/s/human 1765 | moves/s/human 4.20 moves/s/bot 14.48 injected 0.00% | move ms/tick 0.587 | spec moves/s 0.00 spec move ms/tick 0.000 | snap bytes p50 3968 p99 9504 max 9489 choked 75.00% | human move ms/tick 0.012 | sendbuf drops 0 | rate stepped 0 slowest 0.0/s | creations deferred 16
+client 1: snapshot rate 40.0 -> 26.7/s (29% choked, 24.9 ms to clear each, bwlimit 10000)
+client 1: snapshot rate 26.7 -> 40.0/s (0% choked, 1.6 ms to clear each, bwlimit 131072)
+[{t}] Main : Script tracing still throttled: 3.05 ms spent compiling Lua traces this frame exceeds the 3.00 ms limit.
+Client disconnected (0.0.0.0:48001) Quit
+[{t}] Worker 03 : Warning: sound event 'sound/NS2.fev/marine/common/spawn' has no instance limit
+[{t}] Main : Error: Script error: lua/Weapons/Marine/Welder.lua:241: attempt to index a nil value

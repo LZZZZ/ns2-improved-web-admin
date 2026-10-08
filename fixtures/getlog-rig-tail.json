@@ -1,0 +1,706 @@
+{
+  "to": 10276,
+  "more": false,
+  "file_id": "09/28/2026 03:27:00 AM",
+  "path": "config://log-Server.txt",
+  "max_bytes": 262144,
+  "lines": [
+    {
+      "text": "Date: 09/28/2026",
+      "off": 0
+    },
+    {
+      "text": "Time: 03:27:00 AM:",
+      "off": 17
+    },
+    {
+      "text": "Build: 344 (9beedad4ba beta)",
+      "off": 36
+    },
+    {
+      "text": "--------------------------------------------------------------",
+      "off": 65
+    },
+    {
+      "text": "[  0.000] Main : Filesystem initialized, cache enabled",
+      "off": 128
+    },
+    {
+      "text": "Console commands can be written to the FIFO '/tmp/rig.fifo'",
+      "off": 183
+    },
+    {
+      "text": "Build 344.100 (9beedad4ba, beta)",
+      "off": 274
+    },
+    {
+      "text": "Linux",
+      "off": 307
+    },
+    {
+      "text": "Server tickrate 30, client sendrate 20, bandwidth limit per player 51200",
+      "off": 313
+    },
+    {
+      "text": "sendrate 20 does not divide tickrate 30: snapshots arrive 33 and 67 ms apart instead of every 50 ms. Sendrate 15 or 30 gives even spacing.",
+      "off": 386
+    },
+    {
+      "text": "Socket buffers: 524288 bytes receive, 524288 bytes send (as reported by the kernel)",
+      "off": 525
+    },
+    {
+      "text": "Connected to Steam servers after 1.1 seconds",
+      "off": 609
+    },
+    {
+      "text": "Max active zip jobs set to 6",
+      "off": 654
+    },
+    {
+      "text": "ModServicesServer::Initialize()",
+      "off": 683
+    },
+    {
+      "text": "ModServicesServer initialized to AppID: 4920",
+      "off": 715
+    },
+    {
+      "text": "\t Passed '/srv/ns2/mods/' as mod-storage directory",
+      "off": 760
+    },
+    {
+      "text": "ModServices: Searching '/srv/ns2/mods/content/4920/' for installed mods...",
+      "off": 831
+    },
+    {
+      "text": "InitializeInstalledMods: Found 5 ModIDs from mod cache and steam directories",
+      "off": 926
+    },
+    {
+      "text": "\t Adding Mod Combat Fix[509780686]",
+      "off": 1003
+    },
+    {
+      "text": "\t Adding Mod UWE Hotfix 344[3558697165]",
+      "off": 1038
+    },
+    {
+      "text": "\t Adding Mod NSL Badges[2899635443]",
+      "off": 1078
+    },
+    {
+      "text": "Removing mod cache directory of [2909200101][2909200101] thats no longer installed.",
+      "off": 1114
+    },
+    {
+      "text": "Removing mod cache directory of [2633436686][2633436686] thats no longer installed.",
+      "off": 1198
+    },
+    {
+      "text": "ModServicesServer Initialized",
+      "off": 1282
+    },
+    {
+      "text": "ModServices::UpdateModList(1)",
+      "off": 1312
+    },
+    {
+      "text": "ModServices::StartUGCModInfoQuery(1) - count = 1, detailed-1, download-1, includeChildren-1",
+      "off": 1342
+    },
+    {
+      "text": "FetchHotfixModLists(downloadUpdates = true)",
+      "off": 1434
+    },
+    {
+      "text": "ModServices::StartUGCModInfoQuery(2) - count = 2, detailed-0, download-0, includeChildren-1",
+      "off": 1478
+    },
+    {
+      "text": "Fetching hotfix mod list",
+      "off": 1570
+    },
+    {
+      "text": "[  1.149] Main : Steam BuildID: 0",
+      "off": 1595
+    },
+    {
+      "text": "Adding mod 509780686 from MapCycle.json to active mod list",
+      "off": 1629
+    },
+    {
+      "text": "Mod : Fetching Extensions...",
+      "off": 1688
+    },
+    {
+      "text": "FetchHotfixModLists(downloadUpdates = false)",
+      "off": 1717
+    },
+    {
+      "text": "FetchHotfixModLists: Already fetching hotfix mods",
+      "off": 1762
+    },
+    {
+      "text": "VAC Enabled",
+      "off": 1812
+    },
+    {
+      "text": "ModServices::OnModInfoRequestComplete(2) numResults = 2, numMatching = 2, isCachedData = false",
+      "off": 1824
+    },
+    {
+      "text": "ModServices::OnModInfoRequestComplete(1) numResults = 1, numMatching = 1, isCachedData = false",
+      "off": 1919
+    },
+    {
+      "text": "ModServices::HandleModInfoRequestCompleted(1)",
+      "off": 2014
+    },
+    {
+      "text": "ModServices::HandleModInfoRequestCompleted(2)",
+      "off": 2060
+    },
+    {
+      "text": "OnHotfixModListFetched: requestid = 2, success = true ",
+      "off": 2106
+    },
+    {
+      "text": "Found 2 hotfix mods",
+      "off": 2161
+    },
+    {
+      "text": "Found 115 mods in whitelist",
+      "off": 2181
+    },
+    {
+      "text": "FetchHotfixModDetails: download = yes, attempt = 0",
+      "off": 2209
+    },
+    {
+      "text": "ModServices::StartUGCModInfoQuery(3) - count = 2, detailed-1, download-1, includeChildren-0",
+      "off": 2260
+    },
+    {
+      "text": "ModServices::OnModInfoRequestComplete(3) numResults = 2, numMatching = 2, isCachedData = false",
+      "off": 2352
+    },
+    {
+      "text": "ModServices::HandleModInfoRequestCompleted(3)",
+      "off": 2447
+    },
+    {
+      "text": "OnHotfixModDetailsFetched: requestid = 3, success = -617293375 ",
+      "off": 2493
+    },
+    {
+      "text": "All hotfix mods are up to date.",
+      "off": 2557
+    },
+    {
+      "text": "ModServices::Update runningModUpdates is now false",
+      "off": 2589
+    },
+    {
+      "text": "Mod : Mounting Extension d41d68cd",
+      "off": 2640
+    },
+    {
+      "text": "Mod : Mounting Extension acd4ecf3",
+      "off": 2674
+    },
+    {
+      "text": "Web server running at 127.0.0.1:8080",
+      "off": 2708
+    },
+    {
+      "text": "ServerWorld::InstallMods(3)",
+      "off": 2745
+    },
+    {
+      "text": "SetUpdateLockdownEnabled: false",
+      "off": 2773
+    },
+    {
+      "text": "ModServices::UpdateModList(3)",
+      "off": 2805
+    },
+    {
+      "text": "ModServices::StartUGCModInfoQuery(4) - count = 3, detailed-1, download-1, includeChildren-1",
+      "off": 2835
+    },
+    {
+      "text": "Downloading mods",
+      "off": 2927
+    },
+    {
+      "text": "ModServices::OnModInfoRequestComplete(4) numResults = 3, numMatching = 3, isCachedData = false",
+      "off": 2944
+    },
+    {
+      "text": "ModServices::HandleModInfoRequestCompleted(4)",
+      "off": 3039
+    },
+    {
+      "text": "ModServices::Update runningModUpdates is now false",
+      "off": 3085
+    },
+    {
+      "text": "SetUpdateLockdownEnabled: true",
+      "off": 3136
+    },
+    {
+      "text": "Finished Installing Mods",
+      "off": 3167
+    },
+    {
+      "text": "Mod Combat Fix[509780686] is not whitelisted",
+      "off": 3192
+    },
+    {
+      "text": "Server has non whitelisted mods",
+      "off": 3237
+    },
+    {
+      "text": "ModMounter::Mount(3)",
+      "off": 3269
+    },
+    {
+      "text": "[  2.132] Worker 00 : Mounting mod 'NSL Badges'[2899635443] from /srv/ns2/mods/content/4920/2899635443/",
+      "off": 3290
+    },
+    {
+      "text": "[  2.133] Worker 00 : Mounting mod 'UWE Hotfix 344'[3558697165] from /srv/ns2/mods/content/4920/3558697165/",
+      "off": 3414
+    },
+    {
+      "text": "[  2.133] Worker 00 : Mounting mod 'Combat Fix'[509780686] from /srv/ns2/mods/SparkCache/509780686/1441020960/",
+      "off": 3542
+    },
+    {
+      "text": "Script profiling zones are off (pass -luazones to profile script functions)",
+      "off": 3673
+    },
+    {
+      "text": "Resource loader: install disk is slow or unknown, using 1 loader thread(s), preload lock on",
+      "off": 3749
+    },
+    {
+      "text": "Loading config://ServerConfig.json",
+      "off": 3841
+    },
+    {
+      "text": "Loading config://ReservedSlotsConfig.json",
+      "off": 3876
+    },
+    {
+      "text": "Loading config://NS2PlusServerConfig.json",
+      "off": 3918
+    },
+    {
+      "text": "Server  : 0.000000 : [NSLBadges] Network Messages Registered.",
+      "off": 3960
+    },
+    {
+      "text": "Resampling uncompressed animations at 1/2 frame rate to conserve memory",
+      "off": 4022
+    },
+    {
+      "text": "[  2.189] Worker 03 : Error: Unable to open 'models/effects/proximity_force_field_noEntry.model' (usage 0x1)",
+      "off": 4094
+    },
+    {
+      "text": "Server  : 0.000000 : Server-Setting: AFK auto-kick time:  300",
+      "off": 4203
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 79 for badge file clawmarks.dds",
+      "off": 4265
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 80 for badge file clawmarks_20.dds",
+      "off": 4340
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 81 for badge file commander_grey_20.dds",
+      "off": 4418
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 82 for badge file ensl_intermediate_2019_bronze.dds",
+      "off": 4501
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 83 for badge file ensl_intermediate_2019_bronze_20.dds",
+      "off": 4596
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 84 for badge file ensl_intermediate_2019_gold.dds",
+      "off": 4694
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 85 for badge file ensl_intermediate_2019_gold_20.dds",
+      "off": 4787
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 86 for badge file ensl_intermediate_2019_silver_.dds",
+      "off": 4883
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 87 for badge file ensl_intermediate_2019_silver_20.dds",
+      "off": 4979
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 88 for badge file marine.dds",
+      "off": 5077
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 89 for badge file marine_20.dds",
+      "off": 5149
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 90 for badge file nsl_open_tournament_2019_bronze.dds",
+      "off": 5224
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 91 for badge file nsl_open_tournament_2019_gold.dds",
+      "off": 5321
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 92 for badge file nsl_open_tournament_2019_silver.dds",
+      "off": 5416
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 93 for badge file wrench.dds",
+      "off": 5513
+    },
+    {
+      "text": "Server  : 0.000000 : adding custom badgeid 94 for badge file wrench_20.dds",
+      "off": 5585
+    },
+    {
+      "text": "Loading config://ServerAdmin.json",
+      "off": 5660
+    },
+    {
+      "text": "Loading config://BannedPlayers.json",
+      "off": 5694
+    },
+    {
+      "text": "Loading config://MapCycle.json",
+      "off": 5730
+    },
+    {
+      "text": "[  2.358] Worker 00 : Error: Ranking disabled: server has non-whitelisted mods mounted",
+      "off": 5761
+    },
+    {
+      "text": "Requesting server ranking be enabled, request success: false",
+      "off": 5848
+    },
+    {
+      "text": "Starting consistency check hash table generation",
+      "off": 5909
+    },
+    {
+      "text": "Hashed 1 game_setup.xml files for consistency",
+      "off": 5958
+    },
+    {
+      "text": "Hashed 1321 *.lua files for consistency",
+      "off": 6004
+    },
+    {
+      "text": "Hashed 52 *.hlsl files for consistency",
+      "off": 6044
+    },
+    {
+      "text": "Hashed 41 *.shader files for consistency",
+      "off": 6083
+    },
+    {
+      "text": "Hashed 19 *.screenfx files for consistency",
+      "off": 6124
+    },
+    {
+      "text": "Hashed 291 *.surface_shader files for consistency",
+      "off": 6167
+    },
+    {
+      "text": "Hashed 1 *.fxh files for consistency",
+      "off": 6217
+    },
+    {
+      "text": "[  2.427] Worker 07 : Error: Unable to open 'models/effects/frag_metal_01.model' (usage 0x1)",
+      "off": 6254
+    },
+    {
+      "text": "Hashed 6 *.render_setup files for consistency",
+      "off": 6347
+    },
+    {
+      "text": "Hashed 2 *.shader_template files for consistency",
+      "off": 6393
+    },
+    {
+      "text": "Hashed 39 *.level files for consistency",
+      "off": 6442
+    },
+    {
+      "text": "Hashed 9171 *.dds files for consistency",
+      "off": 6482
+    },
+    {
+      "text": "Hashed 1239 *.cinematic files for consistency",
+      "off": 6522
+    },
+    {
+      "text": "Hashed 3486 *.material files for consistency",
+      "off": 6568
+    },
+    {
+      "text": "Hashed 5172 *.model files for consistency",
+      "off": 6613
+    },
+    {
+      "text": "Hashed 123 *.animation_graph files for consistency",
+      "off": 6655
+    },
+    {
+      "text": "Hashed 254 *.polygons files for consistency",
+      "off": 6706
+    },
+    {
+      "text": "Hashed 3 *.fev files for consistency",
+      "off": 6750
+    },
+    {
+      "text": "Hashed 32 *.fsb files for consistency",
+      "off": 6787
+    },
+    {
+      "text": "Hashed 17 *.hmp files for consistency",
+      "off": 6825
+    },
+    {
+      "text": "Hashed 0 ui/*.dds files for consistency",
+      "off": 6863
+    },
+    {
+      "text": "EntryHash lua/entry/UWEHotfix344.entry size = 89, hash = cedadaa5212b1df2-b450a411b8a96728, source = /srv/ns2/mods/content/4920/3558697165/",
+      "off": 6903
+    },
+    {
+      "text": "EntryHash lua/entry/NSLBadges.entry size = 167, hash = 444bb34f8d35ea9f-e29dd19f79c95d18, source = /srv/ns2/mods/content/4920/2899635443/",
+      "off": 7063
+    },
+    {
+      "text": "Restricted lua/entry/*.entry to 2 files for consistency",
+      "off": 7221
+    },
+    {
+      "text": "Skipped 310 *_view*.dds files for consistency",
+      "off": 7277
+    },
+    {
+      "text": "Skipped 191 *_view*.material files for consistency",
+      "off": 7323
+    },
+    {
+      "text": "Skipped 289 *_view*.model files for consistency",
+      "off": 7374
+    },
+    {
+      "text": "Skipped 35 models/marine/hands/* files for consistency",
+      "off": 7422
+    },
+    {
+      "text": "Skipped 1 */hitsounds_client.fev files for consistency",
+      "off": 7477
+    },
+    {
+      "text": "Skipped 1 */hitsounds_client.fsb files for consistency",
+      "off": 7532
+    },
+    {
+      "text": "Skipped 1 shaders/DarkVision.hlsl files for consistency",
+      "off": 7587
+    },
+    {
+      "text": "Skipped 1 shaders/DarkVision.screenfx files for consistency",
+      "off": 7643
+    },
+    {
+      "text": "Skipped 1 shaders/DarkVision.shader files for consistency",
+      "off": 7703
+    },
+    {
+      "text": "Skipped 1 models/marine/male/flashlight.dds files for consistency",
+      "off": 7761
+    },
+    {
+      "text": "Skipped 1 ui/crosshairs.dds files for consistency",
+      "off": 7827
+    },
+    {
+      "text": "Skipped 1 ui/crosshairs-hit.dds files for consistency",
+      "off": 7877
+    },
+    {
+      "text": "Skipped 1 ui/alien_hud_health.dds files for consistency",
+      "off": 7931
+    },
+    {
+      "text": "Skipped 1 ui/alien_hud_health_noise.dds files for consistency",
+      "off": 7987
+    },
+    {
+      "text": "Skipped 0 ui/alien_hud_health.dds files for consistency",
+      "off": 8049
+    },
+    {
+      "text": "Skipped 1 ui/alien_hud_health_old.dds files for consistency",
+      "off": 8105
+    },
+    {
+      "text": "Skipped 1 ui/alien_hud_health_smoke.dds files for consistency",
+      "off": 8165
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar1bg.dds files for consistency",
+      "off": 8227
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar1main.dds files for consistency",
+      "off": 8282
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar1sec.dds files for consistency",
+      "off": 8339
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar2ap.dds files for consistency",
+      "off": 8395
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar2bg-l.dds files for consistency",
+      "off": 8450
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar2bg-r.dds files for consistency",
+      "off": 8507
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar2hp.dds files for consistency",
+      "off": 8564
+    },
+    {
+      "text": "Skipped 1 ui/bottomhudbar2right.dds files for consistency",
+      "off": 8619
+    },
+    {
+      "text": "Skipped 1 ui/centerhudbar.dds files for consistency",
+      "off": 8677
+    },
+    {
+      "text": "Skipped 1 ui/exo_crosshair.dds files for consistency",
+      "off": 8729
+    },
+    {
+      "text": "Skipped 1 ui/exosuit_HUD1.dds files for consistency",
+      "off": 8782
+    },
+    {
+      "text": "Skipped 1 ui/exosuit_HUD2.dds files for consistency",
+      "off": 8834
+    },
+    {
+      "text": "Skipped 1 ui/exosuit_HUD3.dds files for consistency",
+      "off": 8886
+    },
+    {
+      "text": "Skipped 1 ui/exosuit_HUD4.dds files for consistency",
+      "off": 8938
+    },
+    {
+      "text": "Skipped 1 ui/blip.dds files for consistency",
+      "off": 8990
+    },
+    {
+      "text": "Skipped 1 ui/alien_outline_lookup.dds files for consistency",
+      "off": 9034
+    },
+    {
+      "text": "Skipped 1 ui/marine_outline_lookup.dds files for consistency",
+      "off": 9094
+    },
+    {
+      "text": "Skipped 1 ui/drop_icons.dds files for consistency",
+      "off": 9155
+    },
+    {
+      "text": "Skipped 1 ui/hud_damage_arrow.dds files for consistency",
+      "off": 9205
+    },
+    {
+      "text": "Consistency check hash table generation took 0 seconds",
+      "off": 9261
+    },
+    {
+      "text": "Server  : 0.000000 : INFO: LuaJIT setup: maxtrace=20,000, maxmcode=35,000",
+      "off": 9316
+    },
+    {
+      "text": "Loading config://RemoteStats.json",
+      "off": 9390
+    },
+    {
+      "text": "[  2.555] Worker 00 : Loading 'maps/ns2_summit.level'",
+      "off": 9424
+    },
+    {
+      "text": "[  2.673] Worker 07 : Error: Unable to open 'models/bootcamp/invisible.material' (usage 0x1)",
+      "off": 9478
+    },
+    {
+      "text": "Server  : 0.000000 : GetThunderdomeInjectEntities()",
+      "off": 9571
+    },
+    {
+      "text": "Loading pathing mesh for level maps/ns2_summit.level",
+      "off": 9623
+    },
+    {
+      "text": "Finished loading 'maps/ns2_summit.level'",
+      "off": 9676
+    },
+    {
+      "text": "Server  : 0.034296 : Reset AI TeamBrain for Marines",
+      "off": 9717
+    },
+    {
+      "text": "Server  : 0.034296 : Reset AI TeamBrain for Aliens",
+      "off": 9769
+    },
+    {
+      "text": "Server  : 0.034296 : Reset location group stale timers",
+      "off": 9820
+    },
+    {
+      "text": "[  3.889] Main : Script tracing throttled: 3.13 ms spent compiling Lua traces this frame exceeds the 3.00 ms limit, so the JIT was disabled for the rest of the frame. Persistent throttling means scripts are thrashing the trace cache and are running interpreted.",
+      "off": 9875
+    },
+    {
+      "text": "[ 18.030] Main : Error: Unable to open 'web/' (usage 0x1)",
+      "off": 10137
+    },
+    {
+      "text": "webadmin-spa: checking that config://log-Server.txt is this server's log (18030)",
+      "off": 10195
+    }
+  ],
+  "from": 0,
+  "size": 10276,
+  "source": "file",
+  "tail_bytes": 65536,
+  "at_start": true
+}

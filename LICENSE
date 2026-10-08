@@ -1,0 +1,61 @@
+MIT License
+
+Copyright (c) 2026 LZZ
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+What the MIT License above does not cover
+
+The license above applies to the original work in this repository. The
+following are not ours to license. They are included because the mod needs
+them to work alongside Natural Selection 2, and they remain under their
+owners' terms:
+
+1. Code derived from Unknown Worlds Entertainment's ServerWebInterface.lua.
+   lua/ServerWebInterface.lua began as a copy of the game's own file
+   ("Copyright (c) 2012, Unknown Worlds Entertainment, Inc. All rights
+   reserved."), and the probes in tools/spikes/*-probe.lua are built from it.
+   The vanilla code in those files belongs to Unknown Worlds Entertainment.
+   Our changes to them, marked "webadmin-spa:", are under the MIT License.
+
+2. Art taken from Natural Selection 2, (c) Unknown Worlds Entertainment:
+   the map overviews in panel/src/minimaps/, the skill tier badges in
+   panel/src/assets/skill-tiers.png, the NS2 monogram in
+   panel/src/assets/ns2-logo.png, and their built copies in web/assets/.
+   Natural Selection 2 is a trademark of Unknown Worlds Entertainment.
+
+3. The ns2panel.com mark drawn by panel/src/ui/Ns2PanelIcon.tsx belongs to
+   ns2panel.com.
+
+4. Text read from other software: the command help in
+   panel/src/commands.json comes from the game's and Shine's Lua, and keeps
+   their owners' terms.
+
+5. Data captured from Steam and from game servers: Workshop titles,
+   descriptions and ids in fixtures/ and panel/src/whitelist.json belong to
+   their authors and to Valve.
+
+6. Third-party libraries bundled into web/ (Preact, uPlot, Lucide). Their
+   licenses are in panel/public/THIRD-PARTY-LICENSES.txt, which the build
+   copies into web/.
+
+This project is not affiliated with or endorsed by Unknown Worlds
+Entertainment, Valve, or the Shine or ns2panel.com projects.

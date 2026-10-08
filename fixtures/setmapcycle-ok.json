@@ -1,0 +1,91 @@
+{
+  "cycle": {
+    "mods": [
+      "c6fbbb0",
+      "4384b7fe",
+      "e1c54b1d",
+      "9928e9e9",
+      "9ad32966",
+      "aa473d86",
+      "e1eb3efa",
+      "9b817608",
+      "ac9bce1f",
+      "b7149f9",
+      "debda985",
+      "9b55583a",
+      "de58cc8c",
+      "bbe5db27",
+      "ab5272a6",
+      "cc416160",
+      "b0ab9e7e",
+      "3536f85e",
+      "48b95c32",
+      "235ee3a6",
+      "706d242",
+      "1e62a2ce"
+    ],
+    "time": 40,
+    "maps": [
+      {
+        "map": "ns2_veil",
+        "min": 12
+      },
+      "ns2_tram_nextstop",
+      "ns2_summit",
+      {
+        "map": "ns2_jambi",
+        "mods": [
+          "7b986f5"
+        ]
+      },
+      "ns2_biodome",
+      "ns2_ayumi",
+      "ns2_descent",
+      "ns2_derelict",
+      "ns2_unearthed",
+      "ns2_metro",
+      {
+        "map": "ns2_docking_mmpg",
+        "mods": [
+          "d372bb98"
+        ]
+      },
+      {
+        "map": "ns2_caged_mmpg",
+        "mods": [
+          "d372c04b"
+        ]
+      },
+      {
+        "map": "ns2_eclipse_mmpg",
+        "mods": [
+          "a80c2439"
+        ]
+      },
+      {
+        "map": "ns2_tanith_mmpg",
+        "mods": [
+          "a80c2439"
+        ]
+      },
+      {
+        "map": "ns2_nexus_fixes",
+        "mods": [
+          "ad283f25"
+        ]
+      },
+      "ns2_mineral_nsl"
+    ],
+    "groups": [
+      {
+        "name": "small",
+        "maps": [
+          "ns2_veil",
+          "ns2_summit"
+        ]
+      }
+    ],
+    "mode": "order"
+  },
+  "ok": true
+}

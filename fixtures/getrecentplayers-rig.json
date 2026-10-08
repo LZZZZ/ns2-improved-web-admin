@@ -1,0 +1,23 @@
+{
+  "storage": {
+    "saved_at": 1790524330,
+    "loaded": "fallback"
+  },
+  "capacity": 100,
+  "now": 1790524468,
+  "players": [
+    {
+      "name": "Skulkovich",
+      "connected": false,
+      "steamid": 10000000,
+      "played": 154,
+      "last_seen": 1790524330,
+      "names": [
+        "Onosaurus"
+      ],
+      "ipaddress": "0.0.0.0",
+      "first_seen": 1790524176
+    }
+  ],
+  "window": 86400
+}

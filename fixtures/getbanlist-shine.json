@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Fadeaway",
+    "id": "10000013",
+    "reason": "Mic spam after two warnings",
+    "time": 1790586400
+  },
+  {
+    "name": "<unknown>",
+    "id": "10000012",
+    "reason": "Ban evasion (alt of 10000011)",
+    "time": 0
+  },
+  {
+    "name": "Onosaurus",
+    "id": "10000011",
+    "reason": "Griefing; see the Shine log for 2026-09-20",
+    "time": 6e+24
+  },
+  {
+    "name": "Lerkwarm",
+    "id": "10000010",
+    "reason": "No reason given.",
+    "time": 0
+  }
+]
