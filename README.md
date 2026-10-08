@@ -39,10 +39,24 @@ What is still open is in [Next](#next).
 
 ## Installing
 
-Add `e3742516` to `mods` in the server's `MapCycle.json`, then change map
-or restart; the server downloads the item itself. The panel is then at
-`/index.html` on the web admin port, as before. Read [Security](#security)
-first, and expect the server to be unranked while the mod is mounted.
+The mod is on the Steam Workshop as
+[NS2 Improved Web Admin](https://steamcommunity.com/sharedfiles/filedetails/?id=3816039702)
+(item 3816039702, hex `e3742516`). Read [Security](#security) first, and
+expect the server to be unranked while the mod is mounted.
+
+1. Add `e3742516` to `mods` in the server's `MapCycle.json`, then change
+   map or restart; the server downloads the item itself.
+2. **Keep the server's log in its config directory**, so the mod can read
+   it: start the server with `-logdir` set to the same directory as
+   `-config_path`, or with neither flag, which is the engine's default
+   layout (not yet tested). Lua can open files only under the config
+   directory. Without this, the Console tab cannot show the log and the
+   Performance tab has none of the engine's own lines (`tickstat`,
+   `perfmon:`); each says why, and everything else works. The engine also writes `dumps/` wherever the log goes.
+   If you move the log out of the config directory later, delete the
+   `log-Server.txt` left there: the panel spots the stale copy and says
+   so, but shows nothing.
+3. Open `/index.html` on the web admin port, as before.
 
 ## Screenshots
 
