@@ -19,11 +19,9 @@ claims:
                said, with no `;` on the command line
   * --mod --shine=ban,reservedslots,mapvote --maps=modded
                a modded cycle: a stock map's minimap on hover, fetched
-               only then, and a mod map saying it has none; the mapvote banner
-               and round limit,
-               mode disabled with its reason, Shine's next map, a mod map
-               added with its mod, a stock map as a name, the vote's pending
-               options, a missing mod flagged and fixed, a map the server does
+               only then, and a mod map saying it has none; no mapvote
+               banner, mode disabled with its reason, Shine's next map, a mod map
+               added with its mod, a stock map as a name, a missing mod flagged and fixed, a map the server does
                not have flagged, and Shine's options and groups surviving
 
 and on all of them: no uncaught exceptions, nothing fetched from a third party.
@@ -329,7 +327,7 @@ async def shine(c):
     edit_file(SHINE, append="ns2_nosuchmap")
     mark = len(c.events)
     await open_maps(c, SHINE)
-    await wait_for(c, "document.querySelector('.mapvote-banner')")
+    await wait_for(c, "document.querySelector('select[name=cyclemode]')?.disabled")
 
     def minimaps(since):
         return [e["params"]["request"]["url"] for e in c.events[since:]
@@ -354,8 +352,8 @@ async def shine(c):
     check("and the popup goes with the pointer",
           await c.eval("!document.querySelector('.minimap-pop')"))
     b = await banners(c)
-    check("the mapvote banner explains the vote and the round limit",
-          "Shine's mapvote picks the next map" in b and "after 2 rounds" in b, b[:40])
+    check("no banner about Shine's mapvote: the header's Shine tag says it",
+          b == "", b[:40] or "(none)")
     mode = json.loads(await c.eval(
         "JSON.stringify((s=>[s.disabled,s.title])(document.querySelector('select[name=cyclemode]')))"))
     check("the mode is disabled, with its reason", mode[0] is True and "not used" in mode[1],
@@ -393,13 +391,6 @@ async def shine(c):
           file["maps"][0] == {"map": "ns2_veil", "min": 12}
           and file.get("groups") == [{"name": "small", "maps": ["ns2_veil", "ns2_summit"]}]
           and len(file["mods"]) == 22)
-    await c.send("Page.reload")
-    await asyncio.sleep(0.2)
-    await open_maps(c, SHINE)
-    await wait_for(c, "document.querySelector('.vote-pending')")
-    pending = str(await c.eval("document.querySelector('.vote-pending')?.textContent||''"))
-    check("the vote says which maps it offers only from the next map",
-          "not yet in the vote" in pending and "ns2_caged" in pending, pending[:70])
 
 
 async def main():

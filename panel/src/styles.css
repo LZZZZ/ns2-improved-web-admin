@@ -633,7 +633,6 @@ tr.current-map .name-cell { font-weight: 600; }
   margin: 1px 4px 1px 0;
   background: var(--bg-inset);
 }
-.vote-pending { margin-top: 6px !important; }
 
 /* Mods */
 .mod-counts { align-self: center; }

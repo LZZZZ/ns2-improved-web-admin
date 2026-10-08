@@ -81,7 +81,6 @@ export function Maps({ state }: { state: ServerState }) {
           </p>
         </div>
       )}
-      {hasMod && state.shine?.mapVote && <MapVoteBanner cycle={cycle.shown} />}
       <CycleBanners cycle={cycle} />
       {cycle.shown ? (
         <Editor
@@ -98,44 +97,6 @@ export function Maps({ state }: { state: ServerState }) {
         <p class="muted">{cycle.loading ? "Loading the map cycle..." : ""}</p>
       )}
     </section>
-  );
-}
-
-// ------------------------------------------------------------ mapvote
-
-function MapVoteBanner({ cycle }: { cycle: RawMapCycle | null }) {
-  const vote = useResource(mapVote).data;
-  if (!vote) return null;
-  if (!vote.enabled) return null;
-  const names = cycle ? cycle.maps.map(entryName) : [];
-  const notYet = vote.mapsFromCycle ? names.filter((n) => !vote.options.includes(n)) : [];
-  const leaving = vote.mapsFromCycle ? vote.options.filter((n) => !names.includes(n)) : [];
-  return (
-    <div class="banner shine-banner mapvote-banner">
-      <h2>Shine's mapvote picks the next map</h2>
-      {vote.mapsFromCycle ? (
-        <p>
-          The maps below are what players vote on. The vote reads them when a
-          map loads, so a change made here reaches it at the next map. With no
-          vote, Shine takes the next map in list order; the mode is not used.
-          {vote.roundLimit > 0 && ` A map ends after ${vote.roundLimit} round${
-            vote.roundLimit === 1 ? "" : "s"}, not after the cycle's time.`}
-        </p>
-      ) : (
-        <p>
-          Its options come from Shine's own map list, not from this cycle
-          (GetMapsFromMapCycle is off). The cycle still decides which mods
-          load with each map.
-        </p>
-      )}
-      {(notYet.length > 0 || leaving.length > 0) && (
-        <p class="vote-pending">
-          Until the next map:{" "}
-          {notYet.length > 0 && <>not yet in the vote: <b>{notYet.join(", ")}</b>. </>}
-          {leaving.length > 0 && <>still offered: <b>{leaving.join(", ")}</b>.</>}
-        </p>
-      )}
-    </div>
   );
 }
 
