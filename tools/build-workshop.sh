@@ -14,7 +14,10 @@
 # 2 private, 3 unlisted) is required for a new item; on an update, leaving
 # it out keeps what the item has. The title is fixed here, the description
 # is workshop/description.bbcode with {version} replaced by kModVersion from
-# lua/ServerWebInterface.lua.
+# lua/ServerWebInterface.lua. A line starting {if-id} is kept only once the
+# item id is known, one starting {if-no-id} only before; in them {id} is the
+# id and {hexid} the same in hex, as MapCycle.json's mods take it. The build
+# refuses to run with a placeholder left over.
 #
 # The script uploads nothing. It prints the steamcmd command to run, since
 # the login is interactive (password, Steam Guard).
@@ -55,7 +58,14 @@ fi
 [ -z "$VISIBILITY" ] || [[ "$VISIBILITY" =~ ^[0-3]$ ]] || { echo "--visibility is 0, 1, 2 or 3" >&2; exit 1; }
 [ -n "$CHANGENOTE" ] || CHANGENOTE="Version $VERSION"
 
-DESCRIPTION=$(sed "s/{version}/$VERSION/g" workshop/description.bbcode)
+if [ -n "$ID" ]; then keep='{if-id}' drop='{if-no-id}'; else keep='{if-no-id}' drop='{if-id}'; fi
+DESCRIPTION=$(sed -e "/^$drop/d" -e "s/^$keep//" -e "s/{version}/$VERSION/g" workshop/description.bbcode)
+if [ -n "$ID" ]; then
+  DESCRIPTION=${DESCRIPTION//\{id\}/$ID}
+  DESCRIPTION=${DESCRIPTION//\{hexid\}/$(printf '%x' "$ID")}
+fi
+LEFT=$(grep -o '{[a-z-]*}' <<<"$DESCRIPTION" | sort -u | tr '\n' ' ' || true)
+[ -z "$LEFT" ] || { echo "placeholders left in the description: $LEFT(an id placeholder outside an {if-id} line?)" >&2; exit 1; }
 # A VDF string ends at a double quote; refuse rather than guess at escaping.
 for v in "$DESCRIPTION" "$CHANGENOTE" "$TITLE"; do
   case "$v" in *'"'*|*'\'*) echo "a double quote or backslash would break the VDF: ${v:0:60}..." >&2; exit 1 ;; esac
