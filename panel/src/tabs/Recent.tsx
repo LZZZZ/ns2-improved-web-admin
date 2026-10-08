@@ -9,6 +9,7 @@ import { updateSettings, useSettings } from "../store/settings";
 import { BanFields, DEFAULT_TERMS, banMinutes, banSpan } from "../ui/BanFields";
 import { IconButton, StatusIcon } from "../ui/Icon";
 import { Masked } from "../ui/Masked";
+import { PlayerLinks } from "../ui/PlayerLinks";
 import { dateTime, maskSteamId, parseSteamId, span } from "../ui/format";
 
 type SortKey = "seen" | "name" | "first" | "played";
@@ -217,11 +218,14 @@ function RecentList({ state }: { state: ServerState }) {
                       )}
                     </td>
                     <td>
-                      <Masked
-                        value={String(p.steamId)}
-                        masked={maskSteamId(p.steamId)}
-                        label="Steam id"
-                      />
+                      <span class="icon-row">
+                        <Masked
+                          value={String(p.steamId)}
+                          masked={maskSteamId(p.steamId)}
+                          label="Steam id"
+                        />
+                        <PlayerLinks steamId={p.steamId} />
+                      </span>
                     </td>
                     <td class="ip-cell">
                       <span class="revealed">{p.ip || "-"}</span>

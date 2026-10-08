@@ -18,7 +18,7 @@ looks like a failure rather than like a design choice:
   * the 09-26+ engine's Family Sharing and rejected moves show only when
     the server reports them: a Shared column with the owner's id masked, and a
     Rejected column; the mod's Hive skill column (P1); and every human row
-    links to ns2panel.com (P3)
+    links to ns2panel.com (P3) and to the player's Steam profile
   * Mute is disabled without Shine and says why -- the game has no mute,
     and the 2012 panel's sv_mute never existed (defect 18); under Shine's
     basecommands it is sh_gag, and the row shows the gag and offers Unmute
@@ -373,11 +373,17 @@ async def main():
             check("a player links to ns2panel.com by account id, without a referrer",
                   link and link[0] == "https://ns2panel.com/player/10000000"
                   and "noreferrer" in link[1] and link[2] == "_blank", str(link)[:60])
+            link = json.loads(await c.eval(
+                f"JSON.stringify((a=>a&&[a.href,a.rel,a.target])"
+                f"({human}.querySelector('a.steam-link')))"))
+            check("and to the Steam profile by SteamID64, without a referrer",
+                  link and link[0] == "https://steamcommunity.com/profiles/76561197970265728"
+                  and "noreferrer" in link[1] and link[2] == "_blank", str(link)[:70])
             check("while the Steam id itself stays masked",
                   "10000000" not in str(await c.eval(f"{human}.querySelector('td:nth-last-child(3)').textContent")))
             check("and bots get no link", await c.eval(
                 f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
-                ".every(r=>!r.querySelector('a.ns2panel-link'))"))
+                ".every(r=>!r.querySelector('a.player-link'))"))
             if not EXPECT_MOD:
                 await c.send("Page.navigate", url=BETA + "/index.html")
                 await asyncio.sleep(3.5)

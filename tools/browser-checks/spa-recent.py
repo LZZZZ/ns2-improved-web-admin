@@ -9,7 +9,8 @@ saying plainly what it cannot know:
                never asks for one
   * --mod      the window and capacity are stated from the server's reply;
                search finds a player by part of a name, by a former name, by
-               a STEAM_X:Y:Z id and by IP; IPs are shown and Steam ids masked;
+               a STEAM_X:Y:Z id and by IP; IPs are shown and Steam ids masked,
+               beside links to the player's Steam profile and ns2panel.com;
                a kicked player turns from connected to "left"; Ban sends
                sv_ban with `;` stripped and reports what the server printed;
                a banned row disables Ban and says why; a torn, unreadable or
@@ -175,6 +176,14 @@ async def mod(c):
           await cell(c, 10000020, 2))
     masked = await cell(c, 10000020, 1)
     check("Steam ids are masked by default", "10000020" not in masked, masked)
+    links = json.loads(await c.eval(
+        f"JSON.stringify([...{row(10000020)}.cells[1].querySelectorAll('a')]"
+        ".map(a=>[a.href,a.rel,a.target]))"))
+    check("the player links to Steam by SteamID64 and to ns2panel.com",
+          [l[0] for l in links] == ["https://steamcommunity.com/profiles/76561197970265748",
+                                    "https://ns2panel.com/player/10000020"], str(links)[:90])
+    check("both in a new tab, without a referrer",
+          all("noreferrer" in l[1] and l[2] == "_blank" for l in links))
     check("a name with markup is text", "Commander <Cee>" in await cell(c, 10000024, 0),
           await cell(c, 10000024, 0))
     check("a player with no name seen says so",

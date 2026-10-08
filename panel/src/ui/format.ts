@@ -146,6 +146,11 @@ export function parseSteamId(input: string): number | null {
   return null;
 }
 
+/** The SteamID64 of an NS2 id (a Steam account id). Past 2^53, so a string. */
+export function steamId64(accountId: number): string {
+  return (kSteamId64Base + BigInt(accountId)).toString();
+}
+
 /** A size in bytes, as B, KB, MB or GB (binary units). */
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

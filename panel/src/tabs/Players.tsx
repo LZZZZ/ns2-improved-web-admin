@@ -6,7 +6,7 @@ import { banCommand, sendCommand } from "../store/commands";
 import { updateSettings, useSettings } from "../store/settings";
 import { IconButton, StatusIcon } from "../ui/Icon";
 import { Masked } from "../ui/Masked";
-import { Ns2PanelIcon } from "../ui/Ns2PanelIcon";
+import { PlayerLinks } from "../ui/PlayerLinks";
 import { maskIp, maskSteamId } from "../ui/format";
 
 type SortKey = "name" | "team" | "skill" | "score" | "kills" | "assists" | "deaths"
@@ -52,13 +52,6 @@ const REJECTED_TITLE =
 const SHARED_TITLE =
   "Steam Family Sharing: the player is on a copy another account owns, shown "
   + "beside it. Reported by the 09-26+ engine.";
-
-/**
- * A player's page on ns2panel.com. Its id is the Steam account id, which is
- * what the server reports (SteamID64 - 76561197960265728). A plain link, opened
- * in a new tab without a referrer: the panel itself fetches nothing from there.
- */
-const ns2PanelUrl = (steamId: number) => `https://ns2panel.com/player/${steamId}`;
 
 /** The 2012 panel's round buttons, with the commands that exist. */
 const ROUND_ACTIONS = [
@@ -265,12 +258,7 @@ export function Players({ state }: { state: ServerState }) {
                           masked={maskSteamId(p.steamId)}
                           label="Steam id"
                         />
-                        <a class="ns2panel-link" href={ns2PanelUrl(p.steamId)}
-                           target="_blank" rel="noreferrer noopener"
-                           title="Open on ns2panel.com (leaves this panel)">
-                          <Ns2PanelIcon />
-                          <span class="sr-only">ns2panel</span>
-                        </a>
+                        <PlayerLinks steamId={p.steamId} />
                       </span>
                     )}
                 </td>

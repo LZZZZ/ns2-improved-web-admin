@@ -211,9 +211,12 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm { padding: 2px 7px; font-size: 12px; }
 .round-controls { gap: 6px; margin-bottom: 0; }
 .owner-id { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; }
-.ns2panel-link { color: var(--ns2panel); display: inline-flex; opacity: 0.85; }
-.ns2panel-link:hover { opacity: 1; }
-.ns2panel-link svg { display: block; }
+.player-link { display: inline-flex; opacity: 0.85; }
+.player-link:hover { opacity: 1; }
+.player-link svg { display: block; }
+.ns2panel-link { color: var(--ns2panel); }
+/* Valve draws its mark in one colour, black or white: the text's. */
+.steam-link { color: var(--text); }
 
 /* The game's skill badges (tools/make-skill-tiers.sh): its sheet of ten
    100x32 rows, shown 20 px high as the scoreboard does. --row is tier + 2. */
