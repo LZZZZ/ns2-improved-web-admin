@@ -233,17 +233,8 @@ function ModsView(p: ViewProps) {
           <span class="spacer" />
           <UndoReload cycle={store} hasMod={hasMod} />
         </div>
-        <CycleNote cycle={store}
-                   idle="A change here edits the cycle's mods and is written at once." />
-        <p class="muted form-hint">
-          Changes load or unload at the next map change, not now. Mods are
-          listed in the order the server mounts them: its own two, then the
-          ones every map loads, numbered; adding puts a mod last. Loading a
-          mod that is not whitelisted turns ranking off. Installed mods stay
-          on disk: nothing in the game can delete one. To install a mod, find
-          it on the Workshop tab.
-        </p>
-        <WhitelistSource list={p.whitelist} hasMod={hasMod} />
+        {/* How a write went stays by Undo; the standing notes are below the table. */}
+        {(store.saving || store.last) && <CycleNote cycle={store} idle="" />}
       </div>
 
       <div class="toolbar">
@@ -280,6 +271,20 @@ function ModsView(p: ViewProps) {
         </table>
       </div>
 
+      <div class="mods-notes">
+        <p class="muted form-hint">
+          A change here edits the cycle's mods and is written at once.
+        </p>
+        <p class="muted form-hint">
+          Changes load or unload at the next map change, not now. Mods are
+          listed in the order the server mounts them: its own two, then the
+          ones every map loads, numbered; adding puts a mod last. Loading a
+          mod that is not whitelisted turns ranking off. Installed mods stay
+          on disk: nothing in the game can delete one. To install a mod, find
+          it on the Workshop tab.
+        </p>
+        <WhitelistSource list={p.whitelist} hasMod={hasMod} />
+      </div>
     </>
   );
 }

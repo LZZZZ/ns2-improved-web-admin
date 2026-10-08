@@ -636,6 +636,7 @@ tr.current-map .name-cell { font-weight: 600; }
 
 /* Mods */
 .mod-counts { align-self: center; }
+.mods-notes { margin-top: 8px; }
 .selectable { user-select: all; cursor: text; }
 .mods-table a { color: var(--accent); }
 /* A status never wraps inside itself; the cell grows instead. */
