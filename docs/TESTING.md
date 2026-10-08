@@ -187,6 +187,16 @@ installed mod's own `ServerWebInterface.lua` back, and delete any
 boot with a mod mounted also writes a default `ConsistencyConfig.json`
 into `config/` (seen on 09-26); delete it too.
 
+### The default layout
+
+To boot the rig with neither `-config_path` nor `-logdir`, as many
+operators do, set `XDG_CONFIG_HOME` to an empty directory of its own: the
+engine honours it, so the default config directory becomes
+`$XDG_CONFIG_HOME/Natural Selection 2/` instead of the
+`~/.config/Natural Selection 2/` other runs share. Put a `MapCycle.json`
+and a `ProgressionConfig.json` with `"enabled": false` in it before the
+first boot. Keep `-modstorage`. Delete the directory afterwards.
+
 ### Mounting the published item
 
 To test what operators get rather than this repo's working tree, put the

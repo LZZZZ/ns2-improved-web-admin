@@ -608,8 +608,15 @@ directory. In Chrome, the tab showed the file from its first line and a
 command's line within a poll, with no exceptions. Fixtures:
 `getlog-rig-tail.json`, `-since`, `-reset`, `-stale`, `getlog-none.json`.
 
-Not yet seen: a populated round's log through the tab, and a server on
-the default layout (no `-logdir`), which should qualify.
+**The default layout qualifies** *(2026-10-08, the Workshop item on the
+09-27 engine)*: with neither `-config_path` nor `-logdir`, the engine
+writes the config files and `log-Server.txt` to the same directory
+(`$XDG_CONFIG_HOME/Natural Selection 2/`, else
+`~/.config/Natural Selection 2/`). `getlog` served the whole file
+(`source: file`, 185 lines, the marker found, not `stale`), a `sv_say`
+arrived on the next read, and `getperf` read `tickstat` lines from it.
+
+Not yet seen: a populated round's log through the tab.
 
 ## 8. Light, fast, dark, full width
 

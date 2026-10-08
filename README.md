@@ -49,7 +49,7 @@ expect the server to be unranked while the mod is mounted.
 2. **Keep the server's log in its config directory**, so the mod can read
    it: start the server with `-logdir` set to the same directory as
    `-config_path`, or with neither flag, which is the engine's default
-   layout (not yet tested). Lua can open files only under the config
+   layout and works as it is. Lua can open files only under the config
    directory. Without this, the Console tab cannot show the log and the
    Performance tab has none of the engine's own lines (`tickstat`,
    `perfmon:`); each says why, and everything else works. The engine also writes `dumps/` wherever the log goes.
