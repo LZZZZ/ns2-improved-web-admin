@@ -133,7 +133,7 @@ command line under it.
 | Dependencies | Vendored, pinned, no CDN | Plain HTTP on a possibly isolated network. See [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md#no-cdn). |
 | Size | A soft target of 1 MiB for `web/` | About 650 KB today: 250 KB of script and style, and 367 KB of minimaps fetched only on hover. Every joining client downloads the mod, so growth is worth noticing. |
 | Images | PNG | PNG is in every MIME table the engine's binaries carry, and the engine sends `nosniff`, so the type has to be right. WebP is only in the newer network library's table. |
-| Browsers | Current Chrome, Firefox and Safari | Server operators, not players. |
+| Browsers | Current Chrome and Firefox | Server operators, not players. |
 
 ## What the panel deliberately does not do
 
