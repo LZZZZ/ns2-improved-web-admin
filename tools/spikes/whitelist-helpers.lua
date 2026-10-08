@@ -25,8 +25,8 @@ end
 local kWhitelistProbeCalls = {
     { "page", "https://steamcommunity.com/sharedfiles/filedetails/?id=2633436686" },
     { "refused", "https://127.0.0.1:9/" },
-    { "nxdomain", "https://webadmin-spa-probe.invalid/" },
-    { "http404", "https://steamcommunity.com/webadmin-spa-probe-404" },
+    { "nxdomain", "https://improved-webadmin-probe.invalid/" },
+    { "http404", "https://steamcommunity.com/improved-webadmin-probe-404" },
 }
 
 local function WhitelistProbeStep(i)

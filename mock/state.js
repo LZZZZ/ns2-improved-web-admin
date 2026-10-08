@@ -160,7 +160,7 @@ export function createState(fixturesDir, opts = {}) {
         if (opts.whitelist === "fail") {
           wl.error = "Steam could not be reached: Could not resolve host: steamcommunity.com";
           wl.errorAt = Math.floor(Date.now() / 1000);
-          log(`webadmin-spa: whitelist not read: ${wl.error}`);
+          log(`improved-webadmin: whitelist not read: ${wl.error}`);
           return;
         }
         wl.error = null;
@@ -622,7 +622,7 @@ export function createState(fixturesDir, opts = {}) {
     if (!logChecked) {
       logChecked = true;
       if (!logStale) {
-        logLine(`webadmin-spa: checking that ${kLogPath} is this server's log `
+        logLine(`improved-webadmin: checking that ${kLogPath} is this server's log `
           + `(${Date.now() % 1000000})`);
       }
     }

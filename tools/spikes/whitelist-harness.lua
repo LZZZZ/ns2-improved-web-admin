@@ -21,7 +21,7 @@ local MOD = REPO .. "lua/ServerWebInterface.lua"
 local ffi = require("ffi")
 local dkjson = dofile(CORE .. "dkjson.lua")
 
-local kFile = "config://webadmin-spa/whitelist.json"
+local kFile = "config://improved-webadmin/whitelist.json"
 
 -- A Workshop page shaped like Steam's (2026-10-08): the items back to back
 -- after the block's opening tag, then more filedetails links outside it.
@@ -47,7 +47,7 @@ local function NewVM(opts)
     local vm = { now = 1000, calls = { }, files = opts.files or { }, logs = { } }
     local env = setmetatable({ }, { __index = _G })
     env.io = { open = function(path, mode)
-        if not path:find("^config://webadmin%-spa/") then return nil, "not allowed" end
+        if not path:find("^config://improved%-webadmin/") then return nil, "not allowed" end
         if mode == "w" then
             if opts.readOnly then return nil, path .. ": Permission denied" end
             local buffer = { }
@@ -139,7 +139,7 @@ do
     local saved = vm.files[kFile] and dkjson.decode(vm.files[kFile])
     check(saved and saved.version == 1 and saved.read_at == 1002
           and saved.hotfix_list_id == "2633436686" and #saved.whitelist == 3,
-          "a copy in config://webadmin-spa/whitelist.json")
+          "a copy in config://improved-webadmin/whitelist.json")
     vm.now = 1002 + 3599
     r = vm.request()
     check(#vm.calls == 0 and r.fetching == false, "no read again within the hour")

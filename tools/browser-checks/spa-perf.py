@@ -320,7 +320,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('webadmin-spa.settings'); } catch {}")
+                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
 
             print("\n== against a server carrying the mod's Lua")
             await c.send("Page.navigate", url=MOD + "/index.html")

@@ -8,12 +8,12 @@
 
 Script.Load("lua/RingBuffer.lua")
 
--- ===================== webadmin-spa =====================================
+-- ===================== improved-webadmin =====================================
 --
 -- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
 -- game's, so this file replaces the vanilla one wholesale. It started as a
 -- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `webadmin-spa:`. The vanilla code is a starting point, not something
+-- marked `improved-webadmin:`. The vanilla code is a starting point, not something
 -- to preserve: change it wherever that improves the result, keeping the HTTP
 -- API backward compatible when that is cheap (README.md, "Design decisions").
 --
@@ -74,7 +74,7 @@ Script.Load("lua/RingBuffer.lua")
 --
 -- 5. Recent players: everyone seen in the last 24 hours, up to 100, with name,
 --    former names, IP, first and last seen and time played, kept in
---    config://webadmin-spa/ so the list outlives a map change. Read with
+--    config://improved-webadmin/ so the list outlives a map change. Read with
 --    request=getrecentplayers. See docs/REQUIREMENTS.md item 6.
 --
 --    Under Shine's ban plugin, a ban of someone who is not connected is
@@ -116,7 +116,7 @@ Script.Load("lua/RingBuffer.lua")
 --    The engine reads it at boot from a Workshop item and gives Lua no way
 --    to see it, so the mod reads the item's public page itself, once an hour
 --    at most and only when a panel asks, and keeps it in
---    config://webadmin-spa/ across map changes.
+--    config://improved-webadmin/ across map changes.
 --
 -- =========================================================================
 
@@ -363,7 +363,7 @@ end
 -- they emit, formatted. Measured on the rig, 2026-09-05.
 
 
--- webadmin-spa: chat for the Chat tab (CONSTRAINTS item 3).
+-- improved-webadmin: chat for the Chat tab (CONSTRAINTS item 3).
 --
 -- The game keeps the last 20 messages (Server.lua:74) and getchatlist hands
 -- over all of them every time. This keeps 200, with times and increasing ids,
@@ -574,8 +574,8 @@ local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
 local kRecentSlots = {
-    "config://webadmin-spa/recent-players-a.json",
-    "config://webadmin-spa/recent-players-b.json",
+    "config://improved-webadmin/recent-players-a.json",
+    "config://improved-webadmin/recent-players-b.json",
 }
 
 -- Account id -> entry, as saved.
@@ -1002,7 +1002,7 @@ local perfDataBuffer = CreateRingBuffer(kMaxPerfDatas)
 -- The last time performance data was sampled.
 local lastPerfDataTime = 0
 
--- webadmin-spa: performance windows for `getperf` (item 8 above).
+-- improved-webadmin: performance windows for `getperf` (item 8 above).
 --
 -- The engine completes a ServerPerformanceData about once a second (measured:
 -- every 1.00 s, 30 UpdateServer calls apart at tickrate 30). Each fresh one is
@@ -1132,7 +1132,7 @@ local function PerfConfig()
     }
 end
 
--- webadmin-spa: the log tail (item 9 above).
+-- improved-webadmin: the log tail (item 9 above).
 --
 -- io.open reaches only mounted roots, so the log is readable when the engine
 -- writes it into the config directory: -logdir equal to -config_path, or
@@ -1246,7 +1246,7 @@ local function CheckLogIsLive()
     f:close()
 
     local marker = string.format(
-        "webadmin-spa: checking that %s is this server's log (%d)",
+        "improved-webadmin: checking that %s is this server's log (%d)",
         kLogPath, math.floor(Shared.GetSystemTimeReal() * 1000) % 1000000)
     originalSharedMessage(marker)
 
@@ -1328,7 +1328,7 @@ local function GetLog(actions)
 
 end
 
--- webadmin-spa: the engine's own reports from the log, for `getperf` (item 8
+-- improved-webadmin: the engine's own reports from the log, for `getperf` (item 8
 -- above). Some of what the Performance tab wants is printed by the engine
 -- straight into log-Server.txt and never passes through Lua. Measured on the
 -- rig, 09-27 engine (docs/REQUIREMENTS.md item 10):
@@ -1596,7 +1596,7 @@ Shared.SetWebRoot("web")
 --
 -- Returns a list of all of the mods installed on the server (not necessarily active)
 --
--- webadmin-spa: `active` says which are mounted now, so a client need not
+-- improved-webadmin: `active` says which are mounted now, so a client need not
 -- guess from the map cycle -- the engine mounts two hotfix mods the cycle does
 -- not name, and a map's own mods only with that map. Active ids are spelled
 -- as GetModId spells them (measured on 09-26); GetModTitle takes only the
@@ -1658,20 +1658,20 @@ local function GetServerState()
 
     local playerRecords = Shared.GetEntitiesWithClassname("Player")
 
-    -- webadmin-spa: Shine's gags, under its basecommands plugin. Read through
+    -- improved-webadmin: Shine's gags, under its basecommands plugin. Read through
     -- its own IsClientGagged, which also expires a timed gag.
     local gags = GetShinePlugin("basecommands")
     if gags and type(gags.IsClientGagged) ~= "function" then
         gags = nil
     end
 
-    -- webadmin-spa: Family Sharing, from the 09-26 beta engine on (its
+    -- improved-webadmin: Family Sharing, from the 09-26 beta engine on (its
     -- CHANGELOG). Looked up per request: a stock engine has neither function,
     -- and then the keys stay out of the blob.
     local getShared = Server.GetIsFamilyShared
     local getOwner = Server.GetOwnerUserId
 
-    -- webadmin-spa: one of ScoringMixin's numbers, or nil when the player has
+    -- improved-webadmin: one of ScoringMixin's numbers, or nil when the player has
     -- no such method, it errors or it is not a number.
     local function skillOf(player, method)
         local f = player[method]
@@ -1692,7 +1692,7 @@ local function GetServerState()
             {
                 name = player:GetName(),
                 steamid = client:GetUserId(),
-                -- webadmin-spa: a real boolean, like `iscomm` beside it. Stock
+                -- improved-webadmin: a real boolean, like `iscomm` beside it. Stock
                 -- sends tostring()'s "true"/"false" (CONSTRAINTS item 4).
                 isbot = client:GetIsVirtual() == true,
                 team = player:GetTeamNumber(),
@@ -1711,7 +1711,7 @@ local function GetServerState()
                     playerData.gagged = gagged == true
                 end
             end
-            -- webadmin-spa: beta engine only. Bots, the listen host and LAN
+            -- improved-webadmin: beta engine only. Bots, the listen host and LAN
             -- players always read as not shared (CHANGELOG).
             if type(getShared) == "function" then
                 local ok, shared = pcall(getShared, client)
@@ -1725,7 +1725,7 @@ local function GetServerState()
                     end
                 end
             end
-            -- webadmin-spa: moves the server rejected. Time-credit rejections
+            -- improved-webadmin: moves the server rejected. Time-credit rejections
             -- usually mean a modified client; "other" can be a poor connection
             -- (CHANGELOG). ServerClient methods, also beta only.
             if type(client.GetMovesRejectedTimeCredit) == "function" then
@@ -1740,7 +1740,7 @@ local function GetServerState()
                     playerData.moves_rejected_other = tonumber(n)
                 end
             end
-            -- webadmin-spa: Hive skill, as the server holds it for ranking and
+            -- improved-webadmin: Hive skill, as the server holds it for ranking and
             -- team balance (ScoringMixin; under UWE Hotfix 344, from Steam
             -- User Stats). Marines play at skill + offset and aliens at skill -
             -- offset; the commander's pair works the same way. Out of the blob
@@ -1766,7 +1766,7 @@ local function GetServerState()
     {
         webdomain = "[[webdomain]]",
         webport = "[[webport]]",
-        -- webadmin-spa: real booleans, as above.
+        -- improved-webadmin: real booleans, as above.
         cheats  = Shared.GetCheatsEnabled() == true,
         devmode = Shared.GetDevMode() == true,
         map = tostring(Shared.GetMapName()),
@@ -1781,15 +1781,15 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- webadmin-spa: absent on a stock server, which is how a panel knows.
+        -- improved-webadmin: absent on a stock server, which is how a panel knows.
         mod_version = kModVersion,
-        -- webadmin-spa: the reserved slot amount cannot exceed it.
+        -- improved-webadmin: the reserved slot amount cannot exceed it.
         max_players = Server.GetMaxPlayers(),
-        -- webadmin-spa: when this map loaded, Unix seconds: the Lua VM is
+        -- improved-webadmin: when this map loaded, Unix seconds: the Lua VM is
         -- rebuilt at a map change, so this is that change's time. The panel
         -- shows it rather than timing a change it may not have seen.
         map_loaded_at = perfLoadedAt,
-        -- webadmin-spa: absent when Shine is not loaded.
+        -- improved-webadmin: absent when Shine is not loaded.
         shine = GetShineState()
     }
     
@@ -1825,7 +1825,7 @@ local function ModIdsFromHex(t)
     end
 end
 
--- webadmin-spa: the map cycle. CONSTRAINTS items 12 and 13.
+-- improved-webadmin: the map cycle. CONSTRAINTS items 12 and 13.
 
 local kMapCycleFile = "config://MapCycle.json"
 
@@ -1977,7 +1977,7 @@ local function GetMapVote()
 
 end
 
--- webadmin-spa: the workshop search. CONSTRAINTS item 2, measured on 09-26
+-- improved-webadmin: the workshop search. CONSTRAINTS item 2, measured on 09-26
 -- (REQUIREMENTS item 4). Server.SearchWorshop answers at most 50 hits and
 -- ignores its page: pages 1, 2, 3 and 500 were the same 50. Its callback gets
 -- one table, and an empty one both for no matches and for a search Steam
@@ -2061,7 +2061,7 @@ local function SearchWorkshop(searchtext, page)
 
 end
 
--- webadmin-spa: installmod says what it did. Server.InstallMod returns nothing
+-- improved-webadmin: installmod says what it did. Server.InstallMod returns nothing
 -- and drops what it cannot parse without a word: `zz`, `0` and an empty id
 -- left no trace in the log, and `-5` became mod 18446744073709551611, which
 -- Steam then reported as not found (measured on 09-26). So what is not a plain
@@ -2092,7 +2092,7 @@ local function InstallMod(modid)
 
 end
 
--- webadmin-spa: the ranked-mod whitelist (docs/CONSTRAINTS.md item 17, item 10 above).
+-- improved-webadmin: the ranked-mod whitelist (docs/CONSTRAINTS.md item 17, item 10 above).
 --
 -- A mod that is not on it turns ranking off. The engine reads it at boot:
 -- it is the "Required items" of an unlisted Workshop item, fetched in one
@@ -2106,7 +2106,7 @@ end
 -- Ids are decimal strings, as Steam spells them. The panel compares them with
 -- the hex ids the rest of the API uses.
 local kWhitelistPage = "https://steamcommunity.com/sharedfiles/filedetails/?id="
-local kWhitelistFile = "config://webadmin-spa/whitelist.json"
+local kWhitelistFile = "config://improved-webadmin/whitelist.json"
 local kWhitelistFileVersion = 1
 local kWhitelistMaxAge = 60 * 60    -- read Steam again once the copy is older
 local kWhitelistRetrySeconds = 5 * 60
@@ -2207,7 +2207,7 @@ local function SaveWhitelistFile()
         file:close()
     end)
     if not ok then
-        Log("webadmin-spa: whitelist not saved: %s", tostring(err))
+        Log("improved-webadmin: whitelist not saved: %s", tostring(err))
     end
 
 end
@@ -2246,7 +2246,7 @@ local function StartWhitelistFetch(hotfixListId, branch)
         if not current() then return end
         whitelistFetch = nil
         whitelistError, whitelistErrorAt = why, Shared.GetSystemTime()
-        Log("webadmin-spa: whitelist not read: %s", why)
+        Log("improved-webadmin: whitelist not read: %s", why)
     end
 
     -- One page after the other: concurrent HTTPS is what aborted the 09-03
@@ -2323,7 +2323,7 @@ local function GetWhitelist()
 
 end
 
--- webadmin-spa: what a request with no parameters at all gets (CONSTRAINTS
+-- improved-webadmin: what a request with no parameters at all gets (CONSTRAINTS
 -- item 6). That is a browser at the address the boot log prints, which used
 -- to be handed every player's name, Steam id and IP. The engine passes Lua
 -- neither the path nor the headers, so this cannot tell `/` from a missing
@@ -2371,8 +2371,8 @@ end
 local kWhitelistProbeCalls = {
     { "page", "https://steamcommunity.com/sharedfiles/filedetails/?id=2633436686" },
     { "refused", "https://127.0.0.1:9/" },
-    { "nxdomain", "https://webadmin-spa-probe.invalid/" },
-    { "http404", "https://steamcommunity.com/webadmin-spa-probe-404" },
+    { "nxdomain", "https://improved-webadmin-probe.invalid/" },
+    { "http404", "https://steamcommunity.com/improved-webadmin-probe-404" },
 }
 
 local function WhitelistProbeStep(i)
@@ -2405,21 +2405,21 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(WhitelistProbe(actions.reset ~= nil))
     end
 
-    -- webadmin-spa: no parameters at all, so no client of the API.
+    -- improved-webadmin: no parameters at all, so no client of the API.
     if type(actions) ~= "table" or next(actions) == nil then
         return "text/html", kRootPage
     end
 
-    -- webadmin-spa: before anything a request runs can print.
+    -- improved-webadmin: before anything a request runs can print.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: before a request can ban someone who has left.
+    -- improved-webadmin: before a request can ban someone who has left.
     EnsureShineAddBanWrapped()
 
-    -- webadmin-spa: before a request can send chat.
+    -- improved-webadmin: before a request can send chat.
     EnsureChatWrapped()
 
-    -- webadmin-spa: run a command and return what it printed.
+    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -2451,7 +2451,7 @@ local function OnWebRequest(actions)
             last_id = nextConsoleId - 1,
         })
 
-    -- webadmin-spa: the console stream, everything captured since `since`.
+    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0
@@ -2468,7 +2468,7 @@ local function OnWebRequest(actions)
             buffer_size = kConsoleBufferSize,
         })
 
-    -- webadmin-spa: the bans in force, from the table that decides them.
+    -- improved-webadmin: the bans in force, from the table that decides them.
     elseif actions.request == "getbans" then
 
         local source, now, bans = GetBansInForce()
@@ -2480,12 +2480,12 @@ local function OnWebRequest(actions)
             bans = bans,
         })
 
-    -- webadmin-spa: players seen in the last day, connected or not.
+    -- improved-webadmin: players seen in the last day, connected or not.
     elseif actions.request == "getrecentplayers" then
 
         return "application/json", json.encode(GetRecentPlayers())
 
-    -- webadmin-spa: the engine's log, since a byte offset (item 9 above).
+    -- improved-webadmin: the engine's log, since a byte offset (item 9 above).
     elseif actions.request == "getlog" then
 
         return "application/json", json.encode(GetLog(actions))
@@ -2510,7 +2510,7 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(inForce)
     elseif actions.request == "getreservedslots" then
 
-        -- webadmin-spa: when Shine's reservedslots plugin is on, it sets the
+        -- improved-webadmin: when Shine's reservedslots plugin is on, it sets the
         -- slot count and grants access by permission; the vanilla list is not
         -- what is enforced. Its count rides along, and the 2012 panel ignores
         -- the extra key.
@@ -2523,7 +2523,7 @@ local function OnWebRequest(actions)
     elseif actions.request == "getperfdata" then
         return "application/json", json.encode(perfDataBuffer:ToTable())
 
-    -- webadmin-spa: performance windows since `since` (item 8 above).
+    -- improved-webadmin: performance windows since `since` (item 8 above).
     elseif actions.request == "getperf" then
 
         local since = tonumber(actions.since) or 0
@@ -2541,7 +2541,7 @@ local function OnWebRequest(actions)
 
     elseif actions.request == "getchatlist" then
 
-        -- webadmin-spa: with `since`, this mod's 200-entry ring, from that id
+        -- improved-webadmin: with `since`, this mod's 200-entry ring, from that id
         -- on. Without it, the game's 20 exactly as stock serves them: the
         -- 2012 panel polls that shape.
         local since = tonumber(actions.since)
@@ -2561,14 +2561,14 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(GetMapList())
     elseif actions.request == "getmapcycle" then
 
-        -- webadmin-spa: the file rotation reads, and a copy that is really a
+        -- improved-webadmin: the file rotation reads, and a copy that is really a
         -- copy. Json doesn't really have 64 numbers just use the old hex format
         local mapcycle = ReadMapCycleFile() or DeepCopy(MapCycle_GetMapCycle())
         return "application/json", json.encode(MapCycleForClient(mapcycle))
 
     elseif actions.request == "setmapcycle" then
 
-        -- webadmin-spa: refuse what the game cannot use, without writing it,
+        -- improved-webadmin: refuse what the game cannot use, without writing it,
         -- and answer with what the file holds afterwards. Vanilla answered an
         -- empty 200 to all of it; the 2012 panel ignores the body either way.
         local ok, mapcycle = pcall(json.decode, actions.data or "")
@@ -2597,7 +2597,7 @@ local function OnWebRequest(actions)
         end
         return "application/json", json.encode({ ok = true, cycle = MapCycleForClient(written) })
 
-    -- webadmin-spa: Shine's mapvote, as far as it concerns the cycle.
+    -- improved-webadmin: Shine's mapvote, as far as it concerns the cycle.
     elseif actions.request == "getmapvote" then
 
         return "application/json", json.encode(GetMapVote())
@@ -2613,18 +2613,18 @@ local function OnWebRequest(actions)
         
     elseif actions.request == "installmod" then
 
-        -- webadmin-spa: a reply that says what was done. The 2012 panel
+        -- improved-webadmin: a reply that says what was done. The 2012 panel
         -- ignores the body, so it is unaffected.
         return "application/json", json.encode(InstallMod(actions.modid))
 
-    -- webadmin-spa: the ranked-mod whitelist, as Steam last gave it.
+    -- improved-webadmin: the ranked-mod whitelist, as Steam last gave it.
     elseif actions.request == "getwhitelist" then
 
         return "application/json", json.encode(GetWhitelist())
 
     elseif actions.request == "getmods" then
 
-        -- webadmin-spa: see SearchWorkshop. The replies keep `loading` and
+        -- improved-webadmin: see SearchWorkshop. The replies keep `loading` and
         -- `items`, the two keys the 2012 panel reads.
         local searchtext = type(actions.searchtext) == "string" and actions.searchtext or ""
         local page = math.floor(tonumber(actions.p) or 1)
@@ -2649,26 +2649,26 @@ Event.Hook("WebRequest", OnWebRequest)
 --
 local function UpdateServerWebInterface()
 
-    -- webadmin-spa: catch a replacement (Shine's, on its first tick) before an
+    -- improved-webadmin: catch a replacement (Shine's, on its first tick) before an
     -- in-game command's output is lost from the console stream.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: name absent players' bans under Shine (see above).
+    -- improved-webadmin: name absent players' bans under Shine (see above).
     EnsureShineAddBanWrapped()
 
-    -- webadmin-spa: record chat for getchatlist's cursor (see above).
+    -- improved-webadmin: record chat for getchatlist's cursor (see above).
     EnsureChatWrapped()
 
-    -- webadmin-spa: persist a reserved slot removal (see above).
+    -- improved-webadmin: persist a reserved slot removal (see above).
     SaveReservedSlotsIfDirty()
 
-    -- webadmin-spa: keep the recent-players list and its file current.
+    -- improved-webadmin: keep the recent-players list and its file current.
     UpdateRecentPlayers()
 
-    -- webadmin-spa: the windows `getperf` serves.
+    -- improved-webadmin: the windows `getperf` serves.
     UpdatePerfWindows()
 
-    -- webadmin-spa: and the engine's own lines from the log.
+    -- improved-webadmin: and the engine's own lines from the log.
     UpdateEngineLog()
 
     if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then

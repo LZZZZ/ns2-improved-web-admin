@@ -8,12 +8,12 @@
 
 Script.Load("lua/RingBuffer.lua")
 
--- ===================== webadmin-spa =====================================
+-- ===================== improved-webadmin =====================================
 --
 -- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
 -- game's, so this file replaces the vanilla one wholesale. It started as a
 -- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `webadmin-spa:`. The vanilla code is a starting point, not something
+-- marked `improved-webadmin:`. The vanilla code is a starting point, not something
 -- to preserve: change it wherever that improves the result, keeping the HTTP
 -- API backward compatible when that is cheap (README.md, "Design decisions").
 --
@@ -74,7 +74,7 @@ Script.Load("lua/RingBuffer.lua")
 --
 -- 5. Recent players: everyone seen in the last 24 hours, up to 100, with name,
 --    former names, IP, first and last seen and time played, kept in
---    config://webadmin-spa/ so the list outlives a map change. Read with
+--    config://improved-webadmin/ so the list outlives a map change. Read with
 --    request=getrecentplayers. See docs/REQUIREMENTS.md item 6.
 --
 --    Under Shine's ban plugin, a ban of someone who is not connected is
@@ -446,8 +446,8 @@ local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
 local kRecentSlots = {
-    "config://webadmin-spa/recent-players-a.json",
-    "config://webadmin-spa/recent-players-b.json",
+    "config://improved-webadmin/recent-players-a.json",
+    "config://improved-webadmin/recent-players-b.json",
 }
 
 -- Account id -> entry, as saved.
@@ -879,7 +879,7 @@ Shared.SetWebRoot("web")
 --
 -- Returns a list of all of the mods installed on the server (not necessarily active)
 --
--- webadmin-spa: `active` says which are mounted now, so a client need not
+-- improved-webadmin: `active` says which are mounted now, so a client need not
 -- guess from the map cycle -- the engine mounts two hotfix mods the cycle does
 -- not name, and a map's own mods only with that map. Active ids are spelled
 -- as GetModId spells them (measured on 09-26); GetModTitle takes only the
@@ -992,11 +992,11 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- webadmin-spa: absent on a stock server, which is how a panel knows.
+        -- improved-webadmin: absent on a stock server, which is how a panel knows.
         mod_version = kModVersion,
-        -- webadmin-spa: the reserved slot amount cannot exceed it.
+        -- improved-webadmin: the reserved slot amount cannot exceed it.
         max_players = Server.GetMaxPlayers(),
-        -- webadmin-spa: absent when Shine is not loaded.
+        -- improved-webadmin: absent when Shine is not loaded.
         shine = GetShineState()
     }
     
@@ -1032,7 +1032,7 @@ local function ModIdsFromHex(t)
     end
 end
 
--- webadmin-spa: the map cycle. CONSTRAINTS items 12 and 13.
+-- improved-webadmin: the map cycle. CONSTRAINTS items 12 and 13.
 
 local kMapCycleFile = "config://MapCycle.json"
 
@@ -1184,7 +1184,7 @@ local function GetMapVote()
 
 end
 
--- webadmin-spa: the workshop search. CONSTRAINTS item 2, measured on 09-26
+-- improved-webadmin: the workshop search. CONSTRAINTS item 2, measured on 09-26
 -- (REQUIREMENTS item 4). Server.SearchWorshop answers at most 50 hits and
 -- ignores its page: pages 1, 2, 3 and 500 were the same 50. Its callback gets
 -- one table, and an empty one both for no matches and for a search Steam
@@ -1268,7 +1268,7 @@ local function SearchWorkshop(searchtext, page)
 
 end
 
--- webadmin-spa: installmod says what it did. Server.InstallMod returns nothing
+-- improved-webadmin: installmod says what it did. Server.InstallMod returns nothing
 -- and drops what it cannot parse without a word: `zz`, `0` and an empty id
 -- left no trace in the log, and `-5` became mod 18446744073709551611, which
 -- Steam then reported as not found (measured on 09-26). So what is not a plain
@@ -1422,13 +1422,13 @@ local function OnWebRequest(actions)
 
     end
 
-    -- webadmin-spa: before anything a request runs can print.
+    -- improved-webadmin: before anything a request runs can print.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: before a request can ban someone who has left.
+    -- improved-webadmin: before a request can ban someone who has left.
     EnsureShineAddBanWrapped()
 
-    -- webadmin-spa: run a command and return what it printed.
+    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -1460,7 +1460,7 @@ local function OnWebRequest(actions)
             last_id = nextConsoleId - 1,
         })
 
-    -- webadmin-spa: the console stream, everything captured since `since`.
+    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0
@@ -1477,7 +1477,7 @@ local function OnWebRequest(actions)
             buffer_size = kConsoleBufferSize,
         })
 
-    -- webadmin-spa: the bans in force, from the table that decides them.
+    -- improved-webadmin: the bans in force, from the table that decides them.
     elseif actions.request == "getbans" then
 
         local source, now, bans = GetBansInForce()
@@ -1489,7 +1489,7 @@ local function OnWebRequest(actions)
             bans = bans,
         })
 
-    -- webadmin-spa: players seen in the last day, connected or not.
+    -- improved-webadmin: players seen in the last day, connected or not.
     elseif actions.request == "getrecentplayers" then
 
         return "application/json", json.encode(GetRecentPlayers())
@@ -1514,7 +1514,7 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(inForce)
     elseif actions.request == "getreservedslots" then
 
-        -- webadmin-spa: when Shine's reservedslots plugin is on, it sets the
+        -- improved-webadmin: when Shine's reservedslots plugin is on, it sets the
         -- slot count and grants access by permission; the vanilla list is not
         -- what is enforced. Its count rides along, and the 2012 panel ignores
         -- the extra key.
@@ -1534,14 +1534,14 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(GetMapList())
     elseif actions.request == "getmapcycle" then
 
-        -- webadmin-spa: the file rotation reads, and a copy that is really a
+        -- improved-webadmin: the file rotation reads, and a copy that is really a
         -- copy. Json doesn't really have 64 numbers just use the old hex format
         local mapcycle = ReadMapCycleFile() or DeepCopy(MapCycle_GetMapCycle())
         return "application/json", json.encode(MapCycleForClient(mapcycle))
 
     elseif actions.request == "setmapcycle" then
 
-        -- webadmin-spa: refuse what the game cannot use, without writing it,
+        -- improved-webadmin: refuse what the game cannot use, without writing it,
         -- and answer with what the file holds afterwards. Vanilla answered an
         -- empty 200 to all of it; the 2012 panel ignores the body either way.
         local ok, mapcycle = pcall(json.decode, actions.data or "")
@@ -1570,7 +1570,7 @@ local function OnWebRequest(actions)
         end
         return "application/json", json.encode({ ok = true, cycle = MapCycleForClient(written) })
 
-    -- webadmin-spa: Shine's mapvote, as far as it concerns the cycle.
+    -- improved-webadmin: Shine's mapvote, as far as it concerns the cycle.
     elseif actions.request == "getmapvote" then
 
         return "application/json", json.encode(GetMapVote())
@@ -1586,13 +1586,13 @@ local function OnWebRequest(actions)
         
     elseif actions.request == "installmod" then
 
-        -- webadmin-spa: a reply that says what was done. The 2012 panel
+        -- improved-webadmin: a reply that says what was done. The 2012 panel
         -- ignores the body, so it is unaffected.
         return "application/json", json.encode(InstallMod(actions.modid))
 
     elseif actions.request == "getmods" then
 
-        -- webadmin-spa: see SearchWorkshop. The replies keep `loading` and
+        -- improved-webadmin: see SearchWorkshop. The replies keep `loading` and
         -- `items`, the two keys the 2012 panel reads.
         local searchtext = type(actions.searchtext) == "string" and actions.searchtext or ""
         local page = math.floor(tonumber(actions.p) or 1)
@@ -1617,17 +1617,17 @@ Event.Hook("WebRequest", OnWebRequest)
 --
 local function UpdateServerWebInterface()
 
-    -- webadmin-spa: catch a replacement (Shine's, on its first tick) before an
+    -- improved-webadmin: catch a replacement (Shine's, on its first tick) before an
     -- in-game command's output is lost from the console stream.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: name absent players' bans under Shine (see above).
+    -- improved-webadmin: name absent players' bans under Shine (see above).
     EnsureShineAddBanWrapped()
 
-    -- webadmin-spa: persist a reserved slot removal (see above).
+    -- improved-webadmin: persist a reserved slot removal (see above).
     SaveReservedSlotsIfDirty()
 
-    -- webadmin-spa: keep the recent-players list and its file current.
+    -- improved-webadmin: keep the recent-players list and its file current.
     UpdateRecentPlayers()
 
     if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then

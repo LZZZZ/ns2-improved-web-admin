@@ -429,7 +429,7 @@ async def main():
             await c.send("Page.addScriptToEvaluateOnNewDocument",
                          source="window.confirm = (m) => { (window.__confirms ||= []).push(m);"
                                 " return true; };"
-                                "try { localStorage.removeItem('webadmin-spa.settings'); } catch {}")
+                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
             await stock(c)
             await mod(c)
             await shine(c)

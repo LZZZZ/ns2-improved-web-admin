@@ -8,13 +8,13 @@
 
 Script.Load("lua/RingBuffer.lua")
 
--- ===================== webadmin-spa =====================================
+-- ===================== improved-webadmin =====================================
 --
 -- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
 -- game's, so this file replaces the vanilla one wholesale -- which means it
 -- has to carry the vanilla behaviour forward unchanged and add to it. It is a
 -- verbatim copy of the 344 / 26-09-03 original with the additions below, each
--- marked `webadmin-spa:`.
+-- marked `improved-webadmin:`.
 --
 -- 1. Console output is captured and returned.
 --
@@ -375,7 +375,7 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- webadmin-spa: absent on a stock server, which is how a panel knows.
+        -- improved-webadmin: absent on a stock server, which is how a panel knows.
         mod_version = kModVersion
     }
     
@@ -428,7 +428,7 @@ local function OnWebRequest(actions)
 
     end
 
-    -- webadmin-spa: run a command and return what it printed.
+    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -460,7 +460,7 @@ local function OnWebRequest(actions)
             last_id = nextConsoleId - 1,
         })
 
-    -- webadmin-spa: the console stream, everything captured since `since`.
+    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0

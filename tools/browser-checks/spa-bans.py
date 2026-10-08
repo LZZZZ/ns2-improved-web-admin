@@ -267,7 +267,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('webadmin-spa.settings'); } catch {}")
+                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
             await stock(c)
             await mod(c)
             await shine(c)

@@ -209,7 +209,7 @@ cheap. The policy is *Lua changes* in the README's
    > bonus, not a need.
 
 **Also shipped: recent players** *(built 2026-09-27)*. Everyone seen in
-the last 24 hours, up to 100, kept in `config://webadmin-spa/` so the
+the last 24 hours, up to 100, kept in `config://improved-webadmin/` so the
 list outlives a map change, and read with `getrecentplayers`. The file
 can only be rewritten whole and nothing can delete or rename it, so saves
 alternate between two slots and the loader takes the newest one that
@@ -452,7 +452,7 @@ layout.
 copy an earlier run left there, and then it is frozen. Found on the rig: a
 boot with `-logdir` elsewhere served the previous run's log as if it were
 live. So the first `getlog` of each map load prints one line
-(`webadmin-spa: checking that config://log-Server.txt is this server's
+(`improved-webadmin: checking that config://log-Server.txt is this server's
 log (<n>)`) and looks for it in the file; if it is not there, the reply
 is `stale` and the panel says why instead of showing the file. The line
 lands in the server's real log either way.
@@ -522,7 +522,7 @@ items. It reads the hotfix list's page the same way, one page after the
 other, never two at once: the 09-03 drop's libcurl (8.21, mbedTLS 3.6.7)
 aborts the server on concurrent HTTPS. The first request starts a
 read and answers `fetching`. A copy goes to
-`config://webadmin-spa/whitelist.json`; a map change serves the copy, and a
+`config://improved-webadmin/whitelist.json`; a map change serves the copy, and a
 copy older than an hour is read again. After a failure the mod waits 5
 minutes before reading again. The panel falls back on a dated copy it
 ships (`panel/src/whitelist.json`, from `tools/make-whitelist.py`).

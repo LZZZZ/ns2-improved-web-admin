@@ -12,13 +12,13 @@ InitializeInstalledMods: Found 4 ModIDs from mod cache and steam directories
 	 Adding Mod Shine Administration[117887554]
 	 Adding Mod UWE Hotfix 344[3558697165]
 	 Adding Mod NSL Badges[2899635443]
-	 Adding Mod webadmin-spa[509780686]
+	 Adding Mod improved-webadmin[509780686]
 ModServicesServer Initialized
 Mod : Mounting Extension d41d68cd
 Mod : Mounting Extension acd4ecf3
 Web server running at 127.0.0.1:8080
 Finished Installing Mods
-Mod webadmin-spa[509780686] is not whitelisted
+Mod improved-webadmin[509780686] is not whitelisted
 Server has non whitelisted mods
 [{t}] Worker 00 : Mounting mod 'NSL Badges'[2899635443] from /srv/ns2/mods/content/4920/2899635443/
 [{t}] Worker 00 : Mounting mod 'UWE Hotfix 344'[3558697165] from /srv/ns2/mods/content/4920/3558697165/

@@ -72,7 +72,7 @@ A launch that matches what these docs assume:
 ```bash
 . ./webadmin.env      # WEBUSER WEBPASS WEBPORT GAMEPORT; chmod 600, never committed
 exec serverfiles/steam-runtime/shell.sh serverfiles/x64/server_linux \
-  -name 'webadmin-spa local test (do not join)' \
+  -name 'improved-webadmin local test (do not join)' \
   -port "$GAMEPORT" -map ns2_summit -limit 16 -speclimit 5 \
   -password localtest \
   -webadmin -webdomain 127.0.0.1 -webport "$WEBPORT" \
@@ -370,7 +370,7 @@ Afterwards restore `MapCycle.json`, remove the mount mod's copy, and
 delete what the boot creates in the config directory:
 `ConsistencyConfig.json`, a default `shine/plugins/LifeformPicker.json`,
 and that day's Shine log in `shine/logs/`. With a human joined, also
-delete `webadmin-spa/` there (the mod's recent-players file, with the
+delete `improved-webadmin/` there (the mod's recent-players file, with the
 player's real name, IP and Steam id). Restore `shine/temp/lastmaps.json`
 and `shuffle_friend_groups.json` too, which Shine rewrites. The engine
 also refreshes the mod cache; that can stay.

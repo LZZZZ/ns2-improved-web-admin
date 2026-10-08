@@ -39,7 +39,7 @@ from cdp import CDP, launch_chrome, page_target
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 PORT = 9233
-KEY = "webadmin-spa.settings"
+KEY = "improved-webadmin.settings"
 
 results = []
 

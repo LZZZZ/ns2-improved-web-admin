@@ -91,7 +91,7 @@ tags:
     description: The panel's own files, served from the web root.
   - name: mod
     description: |
-      Added by the webadmin-spa mod's `lua/ServerWebInterface.lua`. **Absent on
+      Added by NS2 Improved Web Admin's `lua/ServerWebInterface.lua`. **Absent on
       a stock server**, where these `request` values are unrecognised and fall
       through to the server-state blob like any other unknown value -- so a
       client cannot tell a mod request type from a typo by status code. Detect
@@ -1108,7 +1108,7 @@ paths:
         cursor. The reply is then a fresh tail.
 
         The first `getLog` after each map load prints one line to the log,
-        `webadmin-spa: checking that config://log-Server.txt is this server's
+        `improved-webadmin: checking that config://log-Server.txt is this server's
         log (<n>)`, and looks for it in the file: a copy an earlier run left
         in the config directory opens just as well and never grows. Then the
         reply is `source: none` with `stale: true`.
@@ -1274,7 +1274,7 @@ paths:
         banned. Bots are never recorded.
 
         The list outlives a map change, which rebuilds all Lua state: it is
-        kept in `config://webadmin-spa/recent-players-{a,b}.json`, saved
+        kept in `config://improved-webadmin/recent-players-{a,b}.json`, saved
         alternately so a torn write loses one save rather than the list.
         `storage` says how the load went and whether saves are working.
 
@@ -1353,7 +1353,7 @@ paths:
         - The first request with no copy, or a copy more than an hour old,
           starts a read and answers `fetching: true`; the read takes about
           2 s (two pages, one after the other). A copy is kept in
-          `config://webadmin-spa/whitelist.json`, so a map change does not
+          `config://improved-webadmin/whitelist.json`, so a map change does not
           read Steam again.
         - `whitelist`, `hotfix` and `read_at` are present together, when there
           is a copy. `hotfix` are the hotfix mods, which the engine never
@@ -1696,7 +1696,7 @@ components:
         mod_version:
           type: string
           description: |
-            **Mod only.** The version of the webadmin-spa Lua serving this
+            **Mod only.** The version of NS2 Improved Web Admin's Lua serving this
             request. Absent on a stock server, which is the supported way to
             tell the two apart -- a panel should read this once and say plainly
             what is unavailable rather than offering features that cannot work.

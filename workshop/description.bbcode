@@ -1,0 +1,35 @@
+[h1]NS2 Improved Web Admin {version} (beta)[/h1]
+
+A modern replacement for the dedicated server's web admin panel: a new front end plus a corrected [b]lua/ServerWebInterface.lua[/b], in one server mod. No game files are edited.
+
+[b]Read this first.[/b] This mod is a beta. It was written by an AI coding assistant, directed and reviewed by a human. It is provided [b]as is, with no warranty[/b]. It runs Lua inside your game server and changes how the server handles bans, reserved slots and the map cycle. Test it on a server you can afford to break, and keep backups of your config.
+
+[h2]What it does[/h2]
+[list]
+[*][b]Players:[/b] kick, ban, slay, move, eject, mute, round controls; Hive skill with the game's skill badges; IPs and Steam ids masked until asked.
+[*][b]Recent players:[/b] everyone seen in the last 24 hours, so a player who left can still be banned.
+[*][b]Bans and Reserved Slots:[/b] what the server actually enforces, Shine's when its plugins are on.
+[*][b]Chat:[/b] read with team and time, and send to all, marines or aliens.
+[*][b]Maps:[/b] edit the map cycle by drag and drop, written at once and undoable; Shine's options and mapvote respected.
+[*][b]Mods and Workshop:[/b] what is mounted now, whether each mod is on the ranked whitelist, and Workshop search and install.
+[*][b]Performance:[/b] what perfmon and the engine's tickstat measure, charted over time.
+[*][b]Console:[/b] the server's own log, filtered and coloured, with a command line that shows what each command printed.
+[/list]
+It never reports success it has not verified, and fetches nothing from a third party at runtime. Vanilla and Shine servers are both supported.
+
+[h2]Install[/h2]
+Add this item's id (the number in this page's address) to [b]mods[/b] in your server's [b]MapCycle.json[/b], then change map or restart. Open the web admin as before, at [b]/index.html[/b] on the web admin port.
+
+[h2]Costs[/h2]
+[list]
+[*][b]The server is unranked[/b] while this mod is mounted, as with any mod not on the ranked whitelist.
+[*]Players joining the server download the mod once (under 1 MB).
+[/list]
+
+[h2]Security[/h2]
+The engine's web admin speaks [b]plain HTTP[/b], with or without this mod: player names, Steam ids, IPs, chat and every admin command cross the network in the clear. [b]Do not expose the web admin port to the internet.[/b] Bind it to loopback with [b]-webdomain 127.0.0.1[/b] and reach it through an SSH tunnel or an HTTPS reverse proxy. Details in the README.
+
+[h2]Source, issues, documentation[/h2]
+[url=https://github.com/LZZZZ/ns2-improved-web-admin]github.com/LZZZZ/ns2-improved-web-admin[/url] (MIT License)
+
+Not affiliated with or endorsed by Unknown Worlds Entertainment or Valve.

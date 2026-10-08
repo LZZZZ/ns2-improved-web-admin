@@ -30,7 +30,7 @@ if ownDisk then
     DISK = os.tmpname()
     os.remove(DISK)
 end
-os.execute("mkdir -p '" .. DISK .. "/webadmin-spa'")
+os.execute("mkdir -p '" .. DISK .. "/improved-webadmin'")
 local LOG = DISK .. "/log-Server.txt"
 
 local realOpen = io.open
@@ -151,7 +151,7 @@ local function NewVM()
     env.GetGamerules = function() return rules end
     env.GetBannedPlayersList = function() return { } end
     env.Server = {
-        GetFrameRate = function() return 80 end, GetName = function() return "webadmin-spa bench" end,
+        GetFrameRate = function() return 80 end, GetName = function() return "improved-webadmin bench" end,
         GetMaxPlayers = function() return 18 end,
         GetOwner = function(p) return p.client end,
         GetClientAddress = function(c) return "191.123.45." .. (c.id % 256) end,

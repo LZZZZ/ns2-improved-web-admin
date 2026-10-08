@@ -552,7 +552,7 @@ server.listen(opts.port, opts.host, () => {
   console.log(WEB_ROOT
     ? `  serving ${WEB_ROOT}  ->  http://${opts.host}:${opts.port}/index.html`
     : `  no web root; API only (pass --web <dir>)`);
-  console.log(`  lua: ${opts.mod ? "webadmin-spa mod" : "stock"}` +
+  console.log(`  lua: ${opts.mod ? "NS2 Improved Web Admin mod" : "stock"}` +
               `${opts.shine ? ` + shine (${[...opts.shine].join(",") || "no plugins"})` : ""}` +
               `   auth: ${opts.auth ? "digest" : `off, host rule ${opts.hostRule ? "on" : "off"}`}` +
               `   reproduced bugs: ${Object.entries(state.bugs)

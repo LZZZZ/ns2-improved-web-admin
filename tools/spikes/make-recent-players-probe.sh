@@ -24,7 +24,7 @@ ProbeClock = Shared.GetSystemTimeReal or os.clock
 ProbeLog("file load: system time %s, clock %s", tostring(Shared.GetSystemTime()),
          Shared.GetSystemTimeReal and "Shared.GetSystemTimeReal" or "os.clock")
 do
-    local ok, f = pcall(io.open, "config://webadmin-spa/recent-players-a.json", "r")
+    local ok, f = pcall(io.open, "config://improved-webadmin/recent-players-a.json", "r")
     ProbeLog("Q4 read at file load: pcall %s, handle %s", tostring(ok), tostring(f))
     if ok and f then f:close() end
 end

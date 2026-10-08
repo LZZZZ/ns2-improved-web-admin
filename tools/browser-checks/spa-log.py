@@ -140,7 +140,7 @@ async def main():
             await c.send("Network.enable")
             await c.send("Page.addScriptToEvaluateOnNewDocument",
                          source="window.confirm = () => true;"
-                                "try { localStorage.removeItem('webadmin-spa.settings'); } catch {}")
+                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
 
             print("\n== nothing is read before the tab opens")
             await c.send("Page.navigate", url=MOD + "/index.html")
@@ -172,7 +172,7 @@ async def main():
                 await c.eval(f"document.querySelector('input[name=kind-{kind}]').click()")
             await asyncio.sleep(0.5)
             stored = json.loads(await c.eval(
-                "localStorage.getItem('webadmin-spa.settings')") or "{}")
+                "localStorage.getItem('improved-webadmin.settings')") or "{}")
             check("ticking them is kept in the browser",
                   stored.get("logHiddenKinds") == [], str(stored.get("logHiddenKinds")))
             tail = json.loads(get(f"{MOD}/?request=getlog"))
@@ -485,7 +485,7 @@ async def main():
             await asyncio.sleep(0.3)
             check("a live one shows the mod's check line at the end of the first read",
                   await c.eval("[...document.querySelectorAll('.log .log-line')]"
-                               ".some(e=>e.textContent.startsWith('webadmin-spa: checking that'))"))
+                               ".some(e=>e.textContent.startsWith('improved-webadmin: checking that'))"))
 
             print("\n== a server whose log cannot be reached")
             mark = len(c.events)

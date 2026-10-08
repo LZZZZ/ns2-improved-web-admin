@@ -8,12 +8,12 @@
 
 Script.Load("lua/RingBuffer.lua")
 
--- ===================== webadmin-spa =====================================
+-- ===================== improved-webadmin =====================================
 --
 -- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
 -- game's, so this file replaces the vanilla one wholesale. It started as a
 -- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `webadmin-spa:`. The vanilla code is a starting point, not something
+-- marked `improved-webadmin:`. The vanilla code is a starting point, not something
 -- to preserve: change it wherever that improves the result, keeping the HTTP
 -- API backward compatible when that is cheap (README.md, "Design decisions").
 --
@@ -376,7 +376,7 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- webadmin-spa: absent on a stock server, which is how a panel knows.
+        -- improved-webadmin: absent on a stock server, which is how a panel knows.
         mod_version = kModVersion
     }
     
@@ -436,7 +436,7 @@ local function OnWebRequest(actions)
 
     if actions.request == "probe0926" then
 
-        local out = { args = webadminSpaProbeArgs }
+        local out = { args = improvedWebadminProbeArgs }
 
         -- 1. Everything the handler was given.
         local dump = {}
@@ -474,30 +474,30 @@ local function OnWebRequest(actions)
         end
 
         local stamp = tostring(Shared.GetSystemTime())
-        local main = "config://webadmin-spa-probe.txt"
+        local main = "config://improved-webadmin-probe.txt"
         local w = {}
         w.write = tryWrite(main, "w", "line1 " .. stamp .. "\n")
         w.append = tryWrite(main, "a", "line2 " .. stamp .. "\n")
         local back, backErr = tryRead(main)
         w.read_back = back or ("<nil> " .. tostring(backErr))
         w.round_trip_ok = back == ("line1 " .. stamp .. "\nline2 " .. stamp .. "\n")
-        w.json_ext = tryWrite("config://webadmin-spa-probe.json", "w", '{"probe":' .. stamp .. '}')
-        w.subdir = tryWrite("config://webadmin-spa/probe.txt", "w", "x")
-        w.no_scheme = tryWrite("webadmin-spa-probe-noscheme.txt", "w", "x")
-        w.big = tryWrite("config://webadmin-spa-probe-big.txt", "w", string.rep("0123456789abcdef", 6400))
-        local big = tryRead("config://webadmin-spa-probe-big.txt")
+        w.json_ext = tryWrite("config://improved-webadmin-probe.json", "w", '{"probe":' .. stamp .. '}')
+        w.subdir = tryWrite("config://improved-webadmin/probe.txt", "w", "x")
+        w.no_scheme = tryWrite("improved-webadmin-probe-noscheme.txt", "w", "x")
+        w.big = tryWrite("config://improved-webadmin-probe-big.txt", "w", string.rep("0123456789abcdef", 6400))
+        local big = tryRead("config://improved-webadmin-probe-big.txt")
         w.big_read_len = big and #big or -1
         w.os_rename = type(os.rename)
         w.os_remove = type(os.remove)
         if type(os.rename) == "function" then
-            local ok, a, b = pcall(os.rename, "config://webadmin-spa-probe.json", "config://webadmin-spa-probe-renamed.json")
+            local ok, a, b = pcall(os.rename, "config://improved-webadmin-probe.json", "config://improved-webadmin-probe-renamed.json")
             w.rename_result = { ok = ok, a = tostring(a), b = tostring(b) }
-            w.rename_target_reads = tryRead("config://webadmin-spa-probe-renamed.json") ~= nil
+            w.rename_target_reads = tryRead("config://improved-webadmin-probe-renamed.json") ~= nil
         end
         if type(os.remove) == "function" then
-            local ok, a, b = pcall(os.remove, "config://webadmin-spa-probe-big.txt")
+            local ok, a, b = pcall(os.remove, "config://improved-webadmin-probe-big.txt")
             w.remove_result = { ok = ok, a = tostring(a), b = tostring(b) }
-            w.remove_gone = tryRead("config://webadmin-spa-probe-big.txt") == nil
+            w.remove_gone = tryRead("config://improved-webadmin-probe-big.txt") == nil
         end
         out.write = w
 
@@ -538,7 +538,7 @@ local function OnWebRequest(actions)
     end
 
 
-    -- webadmin-spa: run a command and return what it printed.
+    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -570,7 +570,7 @@ local function OnWebRequest(actions)
             last_id = nextConsoleId - 1,
         })
 
-    -- webadmin-spa: the console stream, everything captured since `since`.
+    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0
@@ -727,7 +727,7 @@ Event.Hook("WebRequest", function(...)
     local n = select("#", ...)
     local seen = { count = n, types = {} }
     for i = 1, n do seen.types[i] = type((select(i, ...))) end
-    webadminSpaProbeArgs = seen
+    improvedWebadminProbeArgs = seen
     return OnWebRequest(...)
 end)
 

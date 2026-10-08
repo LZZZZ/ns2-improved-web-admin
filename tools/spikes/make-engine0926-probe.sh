@@ -20,7 +20,7 @@ awk -v branch="$here/engine0926-branch.lua" '
     print "    local n = select(\"#\", ...)"
     print "    local seen = { count = n, types = {} }"
     print "    for i = 1, n do seen.types[i] = type((select(i, ...))) end"
-    print "    webadminSpaProbeArgs = seen"
+    print "    improvedWebadminProbeArgs = seen"
     print "    return OnWebRequest(...)"
     print "end)"
     next

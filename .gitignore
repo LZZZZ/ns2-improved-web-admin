@@ -13,3 +13,6 @@ fixtures/live/
 # Python bytecode from tools/
 __pycache__/
 *.pyc
+
+# Staged Workshop item (tools/build-workshop.sh).
+build/

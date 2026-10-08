@@ -16,7 +16,7 @@
 # in $LOG/mock-<port>.log. Exit status 0 only if every gate passed.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
-LOG=${LOG:-${TMPDIR:-/tmp}/webadmin-spa-gates}
+LOG=${LOG:-${TMPDIR:-/tmp}/improved-webadmin-gates}
 mkdir -p "$LOG"
 
 # port|flags|stock-web (the 2012 panel instead of web/, for mock-acceptance)

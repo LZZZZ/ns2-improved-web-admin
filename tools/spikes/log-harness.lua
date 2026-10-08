@@ -316,15 +316,15 @@ do
     local r = fresh.log({ })
     local marks = 0
     for _, l in ipairs(fileLines()) do
-        if l.text:find("^webadmin%-spa: checking that config://log%-Server%.txt is this server's log") then marks = marks + 1 end
+        if l.text:find("^improved%-webadmin: checking that config://log%-Server%.txt is this server's log") then marks = marks + 1 end
     end
     check(r.source == "file" and marks == 1, "a live file: one marker line, and the log served")
-    check(r.lines[#r.lines].text:find("^webadmin%-spa: checking") ~= nil,
+    check(r.lines[#r.lines].text:find("^improved%-webadmin: checking") ~= nil,
           "the marker is in the first reply (opened after it was written)")
     fresh.log({ })
     fresh.log({ since = tostring(r.to), file = r.file_id })
     marks = 0
-    for _, l in ipairs(fileLines()) do if l.text:find("^webadmin%-spa: checking") then marks = marks + 1 end end
+    for _, l in ipairs(fileLines()) do if l.text:find("^improved%-webadmin: checking") then marks = marks + 1 end end
     check(marks == 1, "checked once per VM, not per request")
 
     local old = NewVM(true)

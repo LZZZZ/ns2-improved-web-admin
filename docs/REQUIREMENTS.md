@@ -352,7 +352,7 @@ Design notes:
   | `io.open("config://x.txt", "w")`, write, close, read back | Works; the file lands in the `-config_path` directory |
   | `.json` extension | Works |
   | A 100 KB write | Works, reads back 102,400 bytes |
-  | `config://webadmin-spa/probe.txt`, directory absent | **Works -- the directory is created** |
+  | `config://improved-webadmin/probe.txt`, directory absent | **Works -- the directory is created** |
   | Any path without `config://` | Raises `writing to the game directory is not allowed` |
   | Mode `"a"` (append) | **Truncates, like `"w"`.** Write `line1`, append `line2`, read back: only `line2` |
   | `os.rename`, `os.remove` | **Absent** (`nil`) |
@@ -360,7 +360,7 @@ Design notes:
   So the file is **rewritten whole** on every save, never appended to,
   and there is no write-then-rename: a crash mid-write can leave it torn,
   and nothing can delete it. The loader must treat an unparsable file as
-  empty rather than fail. A subdirectory, `config://webadmin-spa/`,
+  empty rather than fail. A subdirectory, `config://improved-webadmin/`,
   keeps the mod's files together.
 
 ### Built *(2026-09-27)*
@@ -370,7 +370,7 @@ server reports both numbers and the tab states them. A connected player
 is never aged out.
 
 - **Two slots stand in for write-then-rename.** Saves alternate between
-  `config://webadmin-spa/recent-players-a.json` and `-b.json`, each
+  `config://improved-webadmin/recent-players-a.json` and `-b.json`, each
   stamped with an increasing `seq`. The loader reads both, decodes each
   under `pcall`, and takes the newest that parses. A torn write costs one
   save, not the list, and the next save overwrites the torn slot. The load
@@ -413,7 +413,7 @@ connected; probe `tools/spikes/make-recent-players-probe.sh`)*:
 | 1. At a map change, does `ClientDisconnect` fire, and `ClientConnect` again after? | **No disconnect at all.** The new map's file loaded with no `ClientDisconnect` before it. `ClientConnect` fired again 18 s after the load, logged as `Client connected` with no `Client connecting`. Deriving `connected` live was the right call: a map change never passes through "left". |
 | 2. Inside `ClientConnect`, what is usable? | `GetUserId`, `Server.GetClientAddress` and `GetControllingPlayer` all are. **The name is still the `NSPlayer` placeholder**, on a first join and on every rejoin; the real one appeared by the next sweep. The code ignores the placeholder, as designed. |
 | 3. `json.decode` on truncated input | **Returns `nil`**, then a position and `unterminated object at line 1, column 1`. It does not throw; the `pcall` stays as a guard. |
-| 4. `config://` readable at file load? | **Yes**: a handle on the second map's load, `nil` on the very first boot only because no file existed yet. `io.open(..., "w")` created `config://webadmin-spa/` itself. |
+| 4. `config://` readable at file load? | **Yes**: a handle on the second map's load, `nil` on the very first boot only because no file existed yet. `io.open(..., "w")` created `config://improved-webadmin/` itself. |
 | 5. What does a save cost? | **0.08 to 0.42 ms** for a one-player file of 191 bytes, timed with `Shared.GetSystemTimeReal`. A full 100-player file (~17 KB) was not measured; nothing suggests it is more than a few times that. |
 
 Also seen end to end: a rename recorded the old name as a former one; a

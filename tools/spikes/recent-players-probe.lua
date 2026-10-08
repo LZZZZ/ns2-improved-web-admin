@@ -16,7 +16,7 @@ ProbeClock = Shared.GetSystemTimeReal or os.clock
 ProbeLog("file load: system time %s, clock %s", tostring(Shared.GetSystemTime()),
          Shared.GetSystemTimeReal and "Shared.GetSystemTimeReal" or "os.clock")
 do
-    local ok, f = pcall(io.open, "config://webadmin-spa/recent-players-a.json", "r")
+    local ok, f = pcall(io.open, "config://improved-webadmin/recent-players-a.json", "r")
     ProbeLog("Q4 read at file load: pcall %s, handle %s", tostring(ok), tostring(f))
     if ok and f then f:close() end
 end
@@ -27,12 +27,12 @@ do
 end
 -- ---------------------------------------------------------------------------
 
--- ===================== webadmin-spa =====================================
+-- ===================== improved-webadmin =====================================
 --
 -- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
 -- game's, so this file replaces the vanilla one wholesale. It started as a
 -- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `webadmin-spa:`. The vanilla code is a starting point, not something
+-- marked `improved-webadmin:`. The vanilla code is a starting point, not something
 -- to preserve: change it wherever that improves the result, keeping the HTTP
 -- API backward compatible when that is cheap (README.md, "Design decisions").
 --
@@ -93,7 +93,7 @@ end
 --
 -- 5. Recent players: everyone seen in the last 24 hours, up to 100, with name,
 --    former names, IP, first and last seen and time played, kept in
---    config://webadmin-spa/ so the list outlives a map change. Read with
+--    config://improved-webadmin/ so the list outlives a map change. Read with
 --    request=getrecentplayers. See docs/REQUIREMENTS.md item 6.
 --
 -- =========================================================================
@@ -450,8 +450,8 @@ local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
 local kRecentSlots = {
-    "config://webadmin-spa/recent-players-a.json",
-    "config://webadmin-spa/recent-players-b.json",
+    "config://improved-webadmin/recent-players-a.json",
+    "config://improved-webadmin/recent-players-b.json",
 }
 
 -- Account id -> entry, as saved.
@@ -949,11 +949,11 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- webadmin-spa: absent on a stock server, which is how a panel knows.
+        -- improved-webadmin: absent on a stock server, which is how a panel knows.
         mod_version = kModVersion,
-        -- webadmin-spa: the reserved slot amount cannot exceed it.
+        -- improved-webadmin: the reserved slot amount cannot exceed it.
         max_players = Server.GetMaxPlayers(),
-        -- webadmin-spa: absent when Shine is not loaded.
+        -- improved-webadmin: absent when Shine is not loaded.
         shine = GetShineState()
     }
     
@@ -991,10 +991,10 @@ end
 
 local function OnWebRequest(actions)
 
-    -- webadmin-spa: before anything a request runs can print.
+    -- improved-webadmin: before anything a request runs can print.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: run a command and return what it printed.
+    -- improved-webadmin: run a command and return what it printed.
     if actions.request == "runcommand" then
 
         local command = actions.cmd or ""
@@ -1026,7 +1026,7 @@ local function OnWebRequest(actions)
             last_id = nextConsoleId - 1,
         })
 
-    -- webadmin-spa: the console stream, everything captured since `since`.
+    -- improved-webadmin: the console stream, everything captured since `since`.
     elseif actions.request == "getconsole" then
 
         local since = tonumber(actions.since) or 0
@@ -1043,7 +1043,7 @@ local function OnWebRequest(actions)
             buffer_size = kConsoleBufferSize,
         })
 
-    -- webadmin-spa: the bans in force, from the table that decides them.
+    -- improved-webadmin: the bans in force, from the table that decides them.
     elseif actions.request == "getbans" then
 
         local source, now, bans = GetBansInForce()
@@ -1055,7 +1055,7 @@ local function OnWebRequest(actions)
             bans = bans,
         })
 
-    -- webadmin-spa: players seen in the last day, connected or not.
+    -- improved-webadmin: players seen in the last day, connected or not.
     elseif actions.request == "getrecentplayers" then
 
         return "application/json", json.encode(GetRecentPlayers())
@@ -1080,7 +1080,7 @@ local function OnWebRequest(actions)
         return "application/json", json.encode(inForce)
     elseif actions.request == "getreservedslots" then
 
-        -- webadmin-spa: when Shine's reservedslots plugin is on, it sets the
+        -- improved-webadmin: when Shine's reservedslots plugin is on, it sets the
         -- slot count and grants access by permission; the vanilla list is not
         -- what is enforced. Its count rides along, and the 2012 panel ignores
         -- the extra key.
@@ -1213,14 +1213,14 @@ Event.Hook("WebRequest", OnWebRequest)
 --
 local function UpdateServerWebInterface()
 
-    -- webadmin-spa: catch a replacement (Shine's, on its first tick) before an
+    -- improved-webadmin: catch a replacement (Shine's, on its first tick) before an
     -- in-game command's output is lost from the console stream.
     EnsureServerAdminPrintWrapped()
 
-    -- webadmin-spa: persist a reserved slot removal (see above).
+    -- improved-webadmin: persist a reserved slot removal (see above).
     SaveReservedSlotsIfDirty()
 
-    -- webadmin-spa: keep the recent-players list and its file current.
+    -- improved-webadmin: keep the recent-players list and its file current.
     UpdateRecentPlayers()
 
     if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then

@@ -138,7 +138,7 @@ vm.tick()                      -- urgent save on the next tick
 r = vm.recent()
 check(find(r, 202).connected == false and find(r, 202).played == 100, "disconnect: not connected, played 100 s")
 check(r.storage.saved_at == clock.now, "saved on the tick after a disconnect")
-check(realOpen(DISK .. "/webadmin-spa/recent-players-a.json"), "slot a written")
+check(realOpen(DISK .. "/improved-webadmin/recent-players-a.json"), "slot a written")
 
 -- Map change: fresh VM over the same disk. Alice reconnects; Bob does not.
 clock.now = clock.now + 20
@@ -153,20 +153,20 @@ check(find(r, 101).first_seen == 1790000000, "first_seen kept across the map cha
 
 -- Force a save into slot b, then tear it: the loader must fall back to a.
 vm.disconnect(a2); vm.tick()
-check(realOpen(DISK .. "/webadmin-spa/recent-players-b.json"), "slot b written by the next save")
-local f = realOpen(DISK .. "/webadmin-spa/recent-players-b.json", "r"); local text = f:read("*a"); f:close()
-f = realOpen(DISK .. "/webadmin-spa/recent-players-b.json", "w"); f:write(text:sub(1, math.floor(#text / 2))); f:close()
+check(realOpen(DISK .. "/improved-webadmin/recent-players-b.json"), "slot b written by the next save")
+local f = realOpen(DISK .. "/improved-webadmin/recent-players-b.json", "r"); local text = f:read("*a"); f:close()
+f = realOpen(DISK .. "/improved-webadmin/recent-players-b.json", "w"); f:write(text:sub(1, math.floor(#text / 2))); f:close()
 vm = NewVM(clock)
 r = vm.recent()
 check(r.storage.loaded == "fallback", "torn newest slot: status fallback")
 check(find(r, 202) and find(r, 101), "fallback kept both players from the older slot")
 vm.tick(); clock.now = clock.now + 61; vm.connect(303, "Carol", "203.0.113.9"); vm.tick()
-f = realOpen(DISK .. "/webadmin-spa/recent-players-b.json", "r"); text = f:read("*a"); f:close()
+f = realOpen(DISK .. "/improved-webadmin/recent-players-b.json", "r"); text = f:read("*a"); f:close()
 check(dkjson.decode(text) ~= nil, "the next save overwrites the torn slot")
 
 -- Both torn: unreadable, and the list starts empty rather than failing.
 for _, s in ipairs({ "a", "b" }) do
-    f = realOpen(DISK .. "/webadmin-spa/recent-players-" .. s .. ".json", "w"); f:write("{\"version\":1,"); f:close()
+    f = realOpen(DISK .. "/improved-webadmin/recent-players-" .. s .. ".json", "w"); f:write("{\"version\":1,"); f:close()
 end
 vm = NewVM(clock)
 r = vm.recent()

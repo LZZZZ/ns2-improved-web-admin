@@ -21,7 +21,7 @@
 
     if actions.request == "probe0926" then
 
-        local out = { args = webadminSpaProbeArgs }
+        local out = { args = improvedWebadminProbeArgs }
 
         -- 1. Everything the handler was given.
         local dump = {}
@@ -59,30 +59,30 @@
         end
 
         local stamp = tostring(Shared.GetSystemTime())
-        local main = "config://webadmin-spa-probe.txt"
+        local main = "config://improved-webadmin-probe.txt"
         local w = {}
         w.write = tryWrite(main, "w", "line1 " .. stamp .. "\n")
         w.append = tryWrite(main, "a", "line2 " .. stamp .. "\n")
         local back, backErr = tryRead(main)
         w.read_back = back or ("<nil> " .. tostring(backErr))
         w.round_trip_ok = back == ("line1 " .. stamp .. "\nline2 " .. stamp .. "\n")
-        w.json_ext = tryWrite("config://webadmin-spa-probe.json", "w", '{"probe":' .. stamp .. '}')
-        w.subdir = tryWrite("config://webadmin-spa/probe.txt", "w", "x")
-        w.no_scheme = tryWrite("webadmin-spa-probe-noscheme.txt", "w", "x")
-        w.big = tryWrite("config://webadmin-spa-probe-big.txt", "w", string.rep("0123456789abcdef", 6400))
-        local big = tryRead("config://webadmin-spa-probe-big.txt")
+        w.json_ext = tryWrite("config://improved-webadmin-probe.json", "w", '{"probe":' .. stamp .. '}')
+        w.subdir = tryWrite("config://improved-webadmin/probe.txt", "w", "x")
+        w.no_scheme = tryWrite("improved-webadmin-probe-noscheme.txt", "w", "x")
+        w.big = tryWrite("config://improved-webadmin-probe-big.txt", "w", string.rep("0123456789abcdef", 6400))
+        local big = tryRead("config://improved-webadmin-probe-big.txt")
         w.big_read_len = big and #big or -1
         w.os_rename = type(os.rename)
         w.os_remove = type(os.remove)
         if type(os.rename) == "function" then
-            local ok, a, b = pcall(os.rename, "config://webadmin-spa-probe.json", "config://webadmin-spa-probe-renamed.json")
+            local ok, a, b = pcall(os.rename, "config://improved-webadmin-probe.json", "config://improved-webadmin-probe-renamed.json")
             w.rename_result = { ok = ok, a = tostring(a), b = tostring(b) }
-            w.rename_target_reads = tryRead("config://webadmin-spa-probe-renamed.json") ~= nil
+            w.rename_target_reads = tryRead("config://improved-webadmin-probe-renamed.json") ~= nil
         end
         if type(os.remove) == "function" then
-            local ok, a, b = pcall(os.remove, "config://webadmin-spa-probe-big.txt")
+            local ok, a, b = pcall(os.remove, "config://improved-webadmin-probe-big.txt")
             w.remove_result = { ok = ok, a = tostring(a), b = tostring(b) }
-            w.remove_gone = tryRead("config://webadmin-spa-probe-big.txt") == nil
+            w.remove_gone = tryRead("config://improved-webadmin-probe-big.txt") == nil
         end
         out.write = w
 

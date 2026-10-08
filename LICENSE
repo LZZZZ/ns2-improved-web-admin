@@ -34,7 +34,7 @@ owners' terms:
    ("Copyright (c) 2012, Unknown Worlds Entertainment, Inc. All rights
    reserved."), and the probes in tools/spikes/*-probe.lua are built from it.
    The vanilla code in those files belongs to Unknown Worlds Entertainment.
-   Our changes to them, marked "webadmin-spa:", are under the MIT License.
+   Our changes to them, marked "improved-webadmin:", are under the MIT License.
 
 2. Art taken from Natural Selection 2, (c) Unknown Worlds Entertainment:
    the map overviews in panel/src/minimaps/, the skill tier badges in

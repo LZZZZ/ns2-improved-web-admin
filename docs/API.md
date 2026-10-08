@@ -532,7 +532,7 @@ Mods tab states the rule rather than showing a ranked indicator.
 items" of the unlisted Workshop item 2909200101, which the engine reads at
 boot and Lua cannot see. The mod's `getwhitelist` reads the item's public
 page instead (no API key), at most once an hour, keeps a copy in
-`config://webadmin-spa/`, and answers with decimal workshop ids, so the
+`config://improved-webadmin/`, and answers with decimal workshop ids, so the
 panel marks each mod, installed or found on the Workshop tab, before it is
 installed. The hotfix mods (NSL Badges, UWE Hotfix 344) are never checked
 and count as whitelisted. Details, and what the engine logs, in
@@ -548,7 +548,7 @@ committed; `fixtures/live/` is gitignored for this reason.
 With the mod, `getrecentplayers` serves the same two values for everyone
 seen in the last 24 hours (up to 100 players), connected or not, with
 their former names. It also **writes them to disk**, in
-`config://webadmin-spa/recent-players-{a,b}.json` under the server's
+`config://improved-webadmin/recent-players-{a,b}.json` under the server's
 config directory, where they stay until they age out. Nothing can delete
 those files from Lua. The Recent players tab shows IPs unmasked, by
 design (see the README's
