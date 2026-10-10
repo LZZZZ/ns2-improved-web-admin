@@ -1,7 +1,8 @@
 import { Unplug } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
-// The N/S monogram, 32x32 (2026-10-07); a drop-in file, and
-// the favicon too (index.html). Shown at its own size: scaled up, it blurs.
+// The N/S monogram, 64x64, cut from the 256 px frame of Steam's client icon
+// for app 4920 (2026-10-10); a drop-in file, and the favicon too (index.html).
+// Shown at 32 px, so it stays sharp at 2x.
 import logoUrl from "../assets/ns2-logo.png";
 import { Activity } from "../tabs/Activity";
 import { Bans } from "../tabs/Bans";

@@ -43,18 +43,15 @@ owners' terms:
    in panel/src/assets/ns2-logo.png, and their built copies in web/assets/.
    Natural Selection 2 is a trademark of Unknown Worlds Entertainment.
 
-3. The ns2panel.com mark drawn by panel/src/ui/Ns2PanelIcon.tsx belongs to
-   ns2panel.com.
-
-4. Text read from other software: the command help in
+3. Text read from other software: the command help in
    panel/src/commands.json comes from the game's and Shine's Lua, and keeps
    their owners' terms.
 
-5. Data captured from Steam and from game servers: Workshop titles,
+4. Data captured from Steam and from game servers: Workshop titles,
    descriptions and ids in fixtures/ and panel/src/whitelist.json belong to
    their authors and to Valve.
 
-6. Third-party libraries bundled into web/ (Preact, uPlot, Lucide). Their
+5. Third-party libraries bundled into web/ (Preact, uPlot, Lucide). Their
    licenses are in panel/public/THIRD-PARTY-LICENSES.txt, which the build
    copies into web/.
 

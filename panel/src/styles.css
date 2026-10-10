@@ -19,8 +19,8 @@
   --ok: #4ec97f;
   --warn: #ffc857;
   --serious: #ec835a;
-  /* ns2panel.com's orange (its own orange-400), for its mark beside a
-     Steam id; the light theme takes the same family's 700. */
+  /* ns2panel.com's orange (its own orange-400), for the icon of its link
+     beside a Steam id; the light theme takes the same family's 700. */
   --ns2panel: #fb923c;
   /* The Log tab's colours (L1), each checked against --bg-inset. */
   --log-time: #7d8796;

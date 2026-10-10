@@ -1,21 +1,13 @@
 // A player's pages elsewhere, beside the Steam id on the Players and Recent
 // players tabs. Plain links, opened in a new tab without a referrer: the panel
 // itself fetches nothing from either site.
-// Both marks are inline SVG drawn in `currentColor`, so their colour comes from
+// Both icons are inline SVG drawn in `currentColor`, so their colour comes from
 // a token (styles.css) and follows the theme. Inline, not files, so the
 // engine's content type for .svg never matters.
+// ns2panel.com's link takes Lucide's chart-pie: ns2panel's own mark is a stock
+// Heroicons pie, and Lucide's is near enough without shipping another set.
+import { ChartPie } from "lucide-preact";
 import { steamId64 } from "./format";
-
-/** The ns2panel.com mark (2026-10-07), in its orange (--ns2panel). */
-function Ns2PanelIcon() {
-  return (
-    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width={2} stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-      <path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-    </svg>
-  );
-}
 
 // Valve's own Steam mark, the round one from its lockup in steam_brandAssets.eps
 // (partner.steamgames.com/doc/marketing/branding, Illustrator, 2024-11-21),
@@ -74,7 +66,7 @@ export function PlayerLinks({ steamId }: { steamId: number }) {
       <a class="player-link ns2panel-link" href={ns2PanelUrl(steamId)}
          target="_blank" rel="noreferrer noopener"
          title="Open on ns2panel.com (leaves this panel)">
-        <Ns2PanelIcon />
+        <ChartPie size={15} strokeWidth={2} aria-hidden="true" />
         <span class="sr-only">ns2panel</span>
       </a>
     </>
