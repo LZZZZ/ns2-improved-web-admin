@@ -37,7 +37,7 @@ action of the 2012 panel. Remaining work is in
 - Shine support throughout
 - Steam ids and IPs masked until asked
 - Fixes for the stock Lua: reserved slots, unban, expired bans
-- Nothing fetched from third parties
+- Nothing fetched from third parties but Workshop thumbnails (Settings turns them off)
 - Dark and light themes, settings kept in the browser
 
 Details of each tab: [docs/DESIGN.md](docs/DESIGN.md#the-tabs).

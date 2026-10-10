@@ -76,7 +76,8 @@ address)`. The mock applies this rule whenever it runs without `--auth`.
 
 The panel is served over plain HTTP, possibly on an isolated network.
 Every dependency is vendored into the build, and nothing is fetched from
-another host at runtime.
+another host at runtime except Workshop thumbnails, from Steam's CDN, which
+Settings turns off.
 
 ## Shipping as a mod
 

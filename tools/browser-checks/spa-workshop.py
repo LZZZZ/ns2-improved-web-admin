@@ -22,15 +22,15 @@ claims:
                and Steam's problem flag; a search the server gave up on shown
                with Retry, and Retry working; an offline server's empty
                result; an install that never arrives never reported as
-               installed; thumbnails fetched only when turned on, from
-               Settings (the tab has no switch, and says where it is)
+               installed; thumbnails fetched by default, without a referrer,
+               and none once Settings turns them off (the tab has no switch)
   * --mod --shine=ban,reservedslots,mapvote --maps=modded
                a result installed and loaded now, and one installed but not
                loaded, marked so, with Open in Mods instead of Install
 
 and on all of them: no uncaught exceptions, and nothing fetched from a third
-party except the thumbnails the operator turned on (blocked here, so the
-gate does not reach Steam either).
+party except the thumbnails (blocked here, so the gate does not reach Steam
+either).
 
 Not covered: the 3-minute "not installed" state, which would need a
 3-minute wait.
@@ -115,11 +115,7 @@ async def open_tab(c, label):
 async def toggle_thumbnails(c):
     """Through Settings, the only place the switch is, and back. Coming back
     shows the last result without searching again."""
-    await c.eval("[...document.querySelectorAll('.workshop-tab .form-hint button')]"
-                 ".find(b=>b.textContent.trim()==='Settings')?.click()"
-                 "|| [...document.querySelectorAll('.tab')]"
-                 ".find(t=>t.textContent.trim()==='Settings').click()")
-    await asyncio.sleep(0.2)
+    await open_tab(c, "Settings")
     await c.eval("document.querySelector('.settings-tab input[name=\"thumbnails\"]').click()")
     await asyncio.sleep(0.2)
     await open_tab(c, "Workshop")
@@ -375,28 +371,27 @@ async def mod(c):
           "Downloading" in r[2] and "installed" not in r[2].replace("not listed", ""),
           r[2][:50])
 
-    blocked = len(c.events)
-    thumbs = [u["url"] for u in requests(c) if "steamusercontent" in u["url"]]
-    check("no thumbnail fetched while they are off", thumbs == [], f"{len(thumbs)}")
-    hint = str(await c.eval("document.querySelector('.workshop-tab .form-hint').textContent"))
-    check("the tab has no thumbnail switch, and says Settings has it",
-          await c.eval("!document.querySelector('.workshop-tab input[name=\"thumbnails\"]')")
-          and "Thumbnails are off" in hint and "Settings" in hint, hint[-50:])
-    await toggle_thumbnails(c)
-    await asyncio.sleep(0.8)
-    thumbs = [u for u in requests(c, blocked) if "steamusercontent" in u["url"]]
-    check("turned on, one per result is fetched from Steam, without a referrer",
-          {u["url"].split("/")[-2] for u in thumbs} == {"5ea0001", "5ea0002", "5ea0003"}
+    thumbs = [u for u in requests(c) if "steamusercontent" in u["url"]]
+    check("thumbnails are on by default: one per result is fetched from Steam, without a referrer",
+          {u["url"].split("/")[-2] for u in thumbs} >= {"5ea0001", "5ea0002", "5ea0003"}
           # Chrome lists the header, empty, under the no-referrer policy.
           and all(u.get("referrerPolicy") == "no-referrer"
                   and not u.get("headers", {}).get("Referer") for u in thumbs),
           f"{len(thumbs)} requests")
     check("and one that fails to load is hidden, not shown broken", await c.eval(
         "document.querySelectorAll('.workshop-table img').length") == 0)
+    check("the tab has no thumbnail switch",
+          await c.eval("!document.querySelector('.workshop-tab input[name=\"thumbnails\"]')"))
     await toggle_thumbnails(c)
     await asyncio.sleep(0.3)
-    check("turned off, none shown", await c.eval(
-        "document.querySelectorAll('.workshop-table img').length") == 0)
+    blocked = len(c.events)
+    await search(c, "halcyon")
+    await asyncio.sleep(0.8)
+    thumbs = [u for u in requests(c, blocked) if "steamusercontent" in u["url"]]
+    check("turned off in Settings, none fetched", thumbs == [], f"{len(thumbs)}")
+    check("and the table has no thumbnail column", await c.eval(
+        "!document.querySelector('.workshop-table th[aria-label=Thumbnail]')"))
+    await toggle_thumbnails(c)
 
 
 async def shine(c):

@@ -172,9 +172,7 @@ export function App() {
         {data && tab === "maps" && <Maps state={data} />}
         {data && tab === "mods" && <Mods state={data} initialFilter={modsFilter} />}
         {data && tab === "workshop" && (
-          <Workshop state={data}
-                    onOpenMods={(id) => goTo("mods", id)}
-                    onOpenSettings={() => goTo("settings")} />
+          <Workshop state={data} onOpenMods={(id) => goTo("mods", id)} />
         )}
         {data && tab === "slots" && <Slots state={data} />}
         {data && tab === "performance" && (

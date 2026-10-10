@@ -28,9 +28,9 @@ import { workshopId } from "./Mods";
 //   * a download is proved only by the installed list, which lists a mod once
 //     it is downloaded and never before.
 //
-// Nothing here fetches from Steam in this browser unless the operator turns
-// thumbnails on, in Settings (off by default, REQUIREMENTS items 4 and 9). The
-// search does not start until the tab is opened.
+// Thumbnails are the one thing this browser fetches from Steam; Settings
+// turns them off (REQUIREMENTS items 4 and 9). The search does not start
+// until the tab is opened.
 //
 // Each result says whether it is whitelisted before it is installed: from
 // Steam's list as the server read it, or the copy the panel ships.
@@ -58,10 +58,9 @@ export function bbcodeToText(source: string): string {
 /** Long enough for any real query; a 3000-character one failed Digest auth. */
 const kMaxQuery = 200;
 
-export function Workshop({ state, onOpenMods, onOpenSettings }: {
+export function Workshop({ state, onOpenMods }: {
   state: ServerState;
   onOpenMods: (id: string) => void;
-  onOpenSettings: () => void;
 }) {
   const hasMod = state.modVersion !== null;
   const settings = useSettings();
@@ -134,18 +133,9 @@ export function Workshop({ state, onOpenMods, onOpenSettings }: {
           Looking for a particular mod? Find it on the{" "}
           <a href={kWorkshopUrl} target="_blank" rel="noreferrer noopener"
              title="Opens Steam (leaves this panel)">Steam Workshop</a>, then search
-          here for its title. Installing downloads a mod to the server; the Mods
-          tab loads it, at the next map change.
-          {!settings.modThumbnails && (
-            <>
-              {" "}Thumbnails are off; they load from Steam, and{" "}
-              <button type="button" class="link-button" onClick={onOpenSettings}>
-                Settings
-              </button>{" "}turns them on.
-            </>
-          )}
+          here for its title. Installing downloads the mod to the server. Use
+          the Mods tab to load it.
         </p>
-        <WhitelistSource list={whitelist} hasMod={hasMod} />
       </div>
 
       <SearchStatus search={search} hasMod={hasMod} onRetry={() => void runSearch(
@@ -182,6 +172,8 @@ export function Workshop({ state, onOpenMods, onOpenSettings }: {
           </table>
         </div>
       )}
+
+      <WhitelistSource list={whitelist} hasMod={hasMod} />
     </section>
   );
 }

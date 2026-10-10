@@ -1,14 +1,12 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ServerState } from "../api/types";
-import { kStockIntervalMs, setTickstat, usePerf } from "../store/perf";
+import { setTickstat, usePerf } from "../store/perf";
 import type { TickstatOutcome } from "../store/perf";
-import { kCatalogueIntervalMs, kListIntervalMs } from "../store/resources";
 import {
   REFRESH_CHOICES, resetSettings, storageOk, systemTheme, updateSettings,
   useSettings,
 } from "../store/settings";
 import type { ClockFormat, Settings as SettingsShape, Theme } from "../store/settings";
-import { kPollMs } from "../store/workshop";
 import { clock } from "../ui/format";
 import { engineRecords, isRunning, kTickstatSeconds, loggingState, statusText } from "./Tickstat";
 
@@ -72,13 +70,6 @@ export function Settings({ state }: { state: ServerState | null }) {
       <div class="form-card">
         <h2>Privacy</h2>
         {checkbox("maskIdentifiers", "mask", "Mask Steam ids and IPs")}
-        <p class="muted form-hint">
-          On by default: every reply carries them over plain HTTP. A masked
-          value is revealed by clicking it, for that row, until you leave the
-          tab. Recent players always shows IPs, since spotting a player who
-          returns under another account is what it keeps them for, and the Log
-          tab shows the server's log as it is, identifiers included.
-        </p>
       </div>
 
       <div class="form-card">
@@ -89,23 +80,6 @@ export function Settings({ state }: { state: ServerState | null }) {
           {refreshSelect("consoleRefreshSeconds", "refresh-chat", "Chat")}
           {refreshSelect("logRefreshSeconds", "refresh-log", "Console, while its tab is open")}
         </div>
-        <p class="muted form-hint">
-          A log read with nothing new transfers no lines; one after a burst
-          carries at most 64 KB.
-        </p>
-        <p class="muted form-hint">Fixed, because they change only when someone acts:</p>
-        <ul class="muted settings-fixed">
-          <li>Bans, Reserved Slots, Recent players and the map vote: every{" "}
-            {kListIntervalMs / 1000} s, and at once after a change made here.</li>
-          <li>The server's maps and installed mods: every {kCatalogueIntervalMs / 1000} s.</li>
-          <li>Performance: once per window the server reports (10 s with this
-            panel's mod), or every {kStockIntervalMs / 1000} s on a stock server.</li>
-          <li>A Workshop search: every {kPollMs / 1000} s until it settles, then not at all.</li>
-        </ul>
-        <p class="muted form-hint">
-          Each list is read only while its tab is open, and nothing is read
-          while this browser tab is hidden.
-        </p>
       </div>
 
       <div class="form-card">
@@ -137,33 +111,22 @@ export function Settings({ state }: { state: ServerState | null }) {
             ))}
           </div>
         </div>
-        <p class="muted form-hint">
-          Chat always writes 24-hour times, as a log does.
-        </p>
       </div>
 
       <div class="form-card">
         <h2>Workshop</h2>
         {checkbox("modThumbnails", "thumbnails", "Show thumbnails, loaded from Steam")}
-        <p class="muted form-hint">
-          Off by default. Turning it on makes this browser fetch each result's
-          image from Steam's servers; nothing else in the panel talks to
-          anyone but the game server.
-        </p>
       </div>
 
       <div class="form-card tickstat-card">
         <h2>tickstat <span class="muted">(the server's, for every admin)</span></h2>
         {state === null ? (
           <p class="muted form-hint" data-tickstat-switch="unreachable">
-            This one is the server's, not this browser's: it shows and changes
-            whether the engine logs tickstat, which needs the server. It cannot
-            be reached now.
+            The server cannot be reached.
           </p>
         ) : state.modVersion === null ? (
           <p class="muted form-hint" data-tickstat-switch="stock">
-            Needs this panel's mod: the engine prints tickstat only to its log,
-            and only the mod reads it.
+            Needs this panel's mod.
           </p>
         ) : <TickstatSwitch />}
       </div>
@@ -177,13 +140,7 @@ export function Settings({ state }: { state: ServerState | null }) {
       </div>
 
       <div class="settings-foot">
-        {storageOk ? (
-          <p class="muted settings-storage">
-            Saved in this browser, for this address only. They do not follow
-            you to another browser, and a different address for the same
-            server keeps its own.
-          </p>
-        ) : (
+        {!storageOk && (
           <p class="tone-error settings-storage">
             This browser refuses to keep them (a private window, or site data
             blocked), so they last until this page closes.
@@ -243,10 +200,7 @@ function TickstatSwitch() {
         {busy && <span class="muted"> -- waiting for the server's log...</span>}
       </label>
       <p class="muted form-hint">
-        {statusText(logging, engine, latest)} On, the Performance tab adds tick
-        spacing, snapshot size, choke and throttling. It sends{" "}
-        <code>tickstat {kTickstatSeconds}</code> or <code>tickstat 0</code>, and
-        the switch moves once the server's log says so.
+        {statusText(logging, engine, latest)}
       </p>
       {outcome && (
         <p class={`form-hint${outcome.kind === "confirmed" ? " muted" : " tone-warn"}`}

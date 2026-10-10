@@ -12,7 +12,7 @@
   --border: #2b323c;
   --text: #e6e9ee;
   --text-dim: #98a2b3;
-  --accent: #4ea1ff;
+  --accent: #a3e635;
   --marine: #4ea1ff;
   --alien: #f0a44a;
   --danger: #ff6b6b;
@@ -47,6 +47,8 @@
   --radius: 6px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
+  /* Checkboxes and radios take the accent too. */
+  accent-color: var(--accent);
 }
 
 :root[data-theme="light"] {
@@ -56,7 +58,7 @@
   --border: #d6dae1;
   --text: #14171c;
   --text-dim: #5c6673;
-  --accent: #1667c7;
+  --accent: #4d7c0f;
   --marine: #1667c7;
   --alien: #b26a10;
   --danger: #c0392b;
@@ -510,6 +512,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .log-filters .kind-admin { color: var(--log-admin); }
 .log-filters .kind-connection { color: var(--log-connection); }
 .log-unavailable p + p, .log-reset p + p { margin-top: 6px; }
+.log-unavailable ol { margin: 4px 0 6px; padding-left: 22px; color: var(--text-dim); }
 
 /* ----------------------------------------------------------- bans, slots */
 
@@ -535,16 +538,29 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-size: 14px;
   height: 34px;
 }
-.form-row input[name="steamid"], .form-row input[name="slotid"] { width: 280px; }
+.form-row input[name="steamid"] { width: 340px; max-width: 100%; }
+.form-row input[name="slotid"] { width: 280px; }
 .form-row input[name="amount"], .form-row input[name="minutes"] { width: 90px; }
 .form-hint { margin: 8px 0 0; font-size: 12px; }
+.form-row .btn { height: 34px; }
+/* A value shown, not edited, laid out as a field: caption above a 34 px
+   line, so it lines up with the inputs and buttons beside it. */
+.read-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-right: 8px;
+}
+.read-field-value { height: 34px; display: flex; align-items: center; font-size: 15px; color: var(--text); }
 
 /* Ban reasons are free text from whoever banned; they wrap rather than
    widen the table. */
 .reason-cell { white-space: normal; word-break: break-word; min-width: 200px; }
 .expires-cell { font-variant-numeric: tabular-nums; }
 
-.slot-count { font-size: 20px; font-weight: 600; align-self: center; }
+.slot-count { font-size: 20px; font-weight: 600; gap: 0.3em; }
 .slot-count .muted { font-size: 13px; font-weight: 400; }
 
 .read-only { opacity: 0.6; }
@@ -566,7 +582,6 @@ tbody tr.ban-row { border-top: none; background: var(--bg-raised); }
 .section-title .tag { margin-left: 8px; font-weight: 400; }
 .inline-form { display: contents; }
 .form-row input[name="cycletime"] { width: 90px; }
-.next-map { align-self: center; font-size: 15px; }
 .cycle-settings .spacer { flex: 1; }
 
 .drag-handle {
@@ -637,6 +652,7 @@ tr.current-map .name-cell { font-weight: 600; }
 /* Mods */
 .mod-counts { align-self: center; }
 .mods-notes { margin-top: 8px; }
+.workshop-tab > .whitelist-source { margin-top: 12px; }
 .selectable { user-select: all; cursor: text; }
 .mods-table a { color: var(--accent); }
 /* A status never wraps inside itself; the cell grows instead. */

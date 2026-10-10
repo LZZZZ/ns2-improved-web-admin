@@ -114,6 +114,12 @@ cp <repo>/lua/ServerWebInterface.lua \
 # boot; for the log tail, -logdir equal to -config_path
 ```
 
+**Restart after copying a new build of `web/`.** The engine lists a mod's
+files when it mounts it, so a rebuilt panel's new asset names answer with
+the stub page and the panel loads blank (`Unable to open
+'web/assets/index-<hash>.js'` in the log). A changed file under an
+existing name is served at once.
+
 **Restore the rig afterwards**: `MapCycle.json` (unmounts the mod and
 restores ranking), `BannedPlayers.json`, `ReservedSlotsConfig.json` if the
 slot count changed, the item's own `ServerWebInterface.lua`, and delete

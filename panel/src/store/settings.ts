@@ -26,7 +26,7 @@ export interface Settings {
   theme: Theme;
   /** How times are written: as the browser's locale does, 24-hour, or UTC. */
   clock: ClockFormat;
-  /** Off by default: thumbnails are fetched from Steam's CDN. */
+  /** On by default; the one thing fetched from a third party, Steam's CDN. */
   modThumbnails: boolean;
   /** Open on the tab last used rather than on Players. */
   reopenLastTab: boolean;
@@ -49,7 +49,7 @@ export const DEFAULTS: Settings = {
   logRefreshSeconds: 2,
   theme: "dark",
   clock: "locale",
-  modThumbnails: false,
+  modThumbnails: true,
   reopenLastTab: true,
   lastTab: "players",
   playersHideBots: false,

@@ -273,15 +273,7 @@ function ModsView(p: ViewProps) {
 
       <div class="mods-notes">
         <p class="muted form-hint">
-          A change here edits the cycle's mods and is written at once.
-        </p>
-        <p class="muted form-hint">
-          Changes load or unload at the next map change, not now. Mods are
-          listed in the order the server mounts them: its own two, then the
-          ones every map loads, numbered; adding puts a mod last. Loading a
-          mod that is not whitelisted turns ranking off. Installed mods stay
-          on disk: nothing in the game can delete one. To install a mod, find
-          it on the Workshop tab.
+          Changes require a map change. Mods are listed in loading order.
         </p>
         <WhitelistSource list={p.whitelist} hasMod={hasMod} />
       </div>

@@ -164,13 +164,10 @@ async def defaults_and_refresh(c):
     check("the defaults", values == {
         "mask": True, "refresh-state": "2", "refresh-chat": "2", "refresh-log": "2",
         "theme": "dark",
-        "clock": "locale", "thumbnails": False, "reopen": True, "hide-bots": False}, values)
+        "clock": "locale", "thumbnails": True, "reopen": True, "hide-bots": False}, values)
     check("the page is dark", await theme(c) == "dark")
-    foot = await c.eval("document.querySelector('.settings-storage').textContent")
-    check("says where they are kept", "this browser, for this address only" in foot, foot[:60])
-    fixed = await c.eval("document.querySelector('.settings-fixed').textContent")
-    check("the fixed rates stated from the stores", all(
-        s in fixed for s in ("every 10 s", "every 60 s", "every 0.5 s")), fixed[:80])
+    check("no storage warning while the browser keeps them",
+          await c.eval("!document.querySelector('.settings-storage')"))
 
     print("\n== the server-state knob")
     await set_select(c, "refresh-state", "5")

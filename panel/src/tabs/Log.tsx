@@ -330,32 +330,24 @@ function Unavailable({ path, error, stale }: {
 }) {
   return (
     <div class="banner log-unavailable">
-      <h2>The server's log cannot be read from here</h2>
+      <h2>The server's log cannot be read</h2>
       <p>
-        The engine writes <code>log-Server.txt</code> into the directory{" "}
-        <code>-logdir</code> names, and the mod's Lua can open files only in
-        the config directory. Start the server with <code>-logdir</code> the
-        same as <code>-config_path</code>, or with neither flag: the default
-        layout keeps both in one place.
+        {stale
+          ? <span class="log-stale">Found <code>{path}</code>, but this server is not writing it.</span>
+          // The engine's message usually names the path already.
+          : <span class="mono">{error.includes(path) ? error
+              : `${path}: ${error || "no reason given"}`}</span>}
       </p>
-      {stale ? (
-        <p class="log-stale">
-          There is a <code>{path}</code>, but this server is not writing it:
-          a line it printed to check did not reach the file. It is a copy an
-          earlier run left behind with <code>-logdir</code> pointing at the
-          config directory, and showing it would pass an old log off as this
-          one. Delete it, or start the server with <code>-logdir</code> there.
-        </p>
-      ) : (
-        <p>
-          The server tried <code>{path}</code> and was told:{" "}
-          <span class="mono">{error || "nothing"}</span>.
-        </p>
-      )}
-      <p>
-        Until then, commands still run below and show what they printed; only
-        the log itself is missing.
-      </p>
+      <p>To fix it:</p>
+      <ol>
+        <li>Stop the server.</li>
+        {stale && <li>Delete <code>{path}</code>, an old copy from an earlier run.</li>}
+        <li>
+          Start it with <code>-logdir</code> set to the same directory
+          as <code>-config_path</code>, or with neither flag.
+        </li>
+      </ol>
+      <p>Commands below still run and show their output.</p>
     </div>
   );
 }

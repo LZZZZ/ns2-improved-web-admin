@@ -40,7 +40,10 @@ export interface MapCycleState {
   conflict: RawMapCycle | null;
   /** The cycle before the last write that landed; Undo writes it back. */
   undo: RawMapCycle | null;
-  /** How the last write went, for the tab's own status line. */
+  /**
+   * How the last write went, for the tab's own status line: null when it
+   * read back as sent.
+   */
   last: { note: string; tone: "sent" | "error" } | null;
 }
 
@@ -165,7 +168,9 @@ async function flush(hasMod: boolean): Promise<void> {
     }
     if (!sameCycle(after, next)) tone = "error";
     record(what, note, tone);
-    emit({ base: after, undo: base, last: { note, tone } });
+    // A write that read back as sent needs no word on the tab; Activity has it.
+    const clean = result.kind === "written" && tone === "sent";
+    emit({ base: after, undo: base, last: clean ? null : { note, tone } });
   } catch (e) {
     fail(`could not be sent: ${(e as Error).message}`);
   } finally {

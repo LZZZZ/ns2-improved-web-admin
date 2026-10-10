@@ -271,11 +271,13 @@ function Editor(p: EditorProps) {
     <>
       <div class="form-card cycle-settings">
         <div class="form-row">
-          <span class="next-map">
-            <span class="muted">next map </span>
-            {shineVote ? vote : <b>{nextMap === "random"
-              ? "random (never the current map)" : nextMap ?? "--"}</b>}
-          </span>
+          <div class="read-field next-map">
+            Next map
+            <span class="read-field-value">
+              {shineVote ? vote : <b>{nextMap === "random"
+                ? "random (never the current map)" : nextMap ?? "--"}</b>}
+            </span>
+          </div>
           <form class="inline-form" onSubmit={(e) => {
             // Enter commits through the input's change event; blurring fires
             // it if it has not fired yet, and never twice.
@@ -314,13 +316,14 @@ function Editor(p: EditorProps) {
           <span class="spacer" />
           <UndoReload cycle={store} hasMod={hasMod} />
         </div>
-        <p class={`muted form-hint${p.last?.tone === "error" ? " tone-error" : ""}`}
-           aria-live="polite">
-          {p.saving ? "Writing..."
-            : time.trim() !== "" && !timeValid ? "Minutes: a number, 0 or more (0 never changes map by time)."
-            : p.last ? p.last.note
-            : "Every change is written at once, as the whole cycle."}
-        </p>
+        {(p.saving || p.last || (time.trim() !== "" && !timeValid)) && (
+          <p class={`muted form-hint${p.last?.tone === "error" ? " tone-error" : ""}`}
+             aria-live="polite">
+            {p.saving ? "Writing..."
+              : time.trim() !== "" && !timeValid ? "Minutes: a number, 0 or more (0 never changes map by time)."
+              : p.last?.note}
+          </p>
+        )}
       </div>
 
       <div class={`maps-columns${drag ? " dragging-map" : ""}`}

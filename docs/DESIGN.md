@@ -53,8 +53,9 @@ Each is a defect of the 2012 panel, and easy to reintroduce:
   design: Recent players shows IPs, since spotting a returning player under
   another account is what it keeps them for; and the Console shows the
   server's log verbatim, since it is the server's own record.
-- It fetches nothing from a third party at runtime: no CDN, no web font,
-  and Workshop thumbnails only when turned on.
+- It fetches nothing from a third party at runtime but Workshop
+  thumbnails, from Steam's CDN, which Settings turns off. No CDN for its
+  own code, no web font.
 
 ## The tabs
 
@@ -69,7 +70,7 @@ and says so.
 | Chat | The chat with team and time; send to all, marines or aliens. A send is confirmed by finding it in the chat. |
 | Maps | The cycle and the available maps side by side. Drag or arrow to reorder, drag in to add, drag out to remove. Every change is written at once, re-read first so a concurrent change is not overwritten, and can be undone. Shine's per-map options and map groups survive. Warnings for a missing map, a mod map whose mod is not loaded, and a duplicate. A stock map's minimap on hover. Shine's mapvote explained. |
 | Mods | Installed mods in mount order: which are loaded now, load or stop loading with every map, and whether each is on the ranked whitelist. |
-| Workshop | Search the Workshop through the server, read a mod's details, install it. Thumbnails only when turned on in Settings. |
+| Workshop | Search the Workshop through the server, read a mod's details, install it. Thumbnails from Steam unless turned off in Settings. |
 | Reserved Slots | The amount, and the slots by name. Shine's count when its plugin is on. |
 | Performance | What `perfmon` measures, in 10 s windows on one time axis: tickrate, slowest tick, score and players, then frame time, late updates, entities and the Lua heap. With the engine's `tickstat` on: tick spacing, snapshot size against what `bwlimit` allows, choke, rate steps. Needs the mod for all but the stock readings. |
 | Console | The server's `log-Server.txt`, filtered by kind and coloured, with the command line under it. A command shows what it printed; names and help are suggested as you type. Save writes what was read to a file. |

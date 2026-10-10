@@ -105,9 +105,10 @@ Stop loading reversed it at the next change. Fixture:
 
 - `authorid` is a number. A name needs the Steam Web API, so the panel
   shows the id and links to the profile.
-- `thumbnailurl` is on Steam's CDN, so thumbnails are an opt-in setting,
-  off by default. The 2012 panel searches on every page load and fetched
-  4.55 MB of thumbnails for a tab nobody opened (CURRENT-UI defect 13); the
+- `thumbnailurl` is on Steam's CDN. Thumbnails are on by default and are
+  the one thing the panel fetches from a third party; Settings turns them
+  off. The 2012 panel searches on every page load and fetched 4.55 MB of
+  thumbnails for a tab nobody opened (CURRENT-UI defect 13); the
   replacement searches only once the tab is shown.
 
 Measured on the rig (09-26 hotfix, stock config; probe
@@ -376,10 +377,10 @@ and the footer's refresh and theme are shortcuts to the same values.
 | Setting | What it is |
 | --- | --- |
 | Mask Steam ids and IPs | On by default. A reveal is per row, until the tab is left. Recent players shows IPs regardless (item 6). |
-| Refresh | Three knobs, each 1, 2, 5, 10 s or off: server state (header, Players), Chat, and the Console's log. The fixed rates (lists 10 s, maps and mods 60 s, Performance per server window, a Workshop search 0.5 s) are listed. A knob turned off says so on its tab and offers Read now. |
+| Refresh | Three knobs, each 1, 2, 5, 10 s or off: server state (header, Players), Chat, and the Console's log. The rest are fixed: lists 10 s, maps and mods 60 s, Performance per server window, a Workshop search 0.5 s. A knob turned off says so on its tab and offers Read now. |
 | Theme | Dark (default), light, or the system's, followed live. |
 | Times | As the browser writes them (default), 24-hour, or UTC: the footer, dates, the console (always 24-hour) and the performance axis. |
-| Workshop thumbnails | Off by default, with what turning them on costs. |
+| Workshop thumbnails | On by default; turning them off leaves the panel talking only to the game server. |
 | Remembered | The last tab (on by default), Players' Hide bots, the Console's filters. |
 | tickstat | The server's `tickstat`, on or off (item 10). |
 

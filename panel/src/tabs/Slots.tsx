@@ -35,6 +35,13 @@ export function Slots({ state }: { state: ServerState }) {
   const parsedId = parseSteamId(idInput);
   const cleanName = slotName(name);
   const existing = data?.slots.find((s) => s.name === cleanName && cleanName !== "");
+  const addHint = existing
+    ? `A slot named ${cleanName} exists and will be replaced: the server keys slots by name.`
+    : cleanName !== name.trim() && name.trim() !== ""
+      ? `Saved as ${cleanName}: a slot name is one console argument, so it cannot hold spaces or quotes.`
+      : idInput.trim() !== "" && parsedId === null
+        ? "Not a Steam id this panel recognises."
+        : null;
 
   const run = async (command: string) => {
     setBusy(true);
@@ -107,13 +114,15 @@ export function Slots({ state }: { state: ServerState }) {
       <form class="form-card" onSubmit={setSlots}>
         <h2>Reserved slots</h2>
         <div class="form-row">
-          <span class="slot-count">
-            {current === null ? "--" : current}
-            <span class="muted">
-              {" "}reserved
-              {state.maxPlayers !== null && ` of ${state.maxPlayers} player slots`}
+          <div class="read-field">
+            Reserved
+            <span class="read-field-value slot-count">
+              {current === null ? "--" : current}
+              {state.maxPlayers !== null && (
+                <span class="muted">of {state.maxPlayers} player slots</span>
+              )}
             </span>
-          </span>
+          </div>
           <label>
             Set to
             <input
@@ -126,13 +135,13 @@ export function Slots({ state }: { state: ServerState }) {
           </label>
           <button class="btn" type="submit" disabled={busy || !amountValid}>Set</button>
         </div>
-        <p class="muted form-hint">
-          {amount.trim() !== "" && !amountValid
-            ? (state.maxPlayers !== null && amountValue > state.maxPlayers
+        {amount.trim() !== "" && !amountValid && (
+          <p class="muted form-hint">
+            {state.maxPlayers !== null && amountValue > state.maxPlayers
               ? `At most ${state.maxPlayers}: the server ignores anything above its player limit, without a word.`
-              : "A whole number, 0 or more.")
-            : `Sent as ${shineOwns ? "sh_setresslots (Shine)" : "sv_reserved_slots"}.`}
-        </p>
+              : "A whole number, 0 or more."}
+          </p>
+        )}
       </form>
 
       <div class="toolbar">
@@ -243,15 +252,7 @@ export function Slots({ state }: { state: ServerState }) {
               Add
             </button>
           </div>
-          <p class="muted form-hint">
-            {existing
-              ? `A slot named ${cleanName} exists and will be replaced: the server keys slots by name.`
-              : cleanName !== name.trim() && name.trim() !== ""
-                ? `Saved as ${cleanName}: a slot name is one console argument, so it cannot hold spaces or quotes.`
-                : idInput.trim() !== "" && parsedId === null
-                  ? "Not a Steam id this panel recognises."
-                  : "A name is a label only; the Steam id is what holds the slot."}
-          </p>
+          {addHint && <p class="muted form-hint">{addHint}</p>}
         </form>
       )}
     </section>
