@@ -1,4 +1,4 @@
-# Build output is committed on purpose (see README.md, "Design decisions") --
+# Build output is committed on purpose (see docs/DESIGN.md, "Design decisions") --
 # the panel ships as static game content, so `web/` is NOT ignored.
 
 node_modules/

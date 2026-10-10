@@ -70,7 +70,7 @@ function storageNotes(data: RecentPlayers): string[] {
  * can still be found and banned. The mod's Lua keeps the list in a file, since
  * a map change wipes everything held in Lua.
  *
- * IPs are shown in the clear here, by design (README.md, "What the panel
+ * IPs are shown in the clear here, by design (docs/DESIGN.md, "What the panel
  * deliberately does not do"):
  * spotting a returning player under another account is what they are for.
  */

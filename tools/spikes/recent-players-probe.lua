@@ -34,7 +34,7 @@ end
 -- verbatim copy of the 344 / 26-09-03 original; the changes below are each
 -- marked `improved-webadmin:`. The vanilla code is a starting point, not something
 -- to preserve: change it wherever that improves the result, keeping the HTTP
--- API backward compatible when that is cheap (README.md, "Design decisions").
+-- API backward compatible when that is cheap (docs/DESIGN.md, "Design decisions").
 --
 -- 1. Console output is captured and returned.
 --
