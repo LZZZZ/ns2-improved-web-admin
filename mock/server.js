@@ -24,8 +24,7 @@
 //
 // Usage: node mock/server.js [--port 8080] [--web <dir>] [--auth user:pass]
 //                           [--mod] [--shine[=ban,reservedslots,mapvote,basecommands]]
-//                           [--maps=modded] [--log=off] [--beta-players]
-//                           [--whitelist=cached|fail]
+//                           [--maps=modded]
 // See mock/README.md.
 
 import { createServer } from "node:http";
@@ -67,12 +66,6 @@ function parseArgs(argv) {
     else if (a === "--tickstat") o.tickstatSeconds = Number(next());
     else if (a === "--no-chat-buffer") o.noChatBuffer = true;
     else if (a === "--mod") o.mod = true;
-    else if (a === "--log=off") o.logOff = true;
-    else if (a === "--beta-players") o.betaPlayers = true;
-    else if (a === "--whitelist=cached" || a === "--whitelist=fail") {
-      o.whitelist = a.slice(a.indexOf("=") + 1);
-    }
-    else if (a === "--whitelist-delay") o.whitelistDelayMs = Number(next());
     else if (a === "--log-rounds") o.logRounds = Number(next());
     else if (a === "--maps" || a.startsWith("--maps=")) {
       o.maps = a.includes("=") ? a.slice(a.indexOf("=") + 1) : next();
@@ -117,15 +110,7 @@ mock NS2 web admin server
                       basecommands
   --maps=modded       a modded server's map cycle, map list and installed mods
                       instead of a stock install's
-  --log=off           --mod's getlog cannot open the log, as on a server whose
-                      -logdir is not its config directory
   --log-rounds <n>    rounds of made-up history in the log (default 40, ~200 KB)
-  --beta-players      with --mod: the 09-26+ engine's per-player Family
-                      Sharing and rejected-move counts (made up)
-  --whitelist=cached  with --mod: getwhitelist has a copy already, as after a
-                      map change; by default the first call starts a read
-  --whitelist=fail    with --mod: the read from Steam fails
-  --whitelist-delay <ms>  how long a read takes (default 1500)
   --perf-rate <s>     seconds between perf samples (default 60; try 2)
   --perf-window <s>   length of a --mod getperf window (default 10, as the Lua)
   --tickstat <s>      boot with the engine's tickstat on at this interval and
@@ -155,12 +140,11 @@ Control endpoints (not part of the real API, and never requested by the panel):
                              the next n workshop searches hang or fail, the
                              next install never arrives
   GET /__mock/log?append=<text>[&n=3] | partial=<text> | burst=<bytes>
-                 | truncate=1 | restart=1 | stale=1|0
+                 | truncate=1 | restart=1
                              write to log-Server.txt behind the server's back:
                              lines, a line with no newline yet, a burst, a cut
-                             to the header, a new file (restart=<n> with n
-                             rounds of history), or make it a copy the server
-                             is not writing
+                             to the header, or a new file (restart=<n> with n
+                             rounds of history)
   GET /__mock/perf?score=-20[&interp_fails=3][&worst_tick_ms=80][&emit=1]
                              the next getperf window's values; emit=1 closes
                              it now. tickrate_config=80 etc. change the rates
@@ -418,7 +402,6 @@ function control(url, res) {
         n: q.has("n") ? Number(q.get("n")) : 1,
         partial: q.get("partial") ?? undefined,
         burst: q.has("burst") ? Number(q.get("burst")) : 0,
-        stale: q.has("stale") ? q.get("stale") === "1" : undefined,
       });
       return send(res, 200, "application/json", JSON.stringify(result));
     }
@@ -526,16 +509,20 @@ const server = createServer(async (req, res) => {
     return send(res, 200, file[0], file[1]);
   }
 
-  // The parameters become one `actions` table, which is all the Lua handler
-  // ever sees. It never learns the path, which is why `/` and
-  // `/does-not-exist.png` are indistinguishable to it. A GET's come from the
-  // query string; a POST's come from the form body only, and its query string
-  // is dropped -- measured on 09-26.
+  // The parameters become one `actions` table. A GET's come from the query
+  // string; a POST's come from the form body only, and its query string is
+  // dropped -- measured on 09-26. Since the 10-12 engine the hook also gets
+  // the path, the method and the headers, names in lower case, without
+  // `authorization` and `cookie` (measured on 10-12).
   const actions = req.method === "POST"
     ? Object.fromEntries(new URLSearchParams(body.toString("utf8")))
     : Object.fromEntries(url.searchParams);
+  const headers = Object.fromEntries(Object.entries(req.headers)
+    .filter(([k]) => k !== "authorization" && k !== "cookie")
+    .map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)]));
 
-  const result = state.onWebRequest(actions);
+  const result = state.onWebRequest(actions,
+    { path: url.pathname, method: req.method, headers });
   log(`${req.method} ${url.pathname}${url.search} -> ` +
       `${actions.request ?? "(default)"} ${result ? `${result[1].length} B` : "empty"}`);
 

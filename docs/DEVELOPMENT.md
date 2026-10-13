@@ -31,13 +31,9 @@ node mock/server.js --port 8094 --web web --mod --perf-window 2
 node mock/server.js --port 8096 --web web --mod --shine
 # a modded server's map cycle, maps and mods
 node mock/server.js --port 8099 --web web --mod --shine=ban,reservedslots,mapvote --maps=modded
-# a server whose log the mod cannot reach
-node mock/server.js --port 8100 --web web --mod --log=off
-# no chat buffer; the 09-26+ engine's player fields
+# no chat buffer; the mod's per-player Family Sharing and rejected moves
 node mock/server.js --port 8101 --web web --no-chat-buffer
-node mock/server.js --port 8102 --web web --mod --beta-players
-# a failed whitelist read
-node mock/server.js --port 8103 --web web --mod --whitelist=fail --whitelist-delay 300
+node mock/server.js --port 8102 --web web --mod
 ```
 
 Then open `http://127.0.0.1:8091/index.html`. There is no dev server:
@@ -75,7 +71,7 @@ verify.
 | `tools/make-skill-tiers.sh` | `<client>/ns2/ui/skill_tier_icons.dds` (client install; the server has no UI art) → `panel/src/assets/skill-tiers.png`. |
 | `tools/make-team-logos.sh` | `<client>/ns2/ui` (`logo_marine.dds`, `logo_alien.dds`) → `panel/src/assets/logo-marines.png`, `logo-aliens.png`. |
 | `tools/make-commands.py` | Regenerate `panel/src/commands.json`, the Console's suggestions: the game's and Shine's admin commands with arguments and help (`--lua <server>/ns2/lua --shine <Shine's lua/shine>`), plus a hand-kept list of engine commands. Re-run after a game or Shine update. |
-| `tools/make-whitelist.py` | Regenerate `panel/src/whitelist.json`, the dated whitelist copy the panel falls back on, from the same Workshop pages `getwhitelist` reads (needs curl). Re-run before a release. |
+| `tools/make-whitelist.py` | Regenerate `panel/src/whitelist.json`, the dated whitelist copy the panel uses on a stock server, from Steam's Workshop pages (needs curl). Re-run before a release. |
 | `tools/nonce-under-load.py` | Poll one Digest nonce at the panel's cadence until the server refuses it, then re-authenticate. |
 | `tools/browser-checks/run-all.sh` | Run the gates, above. |
 | `tools/browser-checks/spa-*.py` | One gate per tab, in headless Chrome against the mocks: `spa-players`, `spa-recent`, `spa-bans`, `spa-chat`, `spa-maps`, `spa-mods`, `spa-workshop`, `spa-slots`, `spa-perf`, `spa-console` (command line), `spa-log` (the Console's log), `spa-settings`. Each script's docstring lists what it asserts. |

@@ -23,9 +23,9 @@ had opened. So the checks are about what this one claims:
                id the server has not installed shown in its place and removable
 
 and the whitelist (docs/CONSTRAINTS.md item 17) on each: stock uses the list the panel ships and
-says why; --mod starts on it while the server reads Steam's, then switches;
-the modded config's 41 whitelisted, 2 hotfix and 6 others; and a read that
-fails (--whitelist=fail) falls back to the shipped list with the reason.
+says why; --mod shows the server's verdict on each mod and never asks for a
+list; the modded config's 43 whitelisted (2 of them hotfix mods) and 6
+others.
 
 and on all of them: no workshop search, no uncaught exceptions, nothing
 fetched from a third party.
@@ -36,7 +36,6 @@ Start the mocks first:
     node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8099 --web web --mod --shine=ban,reservedslots,mapvote --maps=modded
-    node mock/server.js --port 8103 --web web --mod --whitelist=fail --whitelist-delay 300
 """
 import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,7 +44,6 @@ from cdp import CDP, launch_chrome, page_target
 STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_MAPS_URL", "http://127.0.0.1:8099")
-FAIL = os.environ.get("WHITELIST_FAIL_URL", "http://127.0.0.1:8103")
 PORT = 9232
 
 ROWS = "document.querySelectorAll('.mods-table tbody tr[data-mod]')"
@@ -184,7 +182,7 @@ async def stock(c):
     check("the counts do not claim a loaded number", "loaded" not in counts, counts)
     src = await wl_source(c)
     check("whitelist: the shipped copy, dated, and why",
-          src[0] == "shipped" and "stock server cannot read Steam's" in src[1]
+          src[0] == "shipped" and "stock server cannot say" in src[1]
           and "(115 mods)" in src[1] and "whitelisted since then" in src[1], src[1][:70])
     hot = await wl_title(c, "d41d68cd")
     check("a hotfix mod counts as whitelisted, and says why",
@@ -271,48 +269,20 @@ async def mod(c):
 
 
 async def mod_whitelist(c):
-    print(f"\n== --mod, the whitelist read ({MOD})")
+    print(f"\n== --mod, the server's verdicts ({MOD})")
     reset(MOD)
     mark = len(c.events)
-    await c.send("Page.navigate", url=MOD + "/index.html")
-    await wait_for(c, "!!document.querySelector('.tab')")
-    await c.eval("[...document.querySelectorAll('.tab')]"
-                 ".find(t=>t.textContent.trim()==='Mods').click()")
-    seen = []
-    for _ in range(60):
-        s = await wl_source(c)
-        if s[0] and (not seen or seen[-1] != s):
-            seen.append(s)
-        if s[0] == "server":
-            break
-        await asyncio.sleep(0.1)
-    check("first the shipped copy, saying the server is reading Steam's",
-          len(seen) >= 2 and seen[0][0] == "shipped"
-          and "the server is reading Steam's now" in seen[0][1], seen[0][1][:70] if seen else "")
-    check("then Steam's, as the server read it",
-          seen and seen[-1][0] == "server" and "Steam's, read by the server" in seen[-1][1]
-          and "(115 mods)" in seen[-1][1], seen[-1][1][:60] if seen else "")
+    await open_mods(c, MOD)
+    src = await wl_source(c)
+    check("the whitelist is the server's, read at boot",
+          src[0] == "server" and "the server read when it started" in src[1], src[1][:60])
+    hot = await wl_title(c, "d41d68cd")
+    check("the hotfix mod is whitelisted, by the server's verdict",
+          hot[0] == "whitelisted" and "read at boot" in hot[1], hot[1][:60])
     asked = [e["params"]["request"]["url"] for e in c.events[mark:]
              if e["method"] == "Network.requestWillBeSent"
              and "request=getwhitelist" in e["params"]["request"]["url"]]
-    check("asked again soon while the read ran, not every second", 2 <= len(asked) <= 4,
-          f"{len(asked)} requests")
-    other = await wl_title(c, "d41d68cd")
-    check("the hotfix mod is still whitelisted on Steam's list", other[0] == "whitelisted")
-
-
-async def failing(c):
-    print(f"\n== --mod --whitelist=fail ({FAIL})")
-    reset(FAIL)
-    await open_mods(c, FAIL)
-    ok = await wait_for(c, "document.querySelector('.mods-tab .whitelist-source')"
-                           "?.textContent.includes('could not read')", timeout=4)
-    src = await wl_source(c)
-    check("a failed read: the shipped copy, with the server's reason",
-          ok and src[0] == "shipped" and "could not read Steam's: Steam could not be reached: "
-          "Could not resolve host" in src[1], src[1][40:120])
-    hot = await wl_title(c, "acd4ecf3")
-    check("and the verdicts still come from it", hot[0] == "whitelisted")
+    check("no list is asked for", not asked, f"{len(asked)} requests")
 
 
 async def shine(c):
@@ -371,7 +341,7 @@ async def shine(c):
     panel = await wl_title(c, "aa473d86")
     check("Combat Fix is not, NS2Panel is",
           combat[0] == "not whitelisted" and panel[0] == "whitelisted"
-          and "Steam's whitelist, read by the server" in panel[1], panel[1][:50])
+          and "the whitelist the server read at boot" in panel[1], panel[1][:50])
     check("Shine's option, the groups and the per-map mods survived",
           after["maps"][0] == {"map": "ns2_veil", "min": 12}
           and after.get("groups") == before.get("groups")
@@ -397,7 +367,6 @@ async def main():
             await mod_whitelist(c)
             await mod(c)
             await shine(c)
-            await failing(c)
 
             print("\n== every server")
             exceptions = [e for e in c.events if e["method"] == "Runtime.exceptionThrown"]
@@ -408,9 +377,9 @@ async def main():
                     if e["method"] == "Network.requestWillBeSent"]
             check("no workshop search, on load or on the tab",
                   not any("request=getmods" in u for u in urls))
-            check("a stock server is never asked for the whitelist",
-                  not any(u.startswith(STOCK) and "request=getwhitelist" in u for u in urls))
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE, FAIL))})
+            check("no server is asked for a whitelist",
+                  not any("request=getwhitelist" in u for u in urls))
+            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

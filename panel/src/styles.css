@@ -511,8 +511,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .log-filters .chat-mark { margin: 0 3px 0 2px; vertical-align: -2px; }
 .log-filters .kind-admin { color: var(--log-admin); }
 .log-filters .kind-connection { color: var(--log-connection); }
-.log-unavailable p + p, .log-reset p + p { margin-top: 6px; }
-.log-unavailable ol { margin: 4px 0 6px; padding-left: 22px; color: var(--text-dim); }
+.log-reset p + p { margin-top: 6px; }
 
 /* ----------------------------------------------------------- bans, slots */
 

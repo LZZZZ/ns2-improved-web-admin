@@ -83,8 +83,8 @@ reports success it never verified, or does something nobody asked for.
 12. **The host root serves player data instead of the panel.** `/` falls
     through to the state blob ([API.md](API.md#no-404-and-no-directory-index)),
     and the boot line `Web server running at 127.0.0.1:8080` gives exactly
-    that address. The mod answers `/` with a page leading to `/index.html`
-    (CONSTRAINTS item 6).
+    that address. The mod answers a browser at `/` with a page leading to
+    `/index.html`, and a script there with the state (CONSTRAINTS item 6).
 13. **Opening the panel pulls 4.7 MB from third parties.**
     `modbrowser.js:149` calls `getMods(1)` from `$(document).ready`, so
     every load runs a Workshop search and renders 50 rows into the hidden

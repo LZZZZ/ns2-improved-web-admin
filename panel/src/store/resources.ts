@@ -5,7 +5,7 @@
 
 import {
   getBans, getInstalledMods, getMapList, getMapVote, getRecentPlayers,
-  getReservedSlots, getServerState, getWhitelist,
+  getReservedSlots, getServerState,
 } from "../api/client";
 import { createResource } from "./poll";
 import { getSettings } from "./settings";
@@ -37,6 +37,3 @@ export const installedMods = createResource(getInstalledMods, kCatalogueInterval
 // when a vote ends, so it keeps the list pace.
 export const mapVote = createResource(getMapVote, kListIntervalMs);
 
-// Mod only. The server reads Steam at most once an hour, so the list moves
-// rarely; while a read runs, the whitelist hook asks again sooner.
-export const whitelist = createResource(getWhitelist, kCatalogueIntervalMs);

@@ -223,7 +223,7 @@ async def stock(c):
         "JSON.stringify((p=>p?[p.dataset.source,p.textContent]:['',''])"
         "(document.querySelector('.workshop-tab .whitelist-source')))"))
     check("from the shipped whitelist, dated, on a stock server",
-          src[0] == "shipped" and "stock server cannot read Steam's" in src[1], src[1][:60])
+          src[0] == "shipped" and "stock server cannot say" in src[1], src[1][:60])
     await c.eval("window.__confirms = []")
     mark = len(c.events)
     await click_row(c, SMALL, "Install")
@@ -308,7 +308,7 @@ async def mod(c):
     check("Steam's problem with it is flagged", "Steam problem" in t[0][1])
     ok = await wait_for(c, "document.querySelector('.workshop-tab .whitelist-source')"
                            "?.dataset.source==='server'", timeout=5)
-    check("with the mod, the whitelist is Steam's, as the server read it", ok)
+    check("with the mod, the whitelist is the server's verdict", ok)
 
     await click_row(c, MARKUP, "Details")
     detail = json.loads(await c.eval(

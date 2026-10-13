@@ -1,13 +1,14 @@
 -- Off-rig harness for getlog in lua/ServerWebInterface.lua.
 --
 -- Runs the shipped file under LuaJIT with the engine calls it touches stubbed,
--- over a directory standing in for config://, and writes log-Server.txt there
--- the way the engine does: a Date/Time header, lines appended, a new file with
--- a new header at a restart. It checks the tail, the byte cursor, paging back,
--- the cap, a partial line, a cut file and a new one -- not the engine: what the
--- engine writes and when is a rig question (docs/REQUIREMENTS.md item 7).
---
--- Its io.open serves the file as it was at the open, as Spark's does.
+-- and writes log-Server.txt in a scratch directory the way the engine does: a
+-- Date/Time header, lines appended, a new file with a new header at a
+-- restart. Shared.ReadLog reads it as the 10-12 engine's does (measured on the
+-- rig, 2026-10-12): the bytes asked for and the file's size, a negative offset
+-- counting from the end, no maximum meaning the rest. It checks the tail, the
+-- byte cursor, paging back, the cap, a partial line, a cut file and a new one
+-- -- not the engine: what the engine writes and when is a rig question
+-- (docs/REQUIREMENTS.md item 7).
 --
 -- Usage: luajit tools/spikes/log-harness.lua --core <core/lua> [dir]
 --   --core names the game's core/lua directory, in a server install: the
@@ -72,38 +73,22 @@ local function filler(tag, n, width)
     return table.concat(out, "\n") .. "\n"
 end
 
--- `stale`: a file the engine is not writing, left by an earlier run.
-local function NewVM(stale)
+-- Shared.ReadLog(offset, maxBytes): the bytes, and the file's size.
+local function ReadLog(offset, maxBytes)
+    local f = realOpen(LOG, "rb")
+    local data = f and f:read("*a") or ""
+    if f then f:close() end
+    offset = tonumber(offset) or 0
+    if offset < 0 then offset = math.max(0, #data + offset) end
+    local stop = maxBytes and (offset + maxBytes) or #data
+    return data:sub(offset + 1, math.min(stop, #data)), #data
+end
+
+local function NewVM()
     local hooks = { }
     local players = setmetatable({ }, { __index = { GetSize = function(self) return #self end } })
     local env = setmetatable({ }, { __index = _G })
-    -- Spark's handle sees the file as it was when it was opened: a line
-    -- written after the open is not in what it reads (measured on the rig).
-    -- So the fake reads the whole file at open and serves that.
-    env.io = { open = function(path, mode)
-        local rel = path:match("^config://(.*)$")
-        if not rel then return nil, "not a mounted root" end
-        local f, err = realOpen(DISK .. "/" .. rel, mode)
-        if not f then return nil, err end
-        local data = f:read("*a")
-        f:close()
-        local pos = 0
-        return {
-            seek = function(_, whence, off)
-                off = off or 0
-                if whence == "end" then pos = #data + off
-                elseif whence == "cur" then pos = pos + off
-                else pos = off end
-                return pos
-            end,
-            read = function(_, n)
-                if n == "*a" then local t = data:sub(pos + 1); pos = #data; return t end
-                if pos >= #data then return nil end
-                local t = data:sub(pos + 1, pos + n); pos = pos + #t; return t
-            end,
-            close = function() end,
-        }
-    end }
+    env.io = { open = function() return nil, "not in this harness" end }
     env.json = dkjson
     env.Script = { Load = function() end }
     env.CreateRingBuffer = function(n)
@@ -117,8 +102,9 @@ local function NewVM(stale)
     env.Event = { Hook = function(name, fn) hooks[name] = hooks[name] or { }; table.insert(hooks[name], fn) end }
     env.Shared = {
         -- The engine writes a Shared.Message line to its log before returning
-        -- (REQUIREMENTS item 7); into this file unless it is a stale copy.
-        Message = function(m) if not stale then append(tostring(m) .. "\n") end end,
+        -- (REQUIREMENTS item 7).
+        Message = function(m) append(tostring(m) .. "\n") end,
+        ReadLog = ReadLog,
         SetWebRoot = function() end,
         GetSystemTime = function() return 1000 end,
         GetSystemTimeReal = function() return 1000 end,
@@ -131,6 +117,7 @@ local function NewVM(stale)
     }
     env.Server = { GetFrameRate = function() return 60 end }
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 
@@ -152,13 +139,12 @@ end
 
 local vm = NewVM()
 
--- 1. No file: said so, not an empty log.
+-- 1. An empty log: no lines, not an error.
 do
-    os.remove(LOG)
-    local r, body = vm.log({ })
-    check(r.source == "none" and r.path == "config://log-Server.txt" and type(r.error) == "string",
-          "no file: source none, the path and the error")
-    check(body:find('"lines"') == nil, "no file: no lines key at all")
+    write("")
+    local r = vm.log({ })
+    check(r.source == "file" and r.size == 0 and #r.lines == 0 and r.at_start == true,
+          "an empty file: source file, no lines")
 end
 
 -- 2. A small file: all of it, the header parsed into the file id.
@@ -309,35 +295,7 @@ do
     check(r.reset == "truncated", "a negative cursor: reset truncated")
 end
 
--- 11. The live check: one marker line per VM, and a stale file refused.
-do
-    write(header("04:00:00 AM") .. "a line\n")
-    local fresh = NewVM()
-    local r = fresh.log({ })
-    local marks = 0
-    for _, l in ipairs(fileLines()) do
-        if l.text:find("^improved%-webadmin: checking that config://log%-Server%.txt is this server's log") then marks = marks + 1 end
-    end
-    check(r.source == "file" and marks == 1, "a live file: one marker line, and the log served")
-    check(r.lines[#r.lines].text:find("^improved%-webadmin: checking") ~= nil,
-          "the marker is in the first reply (opened after it was written)")
-    fresh.log({ })
-    fresh.log({ since = tostring(r.to), file = r.file_id })
-    marks = 0
-    for _, l in ipairs(fileLines()) do if l.text:find("^improved%-webadmin: checking") then marks = marks + 1 end end
-    check(marks == 1, "checked once per VM, not per request")
-
-    local old = NewVM(true)
-    local st = old.log({ })
-    check(st.source == "none" and st.stale == true and st.error:find("does not grow") ~= nil,
-          "a stale file: source none, stale, and why")
-    check(old.log({ }).stale == true, "and it stays refused for that VM")
-    os.remove(LOG)
-    local gone = old.log({ })
-    check(gone.source == "none" and not gone.stale, "deleted, it reads as missing at once")
-end
-
--- 12. A file with no header: an empty id, and the cursor still works.
+-- 11. A file with no header: an empty id, and the cursor still works.
 do
     write("no header\nsecond\n")
     local r = vm.log({ })

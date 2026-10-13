@@ -48,6 +48,7 @@ local function NewVM()
         InstallMod = function(id) table.insert(vm.installs, id) end,
     }
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 

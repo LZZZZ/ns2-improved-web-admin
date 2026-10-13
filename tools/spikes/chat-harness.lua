@@ -57,6 +57,7 @@ local function NewVM(clock)
     }
     env.IPAddressToString = function(a) return a end
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 

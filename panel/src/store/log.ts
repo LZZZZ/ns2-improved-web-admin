@@ -1,4 +1,4 @@
-// The Log tab's copy of log-Server.txt.
+// The Log tab's copy of the server's log.
 //
 // The mod's getlog serves the engine's log by byte offset, whole lines only,
 // each carrying its offset. So the state here is a byte cursor, the file it
@@ -6,8 +6,8 @@
 // arrive twice. What this has to get right, all of it from how the file and
 // the Lua behave (docs/REQUIREMENTS.md item 7):
 //
-//   * The file outlives a map change: unlike the console buffer, nothing
-//     restarts when the map does, and the cursor stays good.
+//   * The file outlives a map change: nothing restarts when the map does,
+//     and the cursor stays good.
 //   * A restart moves the file to log-Server.old.txt and starts a new one
 //     with a new Date/Time header. The server notices from `file` and answers
 //     with a fresh tail marked `reset`; so does a file shorter than the cursor.
@@ -34,11 +34,6 @@ const kSkipBytes = 1024 * 1024;
 export type LogReset = "new_file" | "truncated" | "skipped";
 
 export interface LogState {
-  /** What the server said: its log, none reachable, or not asked yet. */
-  source: "file" | "none" | null;
-  /** When `source` is "none": the path it tried, what it found, and whether
-   *  the file opened but is not the one being written. */
-  unavailable: { path: string; error: string; stale: boolean } | null;
   fileId: string | null;
   /** The file's size at the last read, in bytes. */
   size: number;
@@ -56,7 +51,7 @@ export interface LogState {
 }
 
 const empty: LogState = {
-  source: null, unavailable: null, fileId: null, size: 0, lines: [],
+  fileId: null, size: 0, lines: [],
   atStart: false, reset: null, skippedBytes: 0, loadingEarlier: false,
   error: null, loading: true, updatedAt: null,
 };
@@ -88,37 +83,23 @@ function merge(existing: LogLine[], incoming: LogLine[], trimOldest: boolean): L
   return trimOldest && merged.length > kMaxLines ? merged.slice(-kMaxLines) : merged;
 }
 
-type FilePage = Extract<LogPage, { source: "file" }>;
-
 /** Start over from a tail: the first read, or a reset of any kind. */
-function replaceWith(page: FilePage, reset: LogReset | null, skippedBytes = 0) {
+function replaceWith(page: LogPage, reset: LogReset | null, skippedBytes = 0) {
   cursor = page.to;
   emit({
-    source: "file", unavailable: null, fileId: page.fileId, size: page.size,
+    fileId: page.fileId, size: page.size,
     lines: page.lines, atStart: page.atStart, reset, skippedBytes,
   });
 }
 
 async function pollOnce(): Promise<void> {
   if (state.fileId === null) {
-    const page = await getLog({});
-    if (page.source === "none") {
-      emit({ source: "none", unavailable: { path: page.path, error: page.error, stale: page.stale } });
-      return;
-    }
-    replaceWith(page, null);
+    replaceWith(await getLog({}), null);
     return;
   }
 
   for (let i = 0; i < kCatchUpReplies; i++) {
     const page = await getLog({ since: cursor, file: state.fileId });
-    if (page.source === "none") {
-      // It was readable and is not now: say so, and start over when it is.
-      cursor = 0;
-      emit({ ...empty, loading: false,
-             source: "none", unavailable: { path: page.path, error: page.error, stale: page.stale } });
-      return;
-    }
     if (page.reset) {
       replaceWith(page, page.reset);
       return;
@@ -127,10 +108,8 @@ async function pollOnce(): Promise<void> {
       // Far behind (the tab was closed, or the page hidden, while a lot was
       // written): take the end instead of replaying megabytes.
       const tail = await getLog({});
-      if (tail.source === "file") {
-        replaceWith(tail, "skipped", Math.max(0, tail.from - cursor));
-        return;
-      }
+      replaceWith(tail, "skipped", Math.max(0, tail.from - cursor));
+      return;
     }
     cursor = page.to;
     const atStart = state.lines.length === 0 ? page.atStart : state.atStart;
@@ -152,7 +131,7 @@ function poll(): Promise<void> {
       emit({ error: null, loading: false, updatedAt: Date.now() });
     } catch (e) {
       const busy = e instanceof ApiError && e.retryable;
-      emit({ error: busy && state.source !== null ? state.error : (e as Error),
+      emit({ error: busy && state.fileId !== null ? state.error : (e as Error),
              loading: false });
     } finally {
       inFlight = null;
@@ -179,14 +158,12 @@ function onVisibility() {
 /** The page before the first line held, prepended. */
 export async function loadEarlier(): Promise<void> {
   const first = state.lines[0];
-  if (state.source !== "file" || state.fileId === null || first === undefined
+  if (state.fileId === null || first === undefined
       || state.atStart || state.loadingEarlier) return;
   emit({ loadingEarlier: true });
   try {
     const page = await getLog({ before: first.off, file: state.fileId });
-    if (page.source === "none") {
-      emit({ source: "none", unavailable: { path: page.path, error: page.error, stale: page.stale } });
-    } else if (page.reset) {
+    if (page.reset) {
       replaceWith(page, page.reset);
     } else {
       emit({ lines: merge(state.lines, page.lines, false), atStart: page.atStart,

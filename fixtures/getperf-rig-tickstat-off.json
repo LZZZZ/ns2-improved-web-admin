@@ -44,7 +44,6 @@
     "perfmon": [],
     "events": [],
     "now": 1790591930,
-    "path": "config://log-Server.txt",
     "last_id": 0,
     "source": "log"
   }

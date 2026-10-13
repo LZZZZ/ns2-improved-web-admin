@@ -50,8 +50,10 @@ local function NewVM(clock, shine)
     end
     env.GetBannedPlayersList = function() return { } end
     env.Event = { Hook = function(name, fn) hooks[name] = hooks[name] or { }; table.insert(hooks[name], fn) end }
+    local printed = { }
     env.Shared = {
-        Message = function() end, SetWebRoot = function() end,
+        Message = function(text) table.insert(printed, tostring(text)) end,
+        SetWebRoot = function() end,
         GetSystemTime = function() return clock.now end,
         GetTime = function() return 0 end,
         GetEntitiesWithClassname = function() return players end,
@@ -71,6 +73,7 @@ local function NewVM(clock, shine)
     }
     env.IPAddressToString = function(a) return a end
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 
@@ -99,11 +102,9 @@ local function NewVM(clock, shine)
         local _, body = hooks.WebRequest[1]({ request = "getrecentplayers" })
         return dkjson.decode(body)
     end
+    -- What the file printed through Shared.Message, which reaches the log.
     function vm.console()
-        local _, body = hooks.WebRequest[1]({ request = "getconsole", since = "0" })
-        local texts = { }
-        for _, line in ipairs(dkjson.decode(body).lines) do table.insert(texts, line.text) end
-        return table.concat(texts, "\n")
+        return table.concat(printed, "\n")
     end
     return vm
 end

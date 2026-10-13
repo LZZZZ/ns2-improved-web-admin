@@ -32,8 +32,8 @@ import { workshopId } from "./Mods";
 // turns them off (REQUIREMENTS items 4 and 9). The search does not start
 // until the tab is opened.
 //
-// Each result says whether it is whitelisted before it is installed: from
-// Steam's list as the server read it, or the copy the panel ships.
+// Each result says whether it is whitelisted before it is installed: the
+// server's verdict, or the copy the panel ships.
 
 /** Where to find a mod the first 50 do not reach. */
 const kWorkshopUrl = "https://steamcommunity.com/app/4920/workshop/";
@@ -101,7 +101,7 @@ export function Workshop({ state, onOpenMods }: {
   };
 
   const install = (item: WorkshopItem) => {
-    const verdict = whitelistVerdict(whitelist, item.id);
+    const verdict = whitelistVerdict(whitelist, item.id, item.whitelisted);
     if (!confirm(
       `Download "${item.title}" to the server?\n\n`
       + "This only downloads it. It loads once the Mods tab adds it, at the next "
@@ -173,7 +173,7 @@ export function Workshop({ state, onOpenMods }: {
         </div>
       )}
 
-      <WhitelistSource list={whitelist} hasMod={hasMod} />
+      <WhitelistSource list={whitelist} />
     </section>
   );
 }
@@ -306,7 +306,7 @@ function ResultRow(p: RowProps) {
         <td>{item.updatedAt ? dateTime(item.updatedAt) : <span class="muted">--</span>}</td>
         <td class="notes-cell status-cell">
           <span class="icon-row">
-            <WhitelistIcon list={p.whitelist} hexId={item.id} />
+            <WhitelistIcon list={p.whitelist} hexId={item.id} server={item.whitelisted} />
             {status}
           </span>
         </td>

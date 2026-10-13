@@ -1,12 +1,15 @@
 # Constraints, fixes and engine asks
 
 What the engine enforces, what shipping as a mod costs, what the mod's Lua
-changes in the stock handler and why, and which engine additions would
-simplify it. Code and other docs cite the numbered items (1-18) by number,
+changes in the stock handler and why, and the engine additions it relies
+on. Code and other docs cite the numbered items (1-18) by number,
 so keep the numbers.
 
 Measurements name the engine drop they ran on (09-03, 09-26 hotfix, 09-27,
-09-28). "The rig" is the local test server ([TESTING.md](TESTING.md)).
+09-28, 10-12 hotfix). "The rig" is the local test server
+([TESTING.md](TESTING.md)). The mod needs the 10-12 drop or later: it
+relies on the functions that drop added at this project's request
+([item 18](#engine-additions-item-18)).
 
 ## Engine rules
 
@@ -123,7 +126,7 @@ engine.
 | What it downloaded | Byte-identical to `build/workshop/content/`: `web/`, `lua/`, `LICENSE` |
 | `lua/ServerWebInterface.lua` | Shadows the game's: `mod_version: "0.1.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
 | `web/` | `index.html` and the other 22 files `200`, byte-identical |
-| The mod's data folder | `config://improved-webadmin/whitelist.json` written (116 ids) |
+| The mod's data folder | `config://improved-webadmin/whitelist.json` written (116 ids; the mod has not written it since 10-12) |
 | `getinstalledmodslist` | The item listed `active`, as `e3742516` |
 | Ranking | `Mod NS2 Improved Web Admin[3816039702] is not whitelisted`, `Ranking disabled`, `ranking_active: false` |
 
@@ -142,11 +145,12 @@ change the Lua wherever it improves the result, and keep the HTTP API
 backward compatible where that is cheap.
 
 1. **Return console command output.** Stock `Shared.ConsoleCommand`
-   returns nothing ([API.md](API.md#console-commands)). The mod captures
-   what a command prints during the call (mechanism: REQUIREMENTS item 5)
-   and adds `runcommand`, which returns it, and `getconsole?since=`, the
-   same capture as a stream. The legacy `command`/`rcon` path is
-   unchanged, and its commands appear in the stream.
+   returns nothing ([API.md](API.md#console-commands)). The mod adds
+   `runcommand`, which runs the command through the 10-12 engine's
+   `Shared.CaptureConsoleCommand` and returns what it printed (REQUIREMENTS
+   item 5). Before 10-12 it wrapped `ServerAdminPrint` and `Shared.Message`
+   into a ring buffer, also served as `getconsole`; both are gone. The
+   legacy `command`/`rcon` path is unchanged.
 2. **Completion and errors for `getmods`.** Steam's failure reaches Lua as
    an empty result, so only a search with no answer at all can be called
    a failure. The mod adds `done`, `count`, `capped` and, after 30 s with
@@ -169,17 +173,23 @@ backward compatible where that is cheap.
    stock server, is how a client detects the mod.
 6. **Answer a browser with the panel, not the state blob.** On a stock
    server `/` returns the state blob, IPs included
-   ([API.md](API.md#no-404-and-no-directory-index)). The mod answers a
-   request with no parameters at all with a page, holding no server data,
-   whose meta refresh leads to `/index.html` (`fixtures/root-mod.html`).
-   It cannot tell `/` from a missing file, nor a browser from a script,
-   so a script reading state must send `request=json`, as both panels do.
+   ([API.md](API.md#no-404-and-no-directory-index)). Since the 10-12
+   engine the `WebRequest` hook's second argument carries the request's
+   `path`, `method` and `headers` (names in lower case, without
+   `authorization` and `cookie`; measured 2026-10-12). The mod answers a
+   request with no parameters by them: at `/`, `Accept` naming
+   `text/html` (a browser navigation) gets a page holding no server data,
+   whose meta refresh leads to `/index.html` (`fixtures/root-mod.html`),
+   and anything else (`*/*` from `curl` and `fetch()`) the state blob, as
+   stock serves it, which auto-shutdown scripts read; any other path gets
+   a not-found page (`fixtures/notfound-mod.html`). Lua still cannot set
+   a status or a header, so no redirect, no `404` and no `Vary`
+   (harmless, since every reply is no-cache).
 
-   The right test is the `Accept` header (`text/html` for a browser
-   navigation, `*/*` from `curl` and `fetch()`), but the `WebRequest` hook
-   gets only the parameter table: no headers, path or method (09-26). Lua
-   also cannot set a status or a header, so no redirect and no `Vary`
-   (harmless, since every reply is no-cache). Proposed engine change:
+   Before 10-12 the hook got the parameter table alone (09-26), so the mod
+   answered every request with no parameters with the page, and a script
+   at `/` lost the state: the 8v8's auto-shutdown check broke while the
+   mod was mounted. The engine change it asked for, now made:
 
    > The web admin's `WebRequest` hook gets one argument, the parameter
    > table: no path, no method, no headers (measured on 09-26). Could the
@@ -282,9 +292,10 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
 14. **Performance data.** Stock `getperfdata` keeps one reading a minute
     of three numbers. The mod adds `getperf`: 10 s windows of
     `ServerPerformanceData` (what `perfmon` prints), the tickrate counted
-    per tick, the slowest tick, and the engine's own `tickstat` and
-    `perfmon:` lines read from the log ([API.md](API.md#getperf);
-    measurements in REQUIREMENTS item 10).
+    per tick, the slowest tick, `tickstat` windows from
+    `Server.GetTickStat()`, and the engine's `perfmon:` block and rate steps
+    read from the log ([API.md](API.md#getperf); measurements in
+    REQUIREMENTS item 10).
 
     **Trap:** `ServerPerformanceData:Accumulate()` of a sample whose
     `GetDurationMs()` is 0 divides by zero in the engine. The server dies
@@ -292,19 +303,15 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
     every map load is empty. The mod skips empty samples, and
     `perf-harness.lua` fails if that guard is lost.
 15. **The server's log.** `getlog` serves `log-Server.txt` by byte offset
-    ([API.md](API.md#getlog); REQUIREMENTS item 7). Lua reaches the file
-    only through `config://`, so only when the engine writes its log into
-    the config directory: `-logdir` equal to `-config_path`, or neither
-    flag.
+    ([API.md](API.md#getlog); REQUIREMENTS item 7), through the 10-12
+    engine's `Shared.ReadLog`, wherever `-logdir` puts it.
 
-    **Trap:** `config://log-Server.txt` opens just as well when it is a
-    frozen copy an earlier run left there. So the first `getlog` of each
-    map load prints `improved-webadmin: checking that
-    config://log-Server.txt is this server's log (<n>)` and looks for it
-    in the file; if it is missing the reply is `stale`. A file handle sees
-    the file as it was when opened, so the check prints before it opens,
-    and `getlog` opens the file per request. A line reaches the file
-    before `Shared.Message` returns (09-26).
+    Before 10-12 Lua reached the file only through `config://`, so only
+    when the engine wrote its log into the config directory (`-logdir`
+    equal to `-config_path`, or neither flag), and a frozen copy an earlier
+    run left there opened just as well. The mod printed a marker line on
+    the first `getlog` of each map load and looked for it, answering
+    `stale` when it was missing. That layout rule and check are gone.
 16. **Hive skill and the map's load time in the state blob.** Each player
     row gains `skill`, `skill_offset`, `comm_skill` and
     `comm_skill_offset` from ScoringMixin (`GetPlayerSkill()` and its
@@ -323,9 +330,10 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
     `map_loaded_at` is the `Shared.GetSystemTime()` the Lua VM started
     with (`getperf`'s `loaded_at`), so the Console can say when the map
     last changed.
-17. **The ranked-mod whitelist, read from Steam.** A mod not on the
-    whitelist turns ranking off, and the server gives Lua no way to ask
-    which mods are on it.
+17. **The ranked-mod whitelist.** A mod not on the whitelist turns ranking
+    off. Since the 10-12 engine the mod asks the engine:
+    `getinstalledmodslist` and `getmods` mark each mod `whitelisted` from
+    `Server.GetIsModWhitelisted(id)`, the list the engine read at boot.
 
     - **Where it lives:** the "Required items" of the unlisted Workshop
       item 2909200101. `libSpark_Network.so` hard-codes four system items
@@ -333,43 +341,34 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
       client hotfix list 2633426471, the whitelist, and Thunderdome
       2908583482; the beta and testing branches use 2708090797,
       2708090349, 2860343495 and 2857373471. At boot the engine fetches
-      the hotfix list and the whitelist (`Found 2 hotfix mods`, `Found 115
-      mods in whitelist`). Hotfix mods are not on the whitelist and are
-      never flagged. Lua gets only `ModServices.GetHotfixListModId()`, and
-      the log names only the first offending mod.
-    - **How the mod reads it:** `getwhitelist` reads the item's public
-      Steam Community page, which lists the same 115 ids as the keyed
-      `IPublishedFileService/GetDetails` (the keyless
-      `ISteamRemoteStorage` calls answer `result 9` for unlisted items),
-      then the hotfix list's page, one after the other: the 09-03 drop's
-      libcurl aborts the server on concurrent HTTPS. The first request
-      answers `fetching`. A copy goes to
-      `config://improved-webadmin/whitelist.json`; a map change serves it,
-      a copy older than an hour is read again, and after a failure the mod
-      waits 5 minutes. Without the mod, or when the read fails, the panel
-      falls back on the dated copy it ships (`panel/src/whitelist.json`,
-      from `tools/make-whitelist.py`).
-    - **`Shared.SendHTTPRequest`'s callback** gets `(body, curl error
-      message, curl code, HTTP status)`: `("", "Failed to connect to ...",
-      7, 0)` for a refused connection, `("", "Could not resolve host:
-      ...", 6, 0)` for an unknown host, the whole page with `nil, 0, 200`
-      on success. Steam answers 200 for an item it does not have, so a
-      page with no item list is the failure to look for.
-    - **Steam Community rate-limits:** a dozen reads in a few minutes got
-      `429`. Python's urllib kept getting 429 where curl, same address and
-      User-Agent, got 200, so `make-whitelist.py` uses curl. The mod reads
-      at most twice an hour.
+      the hotfix list and the whitelist (`Found 2 hotfix mods`, `Found 116
+      mods in whitelist` on 10-12), and the log names only the first
+      offending mod.
+    - **What the engine answers** (10-12 rig, 2026-10-12): `true` or
+      `false` for a number or a hex string; a decimal string is read as
+      hex. Right on the first tick. The hotfix mods read `true` (UWE
+      Hotfix 344, NSL Badges), Combat Fix `false`. It never answers
+      "unknown": if the engine could not read the list, every mod reads
+      `false`. Of a Workshop search for `shine administration`, 20 of 50
+      hits read `true`.
+    - **A stock server** says nothing, so the panel uses the dated copy it
+      ships (`panel/src/whitelist.json`, from `tools/make-whitelist.py`,
+      which reads the items' public Steam Community pages: the keyless
+      `ISteamRemoteStorage` calls answer `result 9` for unlisted items).
+      Steam Community rate-limits: a dozen reads in a few minutes got
+      `429`, and Python's urllib kept getting 429 where curl, same address
+      and User-Agent, got 200, so the tool uses curl.
 
-    Probe: `whitelist-branch.lua` and `whitelist-helpers.lua`, built by
-    `make-whitelist-probe.sh`. Writing it hit the engine's Lua
-    preprocessor trap ([TESTING.md](TESTING.md#traps)).
+    Before 10-12 the mod read the same pages itself (`getwhitelist`, with
+    a cache file and a 5-minute back-off after a failure). That code, its
+    probe and its harness are in git history.
 
-## Engine additions that would simplify the mod (item 18)
+## Engine additions (item 18)
 
-Several parts of the mod work around data the engine holds and does not
-hand to Lua. The bindings are generated from spec files (`server_linux`
-carries "Auto-generated from ModServices.txt"), so a getter over existing
-data is probably small; the maintainers know the real cost.
+Several parts of the mod worked around data the engine holds and did not
+hand to Lua. The asks below went to the engine's maintainer; the **10-12
+drop** answered most of them ("Added mod functions for web admin pages",
+its CHANGELOG), and the mod now relies on them.
 
 **The ranking check**, decoded from the 09-28 `server_linux` (the
 function at `0x11b730`). The engine enables ranking by itself. The check
@@ -391,24 +390,63 @@ inferred, not traced. The mod sends it as `ranking_active` in the state
 blob; the panel parses it but does not show it, since with this mod
 mounted it is always `false`.
 
-| | Ask | Replaces |
-| --- | --- | --- |
-| 1 | `Server.GetIsModWhitelisted(modId)` (true, false, or nil when the list was never read), `ModServices.GetWhitelistedModIds()`, `Server.GetRankingDisabledReason()` | All of item 17: about 240 lines scraping Steam Community's HTML, the 429 limit, the libcurl path that aborts on concurrent HTTPS, the hard-coded branch table, the cache file, and the panel's shipped `whitelist.json`. It would also cover dependencies and use the copy the engine enforces. |
-| 2 | The log directory as a read-only root (`logs://log-Server.txt`), or `Shared.ReadLog(offset, maxBytes)` | Item 15's layout rule and its stale-copy check. The Console would work on any server layout. |
-| 3 | `Server.GetTickStat()`: the last window's fields as a table, with its end time | About 290 lines that scan the log every 2 s and parse the 16-segment `TICKSTAT\|` line, and the dependence on ask 2 and on `tickstat N`, a toggle every admin shares. |
-| 4 | `Event.Hook("ConsoleOutput", fn(text))`, or `Shared.ConsoleCommand` returning what its command printed | About 120 lines of wrappers on `Shared.Message` and `ServerAdminPrint`, re-installed every tick because Shine replaces them, plus the filter for Shine's echoes. `runcommand` would also show engine commands' output (`tickstat`, `bwlimit`, `perfmon`), which today reaches only the log. Touches the print path, so less small. |
-| 5 | `Shared.JsonEncode(table)` over the C JSON writer libSpark_Core already links (`json_write_minified`) | dkjson, most of every reply's cost ([SERVER-COST.md](SERVER-COST.md)). Must write an empty table as `[]`. |
+| | Ask | 10-12 | What it replaced |
+| --- | --- | --- | --- |
+| 1 | `Server.GetIsModWhitelisted(modId)`, `ModServices.GetWhitelistedModIds()`, `Server.GetRankingDisabledReason()` | The first only, never nil | Item 17's Steam Community reader (about 240 lines), its cache file, and `getwhitelist` |
+| 2 | `Shared.ReadLog(offset, maxBytes)`, or a read-only `logs://` | `Shared.ReadLog` | Item 15's layout rule and its stale-copy check |
+| 3 | `Server.GetTickStat()` | Yes, but nil while `tickstat` is off | The parser of the 16-segment `TICKSTAT\|` line. Still a toggle every admin shares. |
+| 4 | Console output for Lua | `Shared.CaptureConsoleCommand(cmd)` | The `Shared.Message` wrapper, the ring buffer, `getconsole` and the filter for Shine's echoes. `runcommand` now shows engine commands' output too. |
+| 5 | `Shared.JsonEncode(value)` | Yes | dkjson for every reply and file the mod writes ([SERVER-COST.md](SERVER-COST.md)) |
+| 6 | The request's path, method and headers in `WebRequest` | Yes, a second argument | Item 6's guess from an empty parameter table |
 
-Smaller asks: the request's path, method and headers in `WebRequest`
-(item 6); `Server.UninstallMod` (REQUIREMENTS item 2);
-`Server.SearchWorshop` honouring its page, reporting Steam's failure and
-finding a mod by id (REQUIREMENTS item 4); `Accumulate()` refusing an
-empty sample instead of dying (item 14); a float `GetUpdateIntervalMs()`;
-and a rename inside `config://`, which would retire recent players' two
-slots. `ModServices.GetModState(modId)` exists and may report download
-progress for `installmod`; that needs a rig probe, not an ask.
+Measured on the 10-12 hotfix rig (`Build: 344.4035 (124b726321 beta)`,
+2026-10-12) with `tools/spikes/engine1012-probe.lua`, a standalone file
+with none of the mod's wrappers:
 
-**Proposed engine additions**, with item 6's:
+- **`Shared.ReadLog(offset, maxBytes)`** returns the bytes and the file's
+  size. A negative offset counts from the end; no `maxBytes` reads to the
+  end; an offset past the end returns `""`; a non-number offset reads as
+  0. It reads the live log with `-logdir` outside the config directory.
+- **`Server.GetTickStat()`** returns 40 numbers: the line's fields under
+  their own names (`intervalP99`, `busyPct`, `snapBytesP99`,
+  `slowestSendrate`, ...), `window` the window's length and `time` the
+  server time it closed. Nil until `tickstat N` is on, then each window's
+  table until it is off again.
+- **`Shared.CaptureConsoleCommand(cmd)`** returns one string: a script's
+  lines prefixed with the log's `[hh:mm:ss]`, the engine's bare, each
+  with its newline. The output still reaches the log. A script error in
+  the command comes back as text, not raised. An unknown command and a
+  silent one both return `""`. A capture inside a captured command takes
+  the inner command's lines, and the outer one loses its own. Under Shine,
+  `ServerAdminPrint(nil, ...)` reached neither the log nor the capture
+  (Shine's replacement), hence the one wrapper the mod keeps ([Shine](#shine)).
+- **`Shared.JsonEncode(value)`** matches dkjson on everything the mod
+  sends: `{}` is `[]`, a string, a number or nil is encoded alone, control
+  characters are escaped, invalid UTF-8 passes raw. Differences: a sparse
+  array (`{[1]=..., [3]=...}`) becomes an object where dkjson fills
+  `null`; DEL passes raw; it refuses nesting somewhere under 200 levels
+  (`nesting too deep`, as for a cycle) and a function value (`unsupported
+  value type`). A SteamID64 loses precision exactly as in dkjson. 2,000
+  rows: 1.2 ms against dkjson's 5.2 ms.
+- **`WebRequest`'s second argument** is `{path, method, headers}`. Header
+  names are lower case; `authorization` and `cookie` are left out. The
+  engine serves a file under `web/` without calling the hook; any other
+  path, a missing file included, reaches it. A repeated query key keeps
+  its last value. Lua still returns only a type and a body: every reply
+  is `200`.
+- **`Server.GetIsModWhitelisted(id)`**: see item 17.
+
+Still not there: `ModServices.GetWhitelistedModIds()` and
+`Server.GetRankingDisabledReason()`; `Server.UninstallMod` (REQUIREMENTS
+item 2); `Server.SearchWorshop` honouring its page, reporting Steam's
+failure and finding a mod by id (REQUIREMENTS item 4); `Accumulate()`
+refusing an empty sample instead of dying (item 14); a float
+`GetUpdateIntervalMs()`; and a rename inside `config://`, which would
+retire recent players' two slots. `ModServices.GetModState(modId)` exists
+and may report download progress for `installmod`; that needs a rig
+probe, not an ask.
+
+**The proposal as sent** (before 10-12), with item 6's:
 
 > Three getters would let the web admin mod drop its biggest workarounds.
 > Each is over data the server already holds.
@@ -437,6 +475,8 @@ progress for `installmod`; that needs a rig probe, not an ask.
 >
 > Nothing breaks without them; the mod falls back to what it does today.
 
+The mod no longer falls back: it needs 10-12 or later.
+
 ## Shine
 
 Almost every server runs Shine, so it is the normal case. Source read from
@@ -445,12 +485,12 @@ Shine config, 23 mods and the mod's Lua.
 
 | What Shine does | Effect | Status |
 | --- | --- | --- |
-| Replaces `ServerAdminPrint` on its first tick, without chaining, with a version that returns at once when there is no client (`core/server/logging.lua`) | Vanilla admin commands run from the web admin printed nothing anywhere. | **Fixed**: the mod re-installs its wrapper every tick and before each request. After: `sv_kick` returns `No matching player`, `sv_listbans` 117 lines. |
-| Replaces `Shared.Message` with a timestamping version | None: captured lines carry no timestamp, the audit line still arrives, and `sh_*` output (through `Print`) is captured. | Works |
+| Replaces `ServerAdminPrint` on its first tick, without chaining, with a version that returns at once when there is no client (`core/server/logging.lua`) | Vanilla admin commands run from the web admin printed nothing anywhere, and `Shared.CaptureConsoleCommand` caught nothing of them. | **Fixed**: the mod puts vanilla's nil-client branch (`Shared.Message`) back over Shine's every tick and before each request; a call with a client goes to Shine's. On 10-12, `sv_listbans` returns `No players are currently banned`. |
+| Replaces `Shared.Message` with a timestamping version | A script's captured line starts with the log's `[hh:mm:ss]`, which `runcommand` drops. | Works |
 | Ban plugin replaces `GetBannedPlayersList()` with its own list | String ids, an unstable order, float `time` (the spec's `getBanList`). The vanilla list drifts from it: 117 against 119. | Item 10's fix handles string ids; the panel reads Shine's table through `getbans` |
 | Ban plugin redirects `sv_ban`/`sv_unban` to `sh_ban`/`sh_unban` (both run), and rejects banned players in its own connection hook | **An `sv_ban` of an absent id is a phantom ban**: `sh_ban` fails (`You cannot target yourself with this command.`), vanilla's `Ban` then prints `Player with SteamId N has been banned`, but the entry lands only in the vanilla list, which nothing enforces. | The panel bans with `sh_banid` (any id) and unbans with `sh_unban` under the plugin |
 | Its own command output | Through `Shared.Message`, no audit line, then a receipt: `Console[N/A] banned <name>[N] for 1 hour.`, `Console[N/A] unbanned N.`, `N is not banned.`, `Console[N/A] set reserved slot count to N`, each followed by `Console[N/A] ran command <cmd> with arguments: <args>`. Weeks are the largest duration unit. | The mock's `--shine` reproduces it |
-| `AdminPrint` sends each line to every admin in game through `ServerAdminPrint(admin, line)` after printing it once | The capture recorded each line once more per in-game admin. | **Fixed**: a `ServerAdminPrint` to a player repeating the line just captured, within a second, is skipped (`console-harness.lua`) |
+| `AdminPrint` sends each line to every admin in game through `ServerAdminPrint(admin, line)` after printing it once | Before 10-12 the mod's capture recorded each line once more per in-game admin. | Gone: a call with a client goes only to that admin, so the capture holds each line once (`console-harness.lua`) |
 | `mapvote` picks the next map, from `MapCycle.json` with `GetMapsFromMapCycle: true` | The Maps tab still edits the file that matters, but `mode` plays no part and edits reach the vote at the next map load (item 13). | Reported by `getmapvote`; the Maps tab says so |
 | `reservedslots` plugin | Shine sets the count itself (`sh_setresslots`) and grants access by the `sh_reservedslot` permission; there is no id list, and vanilla's slots are not enforced. | Detected (`shine` in the state blob, `shine.slots` in `getreservedslots`) |
 | `basecommands` runs `sv_say` as its own `sh_say` | No audit line and no `Chat All - Admin:` line, only the receipt. The message still reaches `AddChatToHistory`. `sv_tsay` is not redirected. | The Chat tab confirms a send by finding it in the chat |

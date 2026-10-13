@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Regenerate panel/src/whitelist.json, the ranked-mod whitelist the panel ships.
 
-The panel asks the server first: the mod's `getwhitelist` reads the list from
-Steam (docs/CONSTRAINTS.md item 17). This file is what the panel falls back on when it cannot --
-a stock server, or a server that could not reach Steam -- so it carries the
-date it was read, and the panel shows it.
+With the mod, the server says for each mod whether it is whitelisted
+(Server.GetIsModWhitelisted, docs/CONSTRAINTS.md item 17). This file is what
+the panel uses on a stock server, which cannot say, so it carries the date it
+was read, and the panel shows it.
 
 The whitelist is the "Required items" of the unlisted Workshop item
 2909200101; the hotfix mods, which the engine never checks, are those of

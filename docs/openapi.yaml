@@ -17,11 +17,13 @@ info:
     call is a `GET` or `POST` to `/`, and the action is chosen by the
     `request` query parameter. The Lua handler is `OnWebRequest(actions)` --
     it receives the query parameters of a `GET`, or the form body of a
-    `POST` (whose query string is dropped; measured on 09-26), and **never
-    learns the path, the method or any header**, so on a stock server `/`,
+    `POST` (whose query string is dropped; measured on 09-26). Stock Lua
+    ignores the path, the method and the headers, which the 10-12 engine
+    passes as a second argument, so on a stock server `/`,
     `/does-not-exist.png` and `/?request=json` all get the same answer. With
-    the mod, a request with no parameters at all gets a page leading to the
-    panel instead (`/#no-parameters`).
+    the mod, a request with no parameters gets a page leading to the panel
+    when a browser asks for `/`, and a not-found page at any other path
+    (`/#no-parameters`).
 
     OpenAPI keys operations by path, which this API does not vary, so each
     action below is keyed by a URL fragment naming its `request` value:
@@ -110,28 +112,36 @@ paths:
         `/`, a path that is not a file (`/index.htm`, `/missing.png`), `/?`,
         `/?foo` (a key with no `=` does not reach Lua) and a `POST` with an
         empty body: the Lua sees an empty parameter table for all of them.
+        Since the 10-12 engine its hook also gets the request's `path`,
+        `method` and `headers` (names in lower case, never `authorization`
+        or `cookie`; measured 2026-10-12).
 
         **Stock:** the server-state blob, as `getServerState`, so the address
         the boot log prints hands every player's name, Steam id and IP to
         whoever opens it (CURRENT-UI defect 12).
 
-        **With the mod** *(2026-10-06, CONSTRAINTS item 6)*: a page holding no
-        server data, whose meta refresh leads a browser to `/index.html`. A
-        script asking for state sends `request=json`, as both panels do; a
-        parameter with any value, even empty (`?foo=`), is not this case.
-        The engine passes Lua no headers, so `Accept` cannot choose between
-        the two; and Lua returns only a type and a body, so this cannot be
-        an HTTP redirect.
+        **With the mod** *(2026-10-12, CONSTRAINTS item 6)*: at `/`, a
+        browser (`Accept` naming `text/html`) gets a page holding no server
+        data, whose meta refresh leads to `/index.html`; anything else gets
+        the state blob, as stock serves it, which auto-shutdown scripts read.
+        Any other path gets a not-found page. A parameter with any value,
+        even empty (`?foo=`), is not this case. Lua returns only a type and
+        a body, so this cannot be an HTTP redirect or a `404`.
       responses:
         "200":
-          description: The page with the mod; the state blob without.
+          description: >
+            With the mod, a page for a browser at `/` and for any other path,
+            the state blob for a script at `/`. Stock, the state blob.
           content:
             text/html:
               schema: { type: string }
               examples:
                 mod:
-                  summary: Measured on the rig, 09-27 engine
+                  summary: A browser at `/`, measured on the rig, 10-12 engine
                   externalValue: ../fixtures/root-mod.html
+                mod-not-found:
+                  summary: Any other path, measured on the rig, 10-12 engine
+                  externalValue: ../fixtures/notfound-mod.html
             application/json:
               schema: { $ref: "#/components/schemas/ServerState" }
         "401": { $ref: "#/components/responses/DigestChallenge" }
@@ -434,8 +444,8 @@ paths:
         from the mod's own ring of 200, which records every call to
         `Server.AddChatToHistory` -- player chat, `sv_say`, `sv_tsay` and
         Shine's `sh_say` -- with a time. Poll with the previous reply's
-        `last_id`, as with `getconsole`. Ids restart from 1 at every map
-        change (both rings are Lua state), so a `last_id` below the cursor
+        `last_id`. Ids restart from 1 at every map
+        change (the ring is Lua state), so a `last_id` below the cursor
         means the map changed. Without `since` the mod answers exactly as
         stock does, because the 2012 panel polls that shape.
       parameters:
@@ -708,7 +718,8 @@ paths:
         **There is no uninstall.** Nothing in the API removes a downloaded
         mod, so this list only ever grows.
 
-        The mod adds `active` to each row: mounted now. See the schema.
+        The mod adds `active` (mounted now) and `whitelisted` (the engine's
+        verdict) to each row. See the schema.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -938,11 +949,12 @@ paths:
       description: |
         **Mod only.** What `sendConsoleCommand` should have been.
 
-        The mod wraps `ServerAdminPrint` (`core/lua/ServerAdmin.lua:156`) and
-        `Shared.Message`, both plain writable globals that nobody aliases
-        locally, and tees every line into a ring buffer.
-        `Shared.ConsoleCommand` is synchronous, so by the time it returns the
-        command's own output is already captured and can be returned with it.
+        The mod runs it with `Shared.CaptureConsoleCommand` (10-12 engine),
+        which returns everything the command printed: script lines, engine
+        lines (`tickstat`, `bwlimit`, `perfmon`) and Shine's. The lines reach
+        the log as well. Shine's `ServerAdminPrint` prints nothing without a
+        client, so the mod puts vanilla's nil-client branch back over it, and
+        a vanilla `sv_` command's output comes back under Shine too.
 
         Reading the result:
 
@@ -951,9 +963,9 @@ paths:
           game emits before every such command. `false` means either a plain
           console command such as `killall`, or no such command; **the server
           does not distinguish those two and neither should a client.**
-        - `lines` is what it printed, in order, each tagged with where it came
-          from: `audit` for the dispatch receipt, `admin` for
-          `ServerAdminPrint`, `server` for `Shared.Message`.
+        - `lines` is what it printed, in order, numbered from 1: `audit` for
+          the dispatch receipt, `server` for everything else. The log's
+          `[hh:mm:ss]` before a script's line is dropped.
         - **An empty `lines` with `dispatched: true` is normal and is not
           failure.** A successful `sv_kick` prints nothing at all -- only its
           failure branch calls `ServerAdminPrint`
@@ -961,7 +973,7 @@ paths:
           either way. Show "ran, no output", never "succeeded".
 
         Only the synchronous call is captured. Anything printed after it
-        returns lands in the buffer and comes back through `getConsole`.
+        returns is in the log (`getLog`).
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: cmd
@@ -985,13 +997,12 @@ paths:
                     cmd: sv_kick NoSuchPlayer
                     dispatched: true
                     elapsed: 0
-                    last_id: 17
                     lines:
-                      - { id: 16, time: 1788642719, src: audit, text: "sv - Admin - 0: : STEAM_0:0:0: sv_kick" }
-                      - { id: 17, time: 1788642719, src: admin, text: "No matching player" }
+                      - { id: 1, time: 1788642719, src: audit, text: "sv - Admin - 0: : STEAM_0:0:0: sv_kick" }
+                      - { id: 2, time: 1788642719, src: server, text: "No matching player" }
                 unknown:
                   summary: No such command -- nothing is printed anywhere
-                  value: { cmd: sv_nonsense, dispatched: false, elapsed: 0, lines: [], last_id: 17 }
+                  value: { cmd: sv_nonsense, dispatched: false, elapsed: 0, lines: [] }
           x-fixtures:
             - runcommand-failed.json
             - runcommand-unknown.json
@@ -1027,53 +1038,6 @@ paths:
         "413": { $ref: "#/components/responses/BodyTooLarge" }
         "503": { $ref: "#/components/responses/Busy" }
 
-  "/#request=getconsole":
-    get:
-      tags: [mod, server]
-      operationId: getConsole
-      x-request: getconsole
-      x-requires-mod: true
-      summary: Console output since a cursor
-      description: |
-        **Mod only.** The same capture that feeds `runCommand`, read as a
-        stream: everything printed through `ServerAdminPrint` or
-        `Shared.Message` since line `since`, whoever caused it. A command run
-        from the game console, or by the 2012 panel through the legacy
-        `command`/`rcon` path, appears here too.
-
-        Poll with the `last_id` of the previous reply. `dropped` counts lines
-        that fell out of the 500-entry ring before anyone read them, so a
-        client can say "some output was missed" rather than silently skipping
-        it.
-
-        **Not persistent.** The buffer is Lua state and Lua state is rebuilt on
-        every map change, so the stream restarts from nothing when the map
-        changes. Durable history is the log tail's job, not this one.
-
-        Engine chatter does not appear: an idle server produced zero lines over
-        75 s, because the periodic messages in `log-Server.txt` are written
-        engine-side and never pass through Lua.
-      parameters:
-        - $ref: "#/components/parameters/RequestConst"
-        - name: since
-          in: query
-          required: false
-          description: |
-            Return lines with an id greater than this. Omit or `0` for
-            everything the buffer still holds.
-          schema: { type: integer, minimum: 0, default: 0 }
-      responses:
-        "200":
-          description: Console lines, oldest first.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ConsoleStream" }
-          x-fixtures:
-            - getconsole.json
-        "401": { $ref: "#/components/responses/DigestChallenge" }
-        "403": { $ref: "#/components/responses/ForeignOrigin" }
-        "503": { $ref: "#/components/responses/Busy" }
-
   "/#request=getlog":
     get:
       tags: [mod, server]
@@ -1083,17 +1047,14 @@ paths:
       summary: The engine's log, since a byte offset
       description: |
         **Mod only.** `log-Server.txt`, the engine's own log, read through
-        `config://` -- which reaches it only when the engine writes it into the
-        config directory: `-logdir` equal to `-config_path`, or neither flag
-        (the default layout). Otherwise the reply says
-        `source: none` and why, and the console buffer (`getConsole`) is what
-        there is. See REQUIREMENTS.md item 7.
+        `Shared.ReadLog` (10-12 engine) wherever `-logdir` puts it. See
+        REQUIREMENTS.md item 7.
 
         It holds what never passes through Lua -- connects and auth, engine
         errors, `Script tracing`, Shine's chat and command lines -- and it
-        **outlives a map change**, unlike the console buffer: the file is the
-        engine's, not Lua state. It is served **verbatim**: IPs, Steam ids and
-        chat included (by design, 2026-09-28).
+        **outlives a map change**: the file is the engine's, not Lua state.
+        It is served **verbatim**: IPs, Steam ids and chat included (by
+        design, 2026-09-28).
 
         With no cursor, the last `tail_bytes` (64 KB), starting at a line.
         Poll with `since` = the previous `to` and `file` = the previous
@@ -1106,12 +1067,6 @@ paths:
         Time differ from `file` (a restart moved the old log to
         `log-Server.old.txt`), `truncated` when the file is shorter than the
         cursor. The reply is then a fresh tail.
-
-        The first `getLog` after each map load prints one line to the log,
-        `improved-webadmin: checking that config://log-Server.txt is this server's
-        log (<n>)`, and looks for it in the file: a copy an earlier run left
-        in the config directory opens just as well and never grows. Then the
-        reply is `source: none` with `stale: true`.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: since
@@ -1135,19 +1090,14 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: Lines of the log, oldest first, or why there are none.
+          description: Lines of the log, oldest first.
           content:
             application/json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/LogPage"
-                  - $ref: "#/components/schemas/LogUnavailable"
+              schema: { $ref: "#/components/schemas/LogPage" }
           x-fixtures:
             - getlog-rig-tail.json
             - getlog-rig-since.json
             - getlog-rig-reset.json
-            - getlog-rig-stale.json
-            - getlog-none.json
         "401": { $ref: "#/components/responses/DigestChallenge" }
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
@@ -1182,11 +1132,12 @@ paths:
         knows a map change happened and that windows between its last poll and
         the change are gone.
 
-        `engine` carries what the engine prints only to `log-Server.txt`:
-        `tickstat` lines, snapshot rate steps, a bwlimit warning and the
-        `perfmon:` block, found by a scan of the log every `scan_s` seconds
-        and read with a cursor of their own (`esince`). Same lifetime as the
-        windows. Measured on the rig's 09-27 engine; REQUIREMENTS.md item 10.
+        `engine` carries the engine's own reports, read with a cursor of their
+        own (`esince`): `tickstat` windows from `Server.GetTickStat()` (10-12
+        engine), and what the engine prints only to `log-Server.txt` --
+        snapshot rate steps, a bwlimit warning and the `perfmon:` block --
+        found by a scan of the log every `scan_s` seconds. Same lifetime as
+        the windows. REQUIREMENTS.md item 10.
 
         Vanilla `getperfdata` is unchanged beside it, for the 2012 panel.
       parameters:
@@ -1332,56 +1283,6 @@ paths:
           x-fixtures:
             - getmapvote-off.json
             - getmapvote-shine.json
-        "401": { $ref: "#/components/responses/DigestChallenge" }
-        "403": { $ref: "#/components/responses/ForeignOrigin" }
-        "503": { $ref: "#/components/responses/Busy" }
-
-  "/#request=getwhitelist":
-    get:
-      tags: [mod]
-      operationId: getWhitelist
-      x-request: getwhitelist
-      x-requires-mod: true
-      summary: The ranked-mod whitelist, as the server last read it from Steam
-      description: |
-        **Mod only.** A mod not on the whitelist turns ranking off. The engine
-        reads the list at boot, as the "Required items" of an unlisted Workshop
-        item, and gives Lua no way to see it, so the mod reads the item's
-        public page itself (CONSTRAINTS.md item 17). Ids are **decimal** workshop ids, as
-        Steam spells them, not the hex the rest of the API uses.
-
-        - The first request with no copy, or a copy more than an hour old,
-          starts a read and answers `fetching: true`; the read takes about
-          2 s (two pages, one after the other). A copy is kept in
-          `config://improved-webadmin/whitelist.json`, so a map change does not
-          read Steam again.
-        - `whitelist`, `hotfix` and `read_at` are present together, when there
-          is a copy. `hotfix` are the hotfix mods, which the engine never
-          checks: they count as whitelisted.
-        - `error` says why the last read failed (Steam unreachable, an HTTP
-          status, a page with no list). The mod then waits 5 minutes before
-          reading again, and keeps serving any older copy meanwhile. With no
-          known whitelist for the server's hotfix list, `branch` is absent
-          and so is everything but `now` and `error`.
-        - `hotfix_list_id` is what `ModServices.GetHotfixListModId()` returns:
-          2633436686 on the live branch, 2708090797 on beta.
-
-        `getwhitelist-fetching.json` and `getwhitelist-rig.json` are the rig's
-        first and second answer (2026-10-08). `getwhitelist-failed.json` is
-        synthetic, with curl's message for an unknown host as the rig's probe
-        recorded it.
-      parameters:
-        - $ref: "#/components/parameters/RequestConst"
-      responses:
-        "200":
-          description: The whitelist, or that it is being read, or why not.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Whitelist" }
-          x-fixtures:
-            - getwhitelist-fetching.json
-            - getwhitelist-rig.json
-            - getwhitelist-failed.json
         "401": { $ref: "#/components/responses/DigestChallenge" }
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
@@ -1589,21 +1490,18 @@ components:
         familyshared:
           type: boolean
           description: |
-            **Mod only, on the 09-26+ beta engine**
-            (`Server.GetIsFamilyShared`): playing a Steam Family Shared copy.
-            Bots, the listen host and LAN players always read false (the
-            engine's CHANGELOG). Absent on an engine without the function,
-            or when it errors.
+            **Mod only** (`Server.GetIsFamilyShared`): playing a Steam Family
+            Shared copy. Bots, the listen host and LAN players always read
+            false (the engine's CHANGELOG).
         owner_steamid:
           allOf: [{ $ref: "#/components/schemas/SteamId" }]
           description: |
-            **Mod only, beta engine**, and only with `familyshared: true`:
+            **Mod only**, and only with `familyshared: true`:
             `Server.GetOwnerUserId`, the account that owns the game.
         moves_rejected_time:
           type: number
           description: |
-            **Mod only, beta engine**
-            (`ServerClient:GetMovesRejectedTimeCredit`): moves rejected for
+            **Mod only** (`ServerClient:GetMovesRejectedTimeCredit`): moves rejected for
             time credit, "usually a modified client" (CHANGELOG). Measured
             2026-10-06: an unmodified 09-28 client on the 09-27 rig, idle and
             minimized most of the time, climbed about 6/s, dropped once (75
@@ -1612,7 +1510,7 @@ components:
         moves_rejected_other:
           type: number
           description: |
-            **Mod only, beta engine** (`ServerClient:GetMovesRejectedOther`):
+            **Mod only** (`ServerClient:GetMovesRejectedOther`):
             moves rejected for anything else; "a poor connection can also
             cause these" (CHANGELOG).
         skill:
@@ -2025,8 +1923,8 @@ components:
             bw_limit:
               type: integer
               description: |
-                `Server.GetBwLimit()`: bytes a second per player. 09-27 engine
-                and later; follows a runtime `bwlimit`. Absent on older ones.
+                `Server.GetBwLimit()`: bytes a second per player; follows a
+                runtime `bwlimit`.
         windows:
           type: array
           items: { $ref: "#/components/schemas/PerfWindow" }
@@ -2045,20 +1943,16 @@ components:
     PerfEngine:
       type: object
       description: |
-        The engine's own lines from `log-Server.txt`. Every record is stamped
-        with the scan that found it (`time`, unix seconds): the lines carry no
-        time of their own. One id sequence across all three lists. Absent
-        from replies of a mod that predates it.
-      required: [source, path, scan_s, last_id, now, tickstats, perfmon, events]
+        The engine's own reports: tickstat windows from
+        `Server.GetTickStat()`, stamped with the time the window closed, and
+        lines from `log-Server.txt`, stamped with the scan that found them
+        (`time`, unix seconds): the lines carry no time of their own. One id
+        sequence across all three lists. Absent from replies of a mod that
+        predates it.
+      required: [source, scan_s, last_id, now, tickstats, perfmon, events]
       properties:
         now: { type: integer, description: "The server's clock, `Shared.GetSystemTime()`." }
-        source:
-          type: string
-          enum: [log, none]
-          description: "`none` when the log is not readable here, or is a stale copy."
-        path: { type: string }
-        error: { type: string, description: Why the log could not be read. }
-        stale: { type: boolean, description: The file opens but this server is not writing it. }
+        source: { const: log }
         scan_s: { type: integer, description: Seconds between scans. }
         last_id:
           type: integer
@@ -2072,7 +1966,7 @@ components:
             the three lists. Absent from a mod that predates paging.
         tickstat_last_at:
           type: integer
-          description: When the newest `TICKSTAT` line was found. Absent when none was since the map load.
+          description: When the newest tickstat window closed. Absent when none did since the map load.
         tickstat_said:
           type: object
           description: "The last `tickstat: on|off` the command printed, when seen since the map load."
@@ -2093,8 +1987,9 @@ components:
     Tickstat:
       type: object
       description: |
-        One `TICKSTAT|` line, field for field. A segment the parser does not
-        know is counted in `unparsed` and its fields are absent.
+        One tickstat window from `Server.GetTickStat()`, under the names of
+        the `TICKSTAT|` line's fields, to three decimals. A field the mod does
+        not know is counted in `unparsed` and left out.
       required: [id, time, unparsed]
       properties:
         id: { type: integer }
@@ -2251,6 +2146,13 @@ components:
             (UWE Hotfix 344, NSL Badges) that the engine mounts with no cycle
             entry. A cycle edit changes it only at the next map change.
             Measured on the 09-26 rig with Shine and 23 mods.
+        whitelisted:
+          type: boolean
+          description: |
+            **Mod only.** On the ranked-mod whitelist the engine read at boot:
+            `Server.GetIsModWhitelisted`. True for the hotfix mods too (UWE
+            Hotfix 344, NSL Badges; measured on the 10-12 rig). Never unknown:
+            if the engine could not read the list, every mod reads false.
 
     MapListEntry:
       type: object
@@ -2350,31 +2252,6 @@ components:
           type: array
           items: { type: string }
 
-    Whitelist:
-      type: object
-      required: [now]
-      additionalProperties: false
-      properties:
-        now: { type: integer, description: "The server's clock, Unix seconds." }
-        hotfix_list_id: { $ref: "#/components/schemas/DecimalWorkshopId" }
-        branch: { type: string, enum: [live, beta] }
-        whitelist_id: { $ref: "#/components/schemas/DecimalWorkshopId" }
-        fetching: { type: boolean }
-        error: { type: string }
-        read_at: { type: integer, description: "When the lists were read, Unix seconds." }
-        whitelist:
-          type: array
-          items: { $ref: "#/components/schemas/DecimalWorkshopId" }
-        hotfix:
-          type: array
-          items: { $ref: "#/components/schemas/DecimalWorkshopId" }
-
-    DecimalWorkshopId:
-      type: string
-      pattern: "^[0-9]+$"
-      description: A workshop id in decimal, as in a Steam URL.
-      examples: ["2909200101"]
-
     WorkshopItem:
       type: object
       description: One workshop search hit, as `Server.SearchWorshop` returns it.
@@ -2405,6 +2282,11 @@ components:
             on a panel served over plain HTTP. On an isolated network these do
             not load; the client should tolerate broken thumbnails.
         version: { type: integer, description: "Unix timestamp of the item's last update." }
+        whitelisted:
+          type: boolean
+          description: |
+            **Mod only.** On the ranked-mod whitelist the engine read at boot,
+            as for `InstalledMod`.
 
     ConsoleLine:
       type: object
@@ -2412,21 +2294,15 @@ components:
         One captured line. **Mod only.**
       required: [id, time, src, text]
       properties:
-        id:
-          type: integer
-          description: |
-            Increasing within one map. Poll `getConsole` with the last id seen;
-            a gap larger than expected means lines were dropped.
+        id: { type: integer, description: "The line's place in the reply, from 1." }
         time: { type: integer, description: "Unix seconds, `Shared.GetSystemTime()`." }
         src:
           type: string
-          enum: [audit, admin, server]
+          enum: [audit, server]
           description: |
             `audit` the dispatch receipt the game emits before every command
-            created by `CreateServerAdminCommand`; `admin` a line printed
-            through `ServerAdminPrint`; `server` one printed through
-            `Shared.Message`. A console should show `admin` and `server` and
-            can hide `audit`.
+            created by `CreateServerAdminCommand`; `server` anything else. A
+            console should show `server` and can hide `audit`.
         text: { type: string }
 
     CommandResult:
@@ -2444,35 +2320,13 @@ components:
             indistinguishable on the server side.
         elapsed:
           type: number
-          description: Seconds inside `Shared.ConsoleCommand`. Effectively zero.
+          description: Seconds inside `Shared.CaptureConsoleCommand`, by the frame clock. Zero.
         lines:
           type: array
           description: |
             What it printed. **Empty is not failure** -- a successful `sv_kick`
             prints nothing.
           items: { $ref: "#/components/schemas/ConsoleLine" }
-        last_id: { type: integer, description: "Cursor for a following `getConsole`." }
-
-    ConsoleStream:
-      type: object
-      description: |
-        A page of the console buffer. **Mod only.**
-      required: [lines, last_id]
-      properties:
-        lines:
-          type: array
-          items: { $ref: "#/components/schemas/ConsoleLine" }
-        last_id: { type: integer, description: "Pass as `since` on the next poll." }
-        dropped:
-          type: integer
-          description: Lines that fell out of the ring buffer before being read.
-        filtered:
-          type: integer
-          description: |
-            Lines dropped at capture as engine noise. Zero in practice -- the
-            filter list is empty because an idle server produced nothing to
-            filter.
-        buffer_size: { type: integer, description: "Ring capacity, 500." }
 
     LogLine:
       type: object
@@ -2497,12 +2351,11 @@ components:
     LogPage:
       type: object
       description: A stretch of `log-Server.txt`. **Mod only.**
-      required: [source, path, file_id, size, from, to, lines, more, at_start,
+      required: [source, file_id, size, from, to, lines, more, at_start,
                  tail_bytes, max_bytes]
       additionalProperties: false
       properties:
         source: { const: file }
-        path: { type: string, description: "`config://log-Server.txt`." }
         file_id:
           type: string
           description: |
@@ -2527,26 +2380,6 @@ components:
           description: The cursor did not fit this file; this reply is a fresh tail.
         tail_bytes: { type: integer, description: "What a tail or a page back reads, 65536." }
         max_bytes: { type: integer, description: "The most one reply serves: 65536, 262144 before 2026-10-08." }
-
-    LogUnavailable:
-      type: object
-      description: |
-        The log cannot be read: the engine writes it outside the config
-        directory, so the file does not open -- or a file opens that the
-        engine is not writing (`stale`). **Mod only.**
-      required: [source, path, error]
-      additionalProperties: false
-      properties:
-        source: { const: none }
-        path: { type: string }
-        stale:
-          type: boolean
-          description: |
-            The file opened but is not this server's log: a line the mod
-            printed (once per map load, on the first `getLog`) did not reach
-            it. A copy an earlier run left with `-logdir` pointing at the
-            config directory. Absent otherwise.
-        error: { type: string, description: "What `io.open` said, or why the file is stale." }
 
     WorkshopSearchResult:
       description: |

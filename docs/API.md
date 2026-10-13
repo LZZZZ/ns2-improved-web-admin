@@ -20,28 +20,32 @@ blob, never by a status code.
 | Request type | What it returns | Details |
 | --- | --- | --- |
 | `runcommand` | What the command it ran printed | CONSTRAINTS item 1 |
-| `getconsole` | The same capture as a stream, `since` a cursor | CONSTRAINTS item 1 |
 | `getbans` | The bans in force, from whichever table decides them (Shine's under its ban plugin) | [CONSTRAINTS.md](CONSTRAINTS.md#shine) |
 | `getrecentplayers` | Everyone seen in the last 24 hours, up to 100 | REQUIREMENTS item 6 |
 | `getmapvote` | What Shine's mapvote will do with the cycle | CONSTRAINTS item 13 |
-| `getperf` | `perfmon`'s data in 10 s windows, and the engine's log lines | [below](#getperf) |
+| `getperf` | `perfmon`'s data in 10 s windows, tickstat windows and the engine's log lines | [below](#getperf) |
 | `getlog` | The server's `log-Server.txt` by byte offset | [below](#getlog) |
-| `getwhitelist` | The ranked-mod whitelist, read from Steam | CONSTRAINTS item 17 |
 
 Changed stock request types: `getchatlist` takes `since` (item 3),
 `getmods` reports completion (item 2), `installmod` answers (item 2),
 `getmapcycle` reads the file and `setmapcycle` validates and answers
 (items 12, 13), `getinstalledmodslist` marks each mod `active` when
-mounted now (REQUIREMENTS item 3), and a request with no parameters gets
-a page leading to the panel (item 6).
+mounted now (REQUIREMENTS item 3) and `whitelisted` (item 17), as `getmods`
+marks each result, and a request with no parameters is answered by path
+and `Accept` (item 6).
 
 State blob additions: `mod_version`, `max_players`, `map_loaded_at`,
 `ranking_active`, `shine` when Shine is loaded, and real booleans
 (item 4). Player rows gain Hive `skill` with its offsets and `skill_tier`
-(item 16), `gagged` under Shine's basecommands, and on the 09-26+ engine
-Family Sharing (`familyshared`, `owner_steamid`) and rejected-move
-counts. Each is absent when the server cannot supply it; meanings are in
+(item 16), `gagged` under Shine's basecommands, Family Sharing
+(`familyshared`, `owner_steamid`) and rejected-move counts. Skill and
+`gagged` are absent when the server cannot supply them; meanings are in
 openapi.yaml's `Player` schema.
+
+The mod needs the 10-12 beta engine or later: it calls
+`Shared.CaptureConsoleCommand`, `Shared.ReadLog`, `Shared.JsonEncode`,
+`Server.GetTickStat` and `Server.GetIsModWhitelisted`, and reads
+`WebRequest`'s second argument (CONSTRAINTS item 18).
 
 ## Shape
 
@@ -76,12 +80,15 @@ included, and so does `/`:
   boot log prints `Web server running at <host>:<port>` with no path, so
   the obvious URL returns player data.
 
-With the mod, a request with no parameters gets a page whose meta refresh
-leads to `/index.html` (CONSTRAINTS item 6):
+With the mod, a request with no parameters is answered by its path and
+`Accept` (CONSTRAINTS item 6). The page's meta refresh leads to
+`/index.html`:
 
 | Request | With the mod |
 | --- | --- |
-| `/`, `/missing.png`, `/index.htm`, `/?`, `/?foo`, `POST /` with an empty body | `text/html`, the page |
+| `/`, `/?`, `/?foo`, `POST /` with an empty body, from a browser (`Accept` names `text/html`) | `text/html`, the page |
+| The same from a script (`curl`, `fetch()`, an auto-shutdown check) | `application/json`, the state, as stock |
+| `/missing.png`, `/index.htm`, any other path | `text/html`, a not-found page |
 | `/?request=json`, `/?foo=1`, `/?foo=`, `/?request=` | `application/json`, the state |
 
 A key without `=` never reaches Lua; one with `=` does, even empty.
@@ -129,8 +136,11 @@ close`.
   Lua: `POST /?request=getbanlist` with an empty body falls through to the
   state blob. So a `POST` carries `request` and every parameter in the
   form body, as jQuery already does for the 2012 panel.
-- **Lua sees parameters and nothing else** (09-26): the hook gets one
-  table, with no headers, path or method.
+- **Lua sees parameters, and since 10-12 the request** (measured
+  2026-10-12): the hook's second argument is `{path, method, headers}`,
+  header names in lower case, never `authorization` or `cookie`. Before
+  10-12 the hook got the parameters alone. Lua still cannot set a status
+  or a header.
 
 The panel sets reserved slots through `sv_reserved_slots`,
 `sv_add_reserved_slot` and `sv_remove_reserved_slot` on every server:
@@ -233,9 +243,9 @@ item 2.
   (REQUIREMENTS item 3).
 - **A mod that is not whitelisted unranks the server** (`Ranking disabled:
   server has non-whitelisted mods mounted`), and nothing in the stock API
-  says so. The mod's `getwhitelist` lets the panel mark each mod, installed
-  or found on the Workshop tab; the hotfix mods count as whitelisted
-  (CONSTRAINTS item 17).
+  says so. With the mod, `getinstalledmodslist` and `getmods` mark each mod
+  `whitelisted`, from `Server.GetIsModWhitelisted`, the list the engine
+  read at boot; the hotfix mods read true (CONSTRAINTS item 17).
 
 ## Authentication
 
@@ -285,30 +295,32 @@ window, where `perfmon` prints a per-second rate with `%d`, so its `iFail
 0` means under one a second. `score` and `quality` are 0, and meaningless,
 with nobody on. Measurements: REQUIREMENTS item 10.
 
-`engine` holds lines the engine writes only to `log-Server.txt`, found by
-scanning the log every `scan_s` (2) seconds. The lines carry no timestamp,
-so each record's `time` is the scan that found it; a map load starts
-scanning from the end of the file. One id sequence covers the three
-lists:
+`engine` holds the engine's own reports. Tickstat windows come from
+`Server.GetTickStat()`, read every second while `tickstat N` is on, each
+`time` the moment its window closed. The rest are lines the engine writes
+only to `log-Server.txt`, found by scanning the log every `scan_s` (2)
+seconds; they carry no timestamp, so each record's `time` is the scan that
+found it, and a map load starts scanning from the end of the file. One id
+sequence covers the three lists:
 
 | Field | What it is |
 | --- | --- |
-| `source` | `log`, or `none` with `error` (and `stale`, as for `getlog`) |
-| `tickstats[]` | One `TICKSTAT` line each (`tickstat N` must be on): `win_s`, `hz`/`target`, tick spacing `int_p50_ms`..`int_max_ms`, `stretch_pct`, `busy_pct`, `humans`, `bots`, `snaps_per_s_human`, `moves_per_s_human`, `snap_p50_bytes`/`snap_p99_bytes`/`snap_max_bytes`, `choked_pct`, `rate_stepped`, `creations_deferred`, move costs, the rest of the line; `unparsed` counts unknown segments |
+| `source` | `log` |
+| `tickstats[]` | One tickstat window each (`tickstat N` must be on), under the `TICKSTAT|` line's names: `win_s`, `hz`/`target`, tick spacing `int_p50_ms`..`int_max_ms`, `stretch_pct`, `busy_pct`, `humans`, `bots`, `snaps_per_s_human`, `moves_per_s_human`, `snap_p50_bytes`/`snap_p99_bytes`/`snap_max_bytes`, `choked_pct`, `rate_stepped`, `creations_deferred`, move costs and the rest, to three decimals; `unparsed` counts fields the mod does not know |
 | `perfmon[]` | The `perfmon:` block, printed only when `perfmon` is typed and covering the last second |
 | `events[]` | `kind: "rate"`, a player's snapshot rate stepped (`client` is a slot number); `kind: "bwlimit_low"`, the engine's warning that `bwlimit` is too low, with the value it `suggested` |
 | `tickstat_said` | The last `tickstat: on` or `off` printed |
-| `tickstat_last_at` | When the newest `TICKSTAT` line was found |
+| `tickstat_last_at` | When the newest tickstat window closed |
 
 Lines are matched anchored at both ends, so a chat line cannot pass for an
 engine line.
 
 ## `getlog`
 
-`log-Server.txt` by byte offset. It holds what never passes through Lua,
-so never reaches `getconsole` (connects and auth, engine errors, `Script
-tracing`, the boot, Shine's chat and command lines), and it survives a map
-change. It needs the log in the config directory (CONSTRAINTS item 15).
+`log-Server.txt` by byte offset, through `Shared.ReadLog`, wherever
+`-logdir` puts it (CONSTRAINTS item 15). It holds what never passes through
+Lua (connects and auth, engine errors, `Script tracing`, the boot, Shine's
+chat and command lines), and it survives a map change.
 
 | Ask | Get |
 | --- | --- |
@@ -326,10 +338,6 @@ escaped. Offsets count bytes.
 restart renames the file to `log-Server.old.txt` and starts another, so a
 `file` that no longer matches, or a cursor past the end, gets a fresh tail
 with `reset: "new_file"` or `"truncated"`.
-
-When the file cannot be read the reply is `{"source": "none", "path",
-"error"}`: `config://log-Server.txt: No such file or directory` when the
-log is elsewhere, or `stale: true` for a copy the server is not writing.
 
 ## Privacy
 

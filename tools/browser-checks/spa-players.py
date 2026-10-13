@@ -10,13 +10,15 @@ looks like a failure rather than like a design choice:
   * a command is reported as sent and unverified, never as succeeded
   * sort order and a half-typed filter survive a poll
   * nothing is fetched from anywhere but the game server (defect 13)
-  * with the mod, a bare / is a page leading to the panel, not the state
-    blob with every player's IP (defect 12); on stock it still is the blob
+  * with the mod, a browser at a bare / gets a page leading to the panel, not
+    the state blob with every player's IP (defect 12), while a script there
+    still gets the blob, and any other path a not-found page; on stock /
+    is the blob for everyone
   * the 2012 panel's round buttons, with commands that exist (its Reset
     Round sent sv_resetround: defect 17); Force even teams is disabled
     mid-round and says why
-  * the 09-26+ engine's Family Sharing and rejected moves show only when
-    the server reports them: a Shared column with the owner's id masked, and a
+  * Family Sharing and rejected moves show only when the server reports
+    them (the mod always does): a Shared column with the owner's id masked, and a
     Rejected column; the mod's Hive skill column (P1); and every human row
     links to ns2panel.com (P3) and to the player's Steam profile
   * one table per team, in the scoreboard's order, under the game's logo
@@ -37,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
 MOCK = os.environ.get("MOCK_URL", "http://127.0.0.1:8091")
-# Shine with basecommands, for Mute, and the 09-26+ engine's per-player
+# Shine with basecommands, for Mute, and a mod server with the per-player
 # fields. Both driven in the stock run only.
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
 BETA = os.environ.get("BETA_URL", "http://127.0.0.1:8102")
@@ -359,15 +361,19 @@ async def main():
                 check("and the gag is gone",
                       "MUTED" not in str(await c.eval(f"{human}.textContent")))
 
-            print("\n== the 09-26+ engine's per-player fields")
+            print("\n== the per-player Family Sharing and rejected-move fields")
             await c.send("Page.navigate", url=BASE)
             await asyncio.sleep(3.5)
-            check("no Rejected column from a server that does not count",
-                  not await c.eval("[...document.querySelectorAll('thead th')]"
-                                   ".some(t=>t.textContent==='Rejected')"))
-            check("and no Shared column",
-                  not await c.eval("[...document.querySelectorAll('thead th')]"
-                                   ".some(t=>t.textContent==='Shared')"))
+            has_rejected = await c.eval("[...document.querySelectorAll('thead th')]"
+                                        ".some(t=>t.textContent==='Rejected')")
+            has_shared = await c.eval("[...document.querySelectorAll('thead th')]"
+                                      ".some(t=>t.textContent==='Shared')")
+            if EXPECT_MOD:
+                check("the mod always counts rejected moves: a Rejected column", has_rejected)
+                check("and a Shared column", has_shared)
+            else:
+                check("no Rejected column from a server that does not count", not has_rejected)
+                check("and no Shared column", not has_shared)
             has_skill = await c.eval("[...document.querySelectorAll('thead th')]"
                                      ".some(t=>t.textContent.startsWith('Skill'))")
             if EXPECT_MOD:
@@ -459,9 +465,18 @@ async def main():
             check("?request=json is still the server state",
                   '"player_list"' in state_body, f"{len(state_body)} B")
             if EXPECT_MOD:
-                check("/ is a page, not the state blob",
+                check("/ for a script is the state blob, as vanilla served it",
+                      ctype.startswith("application/json") and '"player_list"' in body, ctype)
+                req = urllib.request.Request(f"{MOCK}/", headers={"Accept": "text/html"})
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
+                check("/ for a browser is a page, not the state blob",
                       ctype.startswith("text/html") and "player_list" not in body
                       and "ipaddress" not in body, ctype)
+                with urllib.request.urlopen(f"{MOCK}/nothing-here", timeout=5) as r:
+                    ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
+                check("any other path is a not-found page",
+                      ctype.startswith("text/html") and "Nothing here" in body, ctype)
                 await c.send("Page.navigate", url=MOCK + "/")
                 await asyncio.sleep(3)
                 landed = str(await c.eval("location.pathname"))

@@ -13,9 +13,9 @@
 //     whole window in every reply. It is replaced on each poll, never appended
 //     to -- appending is the 2012 panel's defect (CURRENT-UI defect 2).
 //
-// The mod's reply also carries `engine`: what the engine prints only to its
-// log (tickstat lines, rate steps, the perfmon: block), read with a cursor of
-// its own and kept in the same segments, so a map change restarts both.
+// The mod's reply also carries `engine`: tickstat windows, and what the engine
+// prints only to its log (rate steps, the perfmon: block), read with a cursor
+// of its own and kept in the same segments, so a map change restarts both.
 //
 // It polls only while the tab is open, at the server's own window length (a
 // faster poll returns nothing new), and not while the page is hidden. The
@@ -214,7 +214,7 @@ export function refreshPerf(): Promise<void> {
 }
 
 export interface TickstatOutcome {
-  /** "confirmed": the server's log said so; "unconfirmed": sent, not yet seen. */
+  /** "confirmed": the server said so; "unconfirmed": sent, but it did not say so. */
   kind: "confirmed" | "unconfirmed" | "error";
   note: string;
 }
@@ -223,36 +223,30 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Turn the engine's tickstat on at `seconds` (0 turns it off). The command
- * prints only to the server's log, never through Lua, so runcommand comes
- * back with no lines whether it worked or not. What proves it is the
- * `tickstat: on|off` the engine then logs, which the mod's scan of the log
- * picks up within `scan_s`: so read until that reply changes, a few scans'
- * worth, and say which it was.
+ * answers `tickstat: on|off`, which runcommand captures: that is the proof.
+ * The mod's scan of the log picks the same line up within `scan_s`, so the
+ * switch reads one more report after that, for everyone's status to agree.
  */
 export async function setTickstat(seconds: number): Promise<TickstatOutcome> {
   const command = `tickstat ${Math.max(0, Math.round(seconds))}`;
   const want = seconds > 0 ? "on" : "off";
-  const before = state.engine?.tickstatSaid ?? null;
+  let said: boolean;
   try {
-    await runCommand(command);
+    const result = await runCommand(command);
+    said = result.lines.some((l) => l.text === `tickstat: ${want}`);
   } catch (e) {
     const note = `could not be sent: ${(e as Error).message}`;
     record(command, note, "error");
     return { kind: "error", note };
   }
-  const scan = (state.engine?.scanSeconds ?? 2) * 1000;
-  for (let i = 0; i < 3; i++) {
-    await sleep(scan + 500);
-    await poll();
-    const said = state.engine?.tickstatSaid ?? null;
-    if (said && said.text === want
-        && (before === null || said.at !== before.at || said.text !== before.text)) {
-      const note = `the server's log says tickstat is ${want}.`;
-      record(command, note, "sent");
-      return { kind: "confirmed", note };
-    }
+  await sleep(((state.engine?.scanSeconds ?? 2) + 0.5) * 1000);
+  await poll();
+  if (said) {
+    const note = `the server says tickstat is ${want}.`;
+    record(command, note, "sent");
+    return { kind: "confirmed", note };
   }
-  const note = `sent, but the server's log has not said tickstat is ${want} yet.`;
+  const note = `sent, but the server did not say tickstat is ${want}.`;
   record(command, note, "sent");
   return { kind: "unconfirmed", note };
 }

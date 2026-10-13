@@ -8,11 +8,11 @@ here="$(cd "${0%/*}" && pwd)"
 src="$here/../../lua/ServerWebInterface.lua"
 out="$here/engine0926-probe.lua"
 
-grep -q '^local function OnWebRequest(actions)$' "$src"
+grep -q '^local function OnWebRequest(actions, request)$' "$src"
 grep -q '^Event.Hook("WebRequest", OnWebRequest)$' "$src"
 
 awk -v branch="$here/engine0926-branch.lua" '
-  /^local function OnWebRequest\(actions\)$/ {
+  /^local function OnWebRequest\(actions, request\)$/ {
     print; while ((getline line < branch) > 0) print line; next
   }
   /^Event.Hook\("WebRequest", OnWebRequest\)$/ {

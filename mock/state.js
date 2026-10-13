@@ -131,54 +131,16 @@ export function createState(fixturesDir, opts = {}) {
 
   // ------------------------------------------------------------- whitelist
 
-  // request=getwhitelist (--mod): the ranked-mod whitelist as the mod's
-  // GetWhitelist() serves it (docs/CONSTRAINTS.md item 17). The list is the rig's read from
-  // Steam. With no copy, the first request starts a read and answers
-  // `fetching`; a read lands after --whitelist-delay, or fails with
-  // --whitelist=fail and is not tried again for 5 minutes. A copy older than
-  // an hour is read again, and served meanwhile.
-  const wlFixture = fx("getwhitelist-rig");
-  const wl = {
-    copy: opts.whitelist === "cached"
-      ? { readAt: Math.floor(bootedAt / 1000) - 600,
-          whitelist: wlFixture.whitelist, hotfix: wlFixture.hotfix }
-      : null,
-    fetchingSince: null,
-    error: null,
-    errorAt: null,
-  };
-  const kWhitelistMaxAgeS = 60 * 60;
-  const kWhitelistRetryS = 5 * 60;
-  const getWhitelist = () => {
-    const now = Math.floor(Date.now() / 1000);
-    const stale = !wl.copy || now - wl.copy.readAt >= kWhitelistMaxAgeS;
-    const resting = wl.errorAt !== null && now - wl.errorAt < kWhitelistRetryS;
-    if (stale && wl.fetchingSince === null && !resting) {
-      wl.fetchingSince = now;
-      setTimeout(() => {
-        wl.fetchingSince = null;
-        if (opts.whitelist === "fail") {
-          wl.error = "Steam could not be reached: Could not resolve host: steamcommunity.com";
-          wl.errorAt = Math.floor(Date.now() / 1000);
-          log(`improved-webadmin: whitelist not read: ${wl.error}`);
-          return;
-        }
-        wl.error = null;
-        wl.errorAt = null;
-        wl.copy = { readAt: Math.floor(Date.now() / 1000),
-                    whitelist: wlFixture.whitelist, hotfix: wlFixture.hotfix };
-      }, opts.whitelistDelayMs ?? 1500);
-    }
-    return {
-      now,
-      hotfix_list_id: wlFixture.hotfix_list_id,
-      branch: wlFixture.branch,
-      whitelist_id: wlFixture.whitelist_id,
-      fetching: wl.fetchingSince !== null,
-      ...(wl.error ? { error: wl.error } : {}),
-      ...(wl.copy ? { read_at: wl.copy.readAt, whitelist: wl.copy.whitelist,
-                      hotfix: wl.copy.hotfix } : {}),
-    };
+  // Server.GetIsModWhitelisted (--mod): the list the engine read at boot, by
+  // hex id. The list is the rig's read of Steam's on 2026-10-08
+  // (whitelist-rig.json: the whitelist and the hotfix list, which the engine
+  // also counts as whitelisted -- NSL Badges and UWE Hotfix 344 read true on
+  // the rig, 10-12).
+  const wlFixture = JSON.parse(readFileSync(new URL("./whitelist-rig.json", import.meta.url), "utf8"));
+  const whitelistIds = new Set([...wlFixture.whitelist, ...wlFixture.hotfix]);
+  const isWhitelisted = (hexId) => {
+    if (!/^[0-9a-f]{1,16}$/i.test(String(hexId))) return false;
+    return whitelistIds.has(BigInt(`0x${hexId}`).toString());
   };
 
   // Server.GetMaxPlayers(). The reserved slot amount cannot exceed it.
@@ -402,9 +364,9 @@ export function createState(fixturesDir, opts = {}) {
 
   const wireBool = (v) => (opts.mod ? v === "true" : v);
 
-  // --beta-players: what the 09-26+ engine adds per player, made up. The
-  // first human plays a Family Shared copy and has had moves rejected; bots
-  // read as not shared, as the engine's CHANGELOG says they always do.
+  // What the engine adds per player (--mod), made up. The first human plays a
+  // Family Shared copy and has had moves rejected; bots read as not shared,
+  // as the engine's CHANGELOG says they always do.
   function betaPlayer(p) {
     const firstHuman = s.players.find(isHuman);
     if (firstHuman && p.steamid === firstHuman.steamid) {
@@ -470,7 +432,7 @@ export function createState(fixturesDir, opts = {}) {
         isbot: wireBool(p.isbot),
         // The mod reads Shine's gags under basecommands, and only then.
         ...(opts.mod && shineHas("basecommands") ? { gagged: shineGagged.has(p.steamid) } : {}),
-        ...(opts.mod && opts.betaPlayers ? betaPlayer(p) : {}),
+        ...(opts.mod ? betaPlayer(p) : {}),
         ...(opts.mod ? skillOf(p) : {}),
       })),
       // Absent on a stock server, which is how the panel knows which it is
@@ -511,26 +473,23 @@ export function createState(fixturesDir, opts = {}) {
       s.chat.shift();
       s.chatDropped++;
     }
-    // Chat is written to the server log through Shared.Message, so with the
-    // mod's wrappers it lands in the console buffer as well. Measured on the
-    // rig: `Chat All - Admin: <text>`.
+    // Chat is written to the server log through Shared.Message. Measured on
+    // the rig: `Chat All - Admin: <text>`.
     if (opts.mod && tee) {
-      teeConsole("server", `Chat ${teamOnly ? "Team" : "All"} - ${player}: ${message}`);
+      logLine(`Chat ${teamOnly ? "Team" : "All"} - ${player}: ${message}`);
     }
   }
 
   // -------------------------------------------------------------- server log
 
   // log-Server.txt, for request=getlog (--mod). The real file is written by
-  // the engine and read by the mod's Lua through config://, which works when
-  // -logdir is the config directory (docs/REQUIREMENTS.md item 7); --log=off
-  // is a server where it is not. Here it is a Buffer: a header, a boot and
+  // the engine and read by the mod's Lua through Shared.ReadLog, wherever
+  // -logdir puts it (docs/REQUIREMENTS.md item 7). Here it is a Buffer: a header, a boot and
   // rounds of made-up history from log-seed.txt (fake names, 0.0.0.0), then
   // every line the console prints, a map change's loading lines and the
   // engine's Script tracing pair every 30 s. Offsets are bytes, as on the
   // server: a name with an accent is longer in bytes than in characters.
   // clearconsole does nothing to it (measured: a client command).
-  const kLogPath = "config://log-Server.txt";
   const kLogTailBytes = 64 * 1024;
   const kLogMaxBytes = 64 * 1024;   // the Lua's, since 2026-10-08
   const kLogRoundSeconds = 300;
@@ -609,27 +568,7 @@ export function createState(fixturesDir, opts = {}) {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
-  // The mod checks once per map load that the file is the one the engine is
-  // writing, by printing a line and looking for it; a copy an earlier run left
-  // in the config directory never grows. `logStale` is that case.
-  let logChecked = false;
-  let logStale = false;
   function getLog(actions) {
-    if (opts.logOff) {
-      return { source: "none", path: kLogPath,
-               error: `${kLogPath}: No such file or directory` };
-    }
-    if (!logChecked) {
-      logChecked = true;
-      if (!logStale) {
-        logLine(`improved-webadmin: checking that ${kLogPath} is this server's log `
-          + `(${Date.now() % 1000000})`);
-      }
-    }
-    if (logStale) {
-      return { source: "none", path: kLogPath, stale: true,
-               error: "the file does not grow: a line this server printed did not reach it" };
-    }
     const size = logFile.length;
     const fileId = logFileId();
     const since = luaNumber(actions.since);
@@ -671,7 +610,7 @@ export function createState(fixturesDir, opts = {}) {
       [lines, to] = logLinesOf(text, from);
     }
     return {
-      source: "file", path: kLogPath, file_id: fileId, size, from, to, lines,
+      source: "file", file_id: fileId, size, from, to, lines,
       more, at_start: from === 0, ...(reset ? { reset } : {}),
       tail_bytes: kLogTailBytes, max_bytes: kLogMaxBytes,
     };
@@ -679,13 +618,14 @@ export function createState(fixturesDir, opts = {}) {
 
   // ----------------------------------------------------- engine log lines
 
-  // getperf's `engine` (--mod): what the 09-27 engine prints only to the log,
-  // as the mod's scan of it finds it (docs/REQUIREMENTS.md item 10). The
-  // engine side is emulated too: `tickstat N` writes a TICKSTAT line every N s
-  // until `tickstat 0` and survives a map change; a bare `tickstat` reports
-  // on or off; `perfmon` prints its block; a bwlimit too small for a full
-  // game prints the engine's warning. None of it passes through Lua, so
-  // runcommand gets no lines for these commands, as on the real server.
+  // getperf's `engine` (--mod): tickstat windows, as Server.GetTickStat()
+  // hands them to the mod, and what the engine prints only to the log, as the
+  // mod's scan of it finds it (docs/REQUIREMENTS.md item 10). The engine side
+  // is emulated too: `tickstat N` closes a window (and logs its TICKSTAT
+  // line) every N s until `tickstat 0` and survives a map change; a bare
+  // `tickstat` reports on or off; `perfmon` prints its block; a bwlimit too
+  // small for a full game prints the engine's warning. runcommand captures
+  // what these commands print, as Shared.CaptureConsoleCommand does.
   // --tickstat <s> boots with it on and half an hour of it behind.
   // /__mock/tickstat forces the next line's values or a rate step.
   const kEngineScanS = 2;
@@ -793,16 +733,19 @@ export function createState(fixturesDir, opts = {}) {
       delivery_pct: 0, overload_pct: 0, updates: people ? perfConfig.sendrate : 0,
       warn: 0, fail: 0,
     };
-    logLine(`perfmon: tick jitter avg ${f2(b.jitter_avg_ms)}ms max ${f2(b.jitter_max_ms)}ms (n=${b.jitter_n})`);
-    logLine(`perfmon: snapshot write avg ${b.snapshot_write_avg_ms.toFixed(3)}ms max ${b.snapshot_write_max_ms.toFixed(3)}ms (n=${b.snapshot_write_n})`);
-    logLine(`perfmon: entities skipped ${b.entities_skipped} / ${b.entities_total} (${b.entities_skipped_pct.toFixed(1)}%)`);
-    logLine(`perfmon: moves rejected: time credit 0, other 0`);
-    logLine(`perfmon: moves rewound with missing snapshots 0 (since map load)`);
-    logLine(`perfmon: score ${b.score} = idle ${b.idle_pct.toFixed(1)}% - delivery 0.0% - overload 0.0% `
-      + `(updates ${b.updates}, warn 0, fail 0)`);
     engine.perfmon.push(engineRecord(b));
+    return [
+      `perfmon: tick jitter avg ${f2(b.jitter_avg_ms)}ms max ${f2(b.jitter_max_ms)}ms (n=${b.jitter_n})`,
+      `perfmon: snapshot write avg ${b.snapshot_write_avg_ms.toFixed(3)}ms max ${b.snapshot_write_max_ms.toFixed(3)}ms (n=${b.snapshot_write_n})`,
+      `perfmon: entities skipped ${b.entities_skipped} / ${b.entities_total} (${b.entities_skipped_pct.toFixed(1)}%)`,
+      `perfmon: moves rejected: time credit 0, other 0`,
+      `perfmon: moves rewound with missing snapshots 0 (since map load)`,
+      `perfmon: score ${b.score} = idle ${b.idle_pct.toFixed(1)}% - delivery 0.0% - overload 0.0% `
+        + `(updates ${b.updates}, warn 0, fail 0)`,
+    ];
   }
-  // The engine's side of the three commands; "" so nothing reaches the tee.
+  // The engine's side of the three commands: what each prints, which goes to
+  // the log and to a capture alike. null for any other command.
   function engineCommand(cmd, args) {
     if (cmd === "tickstat") {
       if (args[0] !== undefined) {
@@ -810,48 +753,42 @@ export function createState(fixturesDir, opts = {}) {
         setTickstat(Number.isFinite(every) && every > 0 ? every : 0);
       }
       const said = tickstatEvery > 0 ? "on" : "off";
-      logLine(`tickstat: ${said}`);
       engine.said = { text: said, time: unixNow() };
-      return "";
+      return `tickstat: ${said}`;
     }
     if (cmd === "perfmon") {
-      // The engine's block goes to the log only; the game's Lua then says
-      // where the level went, and that line does pass through Lua.
-      perfmonBlock();
+      // The engine's block, then the game's Lua says where the level went.
+      const block = perfmonBlock();
       perfmonLevel = (perfmonLevel + 1) % 4;
       const said = ["false", "true", "true (detailed)", "true (detailed)[spam]"][perfmonLevel];
-      return `Server  : ${((Date.now() - bootedAt) / 1000).toFixed(6)} : monitoringActive ${said}`;
+      return [...block,
+        `Server  : ${((Date.now() - bootedAt) / 1000).toFixed(6)} : monitoringActive ${said}`].join("\n");
     }
-    if (cmd === "bwlimit" && args[0] !== undefined) {
+    if (cmd === "bwlimit") {
+      if (args[0] === undefined) {
+        return `bandwidth limit: ${perfConfig.bw_limit ?? 131072} bytes/sec per player`;
+      }
       const bw = Math.round(Number(args[0]));
       if (!Number.isFinite(bw) || bw <= 0) return "";
       perfConfig.bw_limit = bw;
       const per = Math.floor(bw / perfConfig.sendrate);
+      const out = [];
       if (per < 2048) {
         const suggested = 2048 * perfConfig.sendrate;
-        logLine(`bwlimit ${bw} bytes/sec at sendrate ${perfConfig.sendrate} leaves ${per} bytes per `
+        out.push(`bwlimit ${bw} bytes/sec at sendrate ${perfConfig.sendrate} leaves ${per} bytes per `
           + `snapshot, below the 2048 a full game needs: snapshots will choke and arrive late. `
           + `bwlimit ${suggested} or more avoids it.`);
         engine.events.push(engineRecord({ kind: "bwlimit_low", bwlimit: bw,
           sendrate: perfConfig.sendrate, per_snapshot: per, needed: 2048, suggested }));
       }
-      logLine(`bandwidth limit: ${bw} bytes/sec per player`);
-      return "";
+      out.push(`bandwidth limit: ${bw} bytes/sec per player`);
+      return out.join("\n");
     }
     return null;
   }
   function engineReport(esince) {
-    const base = { path: kLogPath, scan_s: kEngineScanS, last_id: engine.nextId - 1, more: false,
+    const base = { scan_s: kEngineScanS, last_id: engine.nextId - 1, more: false,
                    now: unixNow() };
-    if (opts.logOff) {
-      return { ...base, source: "none", error: `${kLogPath}: No such file or directory`,
-               tickstats: [], perfmon: [], events: [] };
-    }
-    if (logStale) {
-      return { ...base, source: "none", stale: true,
-               error: "the file does not grow: a line this server printed did not reach it",
-               tickstats: [], perfmon: [], events: [] };
-    }
     // One id sequence across the three lists: the page ends at the
     // kPerfReplyMax-th lowest id held past the cursor, whichever list it is in.
     const held = [...engine.tickstats, ...engine.perfmon, ...engine.events]
@@ -878,10 +815,9 @@ export function createState(fixturesDir, opts = {}) {
 
   // ----------------------------------------------------------- console tee
 
-  // The mod's Lua wraps ServerAdminPrint and Shared.Message and tees every
-  // line into a 500-entry ring buffer, so a command's own output comes back in
-  // its response and a console tab can stream everything. Only present with
-  // --mod; a stock server has none of this.
+  // The mod's runcommand runs a command through Shared.CaptureConsoleCommand,
+  // which returns what it printed; the lines reach the log as well. Only
+  // present with --mod; a stock server has none of this.
   //
   // What each command really prints, and through which path, is not guesswork:
   //   * "No matching player"                ServerAdminCommands.lua:172, via ServerAdminPrint
@@ -891,11 +827,6 @@ export function createState(fixturesDir, opts = {}) {
   // and commands that print nothing at all print nothing here either --
   // sv_cheats and sv_changemap emit only their audit line, and an unknown
   // command emits not even that. All three measured 2026-09-05.
-
-  const kConsoleBufferSize = 500;
-  let consoleBuffer = [];
-  let nextConsoleId = 1;
-  let droppedConsoleLines = 0;
 
   // Commands the game creates with CreateServerAdminCommand. Only these emit
   // the audit line that proves a command was dispatched.
@@ -931,48 +862,23 @@ export function createState(fixturesDir, opts = {}) {
   ];
 
   // Strings consoleCommand returns for the mock's own log that the real server
-  // never prints. They must not reach the console buffer or the mock would be
-  // more informative than the thing it imitates.
+  // never prints. They must not reach a capture or the mock would be more
+  // informative than the thing it imitates.
   // Checked one by one against ServerAdminCommands.lua: a successful sv_kick
   // prints nothing (only the failure branch calls ServerAdminPrint, line 172),
   // and neither sv_slay nor sv_switchteam reports success at all. A
   // successful sv_unban prints nothing either -- measured on the rig, where a
   // working unban returned an empty line list. sv_ban *does* report, and is
   // not in this list. The mock keeps these strings for its own log, but they
-  // must never reach the console buffer.
+  // must never reach a capture.
   const kMockOnlyOutput = [
     /^Changing map to /, /^Cheats /, /^Password set$/, /^Unknown command: /,
     /^No map specified$/,
     /^Kicked /, /^Slayed /, /^Switched /, /^Unbanned /,
   ];
 
-  // Lines the real server routes through ServerAdminPrint rather than
-  // Shared.Message. Everything else that does get printed goes through
-  // Shared.Message, which is what "server" means here.
-  const kAdminPrintOutput = [
-    /^No matching player$/, /^No matching Steam Id in ban list: /,
-    / has been banned$/,
-    /^Added reserved slot for /, /^Removed reserved slot for /,
-    /^Invalid arguments?\. /,
-  ];
-
-  function teeConsole(src, text) {
-    // Everything the wrappers see went to Shared.Message, i.e. to the log.
-    logLine(text);
-    if (consoleBuffer.length === kConsoleBufferSize) {
-      consoleBuffer.shift();
-      droppedConsoleLines += 1;
-    }
-    consoleBuffer.push({
-      id: nextConsoleId++,
-      time: Math.floor(Date.now() / 1000),
-      src,
-      text,
-    });
-  }
-
   // Run one console line the way Shared.ConsoleCommand does, and return what it
-  // printed, in order, as { src, text } -- without teeing it anywhere. Both the
+  // printed, in order, as { src, text } -- without logging it. Both the
   // mod's runcommand and the legacy rcon path go through here, so Shine's
   // effects land whichever path sent the command.
   //
@@ -997,7 +903,7 @@ export function createState(fixturesDir, opts = {}) {
     if (cmd === "sv_help") {
       const wanted = args[0];
       for (const [name, help] of kHelp) {
-        if (!wanted || wanted === name) out.push({ src: "admin", text: `${name}: ${help}` });
+        if (!wanted || wanted === name) out.push({ src: "server", text: `${name}: ${help}` });
       }
       return { dispatched: false, lines: out };
     }
@@ -1020,24 +926,22 @@ export function createState(fixturesDir, opts = {}) {
     // One command can print several lines (sv_reset prints three).
     for (const text of output ? output.split("\n") : []) {
       if (kMockOnlyOutput.some((re) => re.test(text))) continue;
-      const src = kAdminPrintOutput.some((re) => re.test(text))
-        ? "admin" : "server";
-      out.push({ src, text });
+      out.push({ src: "server", text });
     }
     return { dispatched, lines: out, mockLog: output };
   }
 
   // Run a command the way request=runcommand does, capturing what it printed.
+  // Everything printed also lands in the log.
   function runCommandCapturing(line) {
-    const firstId = nextConsoleId;
     const { dispatched, lines } = execute(line);
-    for (const l of lines) teeConsole(l.src, l.text);
+    const time = Math.floor(Date.now() / 1000);
+    for (const l of lines) logLine(l.text);
     return {
       cmd: line,
       dispatched,
       elapsed: 0,
-      lines: consoleBuffer.filter((l) => l.id >= firstId),
-      last_id: nextConsoleId - 1,
+      lines: lines.map((l, i) => ({ id: i + 1, time, src: l.src, text: l.text })),
     };
   }
 
@@ -1311,7 +1215,6 @@ export function createState(fixturesDir, opts = {}) {
         const map = args[0];
         if (!map) return "No map specified";
         s.map = map;
-        logChecked = false;   // a new Lua VM checks again
         logLine(`${engineStamp(Date.now())} Worker 00 : Loading 'maps/${map}.level'`);
         logLine(`Loading pathing mesh for level maps/${map}.level`);
         logLine(`Finished loading 'maps/${map}.level'`);
@@ -1392,18 +1295,25 @@ export function createState(fixturesDir, opts = {}) {
 
   // ----------------------------------------------------------- request types
 
-  // Mirrors OnWebRequest(actions). Returns [contentType, body] the way the Lua
-  // does, or null for the write operations, which the engine turns into an
-  // empty 200 with `Content-Type: text/html` -- not JSON. Verified against a
-  // live server; see fixtures/live/setmapcycle.headers.
-  function onWebRequest(actions) {
+  // Mirrors OnWebRequest(actions, request). Returns [contentType, body] the
+  // way the Lua does, or null for the write operations, which the engine turns
+  // into an empty 200 with `Content-Type: text/html` -- not JSON. Verified
+  // against a live server; see fixtures/live/setmapcycle.headers.
+  function onWebRequest(actions, request = { path: "/", method: "GET", headers: {} }) {
     const json = (v) => ["application/json", JSON.stringify(v)];
 
-    // The mod answers a request with no parameters at all -- a bare `/`, a
-    // missing file, an empty POST -- with a page pointing at the panel, not
-    // the state blob (CONSTRAINTS item 6). The rig's reply, verbatim.
+    // The mod answers a request with no parameters by its path and Accept: a
+    // browser at `/` gets a page pointing at the panel, a script there the
+    // state blob, as vanilla served it; any other path a not-found page
+    // (CONSTRAINTS item 6). The rig's replies, verbatim.
     if (opts.mod && Object.keys(actions).length === 0) {
-      return ["text/html", readFileSync(join(fixturesDir, "root-mod.html"), "utf8")];
+      if (request.path !== "/") {
+        return ["text/html", readFileSync(join(fixturesDir, "notfound-mod.html"), "utf8")];
+      }
+      if (String(request.headers?.accept ?? "").includes("text/html")) {
+        return ["text/html", readFileSync(join(fixturesDir, "root-mod.html"), "utf8")];
+      }
+      return json(serverState());
     }
 
     switch (actions.request) {
@@ -1463,6 +1373,7 @@ export function createState(fixturesDir, opts = {}) {
         if (!opts.mod) return json(s.installedMods);
         return json(s.installedMods.map((m) => ({
           ...m, active: s.activeMods.includes(m.id.toLowerCase()),
+          whitelisted: isWhitelisted(m.id),
         })));
 
       case "getmaplist":
@@ -1588,8 +1499,8 @@ export function createState(fixturesDir, opts = {}) {
                 || m.description.toLowerCase().includes(needle))
               .slice(0, kWorkshopLimit);
             started.result = JSON.stringify(opts.mod
-              ? { done: true, page, items: hits, count: hits.length,
-                  capped: hits.length >= kWorkshopLimit }
+              ? { done: true, page, items: hits.map((m) => ({ ...m, whitelisted: isWhitelisted(m.id) })),
+                  count: hits.length, capped: hits.length >= kWorkshopLimit }
               : { items: hits });
             started.cachedAt = Date.now();
           }, fate === "offline" ? 0 : (opts.modSearchMs ?? 1200));
@@ -1615,11 +1526,6 @@ export function createState(fixturesDir, opts = {}) {
       case "getrecentplayers": {
         if (!opts.mod) break;
         return json(recentPlayers());
-      }
-
-      case "getwhitelist": {
-        if (!opts.mod) break;
-        return json(getWhitelist());
       }
 
       case "getmapvote": {
@@ -1658,21 +1564,10 @@ export function createState(fixturesDir, opts = {}) {
         return json(getLog(actions));
       }
 
-      case "getconsole": {
-        if (!opts.mod) break;
-        const since = Number(actions.since ?? 0) || 0;
-        return json({
-          lines: consoleBuffer.filter((l) => l.id > since),
-          last_id: nextConsoleId - 1,
-          dropped: droppedConsoleLines,
-          filtered: 0,
-          buffer_size: kConsoleBufferSize,
-        });
-      }
     }
 
-    // Anything unmatched falls through here, including a bare `/`, an unknown
-    // request type, and -- without --mod -- runcommand and getconsole. The
+    // Anything unmatched falls through here, including -- without --mod -- a
+    // bare `/`, an unknown request type and runcommand. The
     // shipped panel sends request=json, which is one of those unmatched
     // values. See API.md, "There is no directory index either".
     if (actions.command) {
@@ -1747,12 +1642,10 @@ export function createState(fixturesDir, opts = {}) {
      * The log behind the server's back: `restart` starts a new file (a new
      * header, as a restart does), `truncate` cuts it to its header, `append`
      * adds `n` numbered lines, `partial` writes text with no newline, `burst`
-     * appends that many bytes of lines at once, `stale` makes the file one
-     * the server is not writing (a copy left by an earlier run).
+     * appends that many bytes of lines at once.
      */
-    logControl({ restart, truncate, append, n = 1, partial, burst, stale } = {}) {
-      if (restart) { newLogFile(Number(restart) > 1 ? Number(restart) : 0); logChecked = false; }
-      if (stale !== undefined) { logStale = stale; logChecked = false; }
+    logControl({ restart, truncate, append, n = 1, partial, burst } = {}) {
+      if (restart) newLogFile(Number(restart) > 1 ? Number(restart) : 0);
       if (truncate) logFile = Buffer.from(logHeader(logBootAt), "utf8");
       if (append !== undefined) {
         for (let i = 1; i <= n; i++) logLine(n > 1 ? `${append} ${i}` : append);

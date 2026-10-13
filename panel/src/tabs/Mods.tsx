@@ -36,8 +36,8 @@ import {
 // Finding and downloading mods is the Workshop tab's: this tab makes no
 // workshop request at all.
 //
-// Each mod says whether it is whitelisted, from Steam's list as the server
-// last read it, or from the copy the panel ships (ui/whitelist.tsx).
+// Each mod says whether it is whitelisted: the server's verdict, or the copy
+// the panel ships (ui/whitelist.tsx).
 
 /**
  * Mounted by the engine whatever the cycle says, and before it, in this order:
@@ -182,7 +182,7 @@ function ModsView(p: ViewProps) {
       if (r) { place(r); byId.delete(id); continue; }
       // Listed twice, or engine-mounted anyway: already placed.
       if (ordered.some((o) => o.id === id)) continue;
-      place(make({ id, name: id, active: null }, true));
+      place(make({ id, name: id, active: null, whitelisted: null }, true));
     }
     const rest = [...byId.values()].sort((a, b) => rank(a) - rank(b)
       || a.mod.name.localeCompare(b.mod.name, undefined, { sensitivity: "base" }));
@@ -275,7 +275,7 @@ function ModsView(p: ViewProps) {
         <p class="muted form-hint">
           Changes require a map change. Mods are listed in loading order.
         </p>
-        <WhitelistSource list={p.whitelist} hasMod={hasMod} />
+        <WhitelistSource list={p.whitelist} />
       </div>
     </>
   );
@@ -339,7 +339,7 @@ function ModRow({ r, hasMod, locked, whitelist, onAdd, onRemove }: RowProps) {
       </td>
       <td class="status-cell">
         <span class="icon-row">
-          <WhitelistIcon list={whitelist} hexId={r.id} />
+          <WhitelistIcon list={whitelist} hexId={r.id} server={r.mod.whitelisted} />
           {active === true && <StatusIcon icon={CircleCheck} label="loaded now" tone="ok" />}
           {r.global && <StatusIcon icon={Globe} label="every map"
                                    title="The cycle loads it with every map" />}

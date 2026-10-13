@@ -27,10 +27,18 @@ no Shine, no production config, and stock `ns2/web/` and
 
 ### Engine version
 
+**The mod needs the 10-12 drop or later** (`Build: 344.4035` and up): it
+calls the functions that drop added for web admin pages. The rig has run
+the 10-12 hotfix (`124b726321`) since 2026-10-12; `overlay.sh <zip>` in the
+rig applies a drop and checks every file.
+
 The docs' measurements ran on the 09-03 engine drop and later ones (09-26
-hotfix, 09-27, 09-28), extracted over the install's `x64/`, and each names
-its drop. The `fixtures/` were captured on 09-03; a 09-26 recapture
-validated against the spec with no change in shape.
+hotfix, 09-27, 09-28, 10-12 hotfix), extracted over the install's `x64/`,
+and each names its drop. The `fixtures/` were captured on 09-03; a 09-26
+recapture validated against the spec with no change in shape. The 10-12
+changes to the mod's replies (`runcommand`, `getlog`, `getperf`'s `engine`,
+`whitelisted`) were made to the fixtures by hand, from replies measured on
+the rig, rather than recaptured.
 
 - **A Steam validate reverts the engine** to stock. Re-apply the drop
   after every validate, and check the boot log's `Build:` line before a
@@ -111,7 +119,7 @@ cp config/MapCycle.json config/BannedPlayers.json /tmp/        # back up
 cp <repo>/lua/ServerWebInterface.lua \
    mods/SparkCache/509780686/1441020960/lua/
 # add "mods": ["1e62a2ce"] to config/MapCycle.json: mods mount at map load
-# boot; for the log tail, -logdir equal to -config_path
+# boot
 ```
 
 **Restart after copying a new build of `web/`.** The engine lists a mod's
@@ -123,9 +131,8 @@ existing name is served at once.
 **Restore the rig afterwards**: `MapCycle.json` (unmounts the mod and
 restores ranking), `BannedPlayers.json`, `ReservedSlotsConfig.json` if the
 slot count changed, the item's own `ServerWebInterface.lua`, and delete
-what tests leave in `config/`: `log-Server.txt` and `dumps/` from a
-`-logdir` test, `ConsistencyConfig.json` (written on a boot with a mod
-mounted), and `improved-webadmin/`.
+what tests leave in `config/`: `ConsistencyConfig.json` (written on a boot
+with a mod mounted) and `improved-webadmin/`.
 
 **The published item.** To test the upload rather than the working tree,
 put `e3742516` in `MapCycle.json`'s `mods` instead of the Combat Fix
@@ -155,24 +162,28 @@ what the engine's hooks really do.
 
 | Probe (`tools/spikes/`) | Request | What it answers |
 | --- | --- | --- |
-| `console-output-probe.lua`, `logdir-probe.lua`, `unban-probe.lua` | various | Command capture, the log through `config://`, the unban fixes (REQUIREMENTS items 5, 7; CONSTRAINTS items 7-10) |
+| `engine1012-probe.lua` | `probe1012&what=...` | Standalone, none of the mod's wrappers: the 10-12 engine's `WebRequest` argument, `Shared.ReadLog`, `Server.GetTickStat`, `Shared.CaptureConsoleCommand`, `Shared.JsonEncode` against dkjson, `Server.GetIsModWhitelisted` (CONSTRAINTS item 18) |
+| `unban-probe.lua` | various | The unban fixes (REQUIREMENTS item 5; CONSTRAINTS items 7-10) |
 | `make-engine0926-probe.sh` | `engine0926-branch.lua` | 09-26 engine checks: hook arguments, `config://` writes (CONSTRAINTS item 6, REQUIREMENTS item 6) |
 | `make-recent-players-probe.sh` | `[recent-probe]` log lines | Connect and disconnect hooks, file load, saves (REQUIREMENTS item 6). Logged to the file because it survives a map change |
 | `make-mods-probe.sh` | `modsprobe` | Installed and active mod ids, the cycle's mods, `Server`'s mod functions (REQUIREMENTS item 3) |
 | `make-workshop-probe.sh` | `workshopprobe` | `SearchWorshop` and `InstallMod` results and timing, Steam getters (REQUIREMENTS item 4) |
 | `make-perf-probe.sh` | `perfprobe` | Per-tick timing on two clocks and every `ServerPerformanceData` getter (REQUIREMENTS item 10). It logs each getter's name before calling it, which is how the `Accumulate()` crash was found |
-| `make-log-probe.sh` | `logprobe` | Reply sizes, odd bytes through `Shared.Message`, the log's header, read costs (REQUIREMENTS item 7). Needs `-logdir` equal to the config path |
-| `make-tickstat-probe.sh` | `tickprobe[&from=N]` | `Server.GetBwLimit()`, rate getters, a timed log scan with the last `TICKSTAT\|`, rate-step and `perfmon:` lines (REQUIREMENTS item 10). Needs the log in the config directory and a `-consolefifo` |
-| `make-whitelist-probe.sh` | -- | What `Shared.SendHTTPRequest` hands its callback (CONSTRAINTS item 17) |
 | `make-maps-probe.sh` | `mapsprobe` | The in-memory cycle's id types, the file, dkjson round trips, Shine's mapvote (CONSTRAINTS items 12, 13) |
+
+The probes for what 10-12 replaced -- the log through `config://`, the
+command capture by wrappers, the tickstat log scan, the whitelist read
+from Steam -- were removed with that code; they are in git history.
 
 Harnesses: `maps-harness.lua` (the map cycle request types and
 `getinstalledmodslist`), `recent-players-harness.lua`,
-`workshop-harness.lua`, `perf-harness.lua`, `tickstat-harness.lua` (over
-the real lines in `tickstat-rig-20260928.txt`), `log-harness.lua` (with a
-fake `io.open` that, like Spark's, serves the file as it was when opened),
-`chat-harness.lua`, `console-harness.lua`, `state-harness.lua` and
-`whitelist-harness.lua`.
+`workshop-harness.lua`, `perf-harness.lua`, `tickstat-harness.lua` (a
+`Server.GetTickStat` stub, and the real lines in
+`tickstat-rig-20260928.txt`), `log-harness.lua` (a `Shared.ReadLog` stub
+over a file), `chat-harness.lua`, `console-harness.lua` (a
+`Shared.CaptureConsoleCommand` stub) and `state-harness.lua`. The 10-12
+calls each harness does not stub itself come from `engine-stubs.lua`, with
+dkjson standing in for `Shared.JsonEncode`.
 
 `server-cost-bench.lua` is a benchmark under the same stubs; see
 [SERVER-COST.md](SERVER-COST.md).
@@ -194,9 +205,6 @@ for the game's own dkjson and `RingBuffer.lua`.
   trigger was not pinned down. Moving the code into top-level functions
   fixed it. After booting with changed Lua, `grep -A2 "not completely
   preprocessed" logs/log-Server.txt` must print nothing.
-- **A log left in `config/` is served as live.** A later boot with
-  `-logdir` elsewhere still opens `config://log-Server.txt`. The mod
-  reports it `stale`, but delete it when you restore the rig.
 - **The mod's `web/` is indexed at map load.** A new build copied in while
   the server runs serves the new `index.html` without its new hashed
   assets: a blank page. `sv_changemap` picks them up.

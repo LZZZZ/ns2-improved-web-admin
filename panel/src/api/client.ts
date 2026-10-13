@@ -16,16 +16,16 @@
 //     poll across a nonce expiry never showed a 401 to the page
 
 import type {
-  Ban, BanList, CommandResult, ConsoleLine, ConsolePage, InstalledMod, MapInfo,
+  Ban, BanList, CommandResult, ConsoleLine, InstalledMod, MapInfo,
   MapCycleWrite, MapVote, Player, RawBan, RawBanList, RawCommandResult,
-  RawConsoleLine, RawConsoleStream, RawInstalledMod, RawMapCycle,
+  RawConsoleLine, RawInstalledMod, RawMapCycle,
   RawMapCycleWrite, RawMapListEntry, RawMapVote, RawPlayer, RawRecentPlayers,
   RawReservedSlots, RawServerState, RecentPlayers, ReservedSlots, ServerState,
   InstallModResult, RawInstallModResult, RawWorkshopItem, RawWorkshopSearch,
   WorkshopItem, WorkshopSearch, PerfPoint, PerfReport, RawPerfReport,
   PerfEngine, RawPerfEngine,
-  RawPerfSample, RawPerfWindow, LogPage, RawLogPage, RawLogUnavailable, WireBool,
-  ChatEntry, ChatPage, RawChatMessage, RawChatStream, RawWhitelist, ServerWhitelist,
+  RawPerfSample, RawPerfWindow, LogPage, RawLogPage, WireBool,
+  ChatEntry, ChatPage, RawChatMessage, RawChatStream,
 } from "./types";
 
 export class ApiError extends Error {
@@ -301,21 +301,6 @@ export async function runCommand(
     command: raw.cmd,
     dispatched: raw.dispatched,
     lines: (raw.lines ?? []).map(normalizeConsoleLine),
-    lastId: raw.last_id ?? 0,
-  };
-}
-
-/** Console output since `since`. Mod only. */
-export async function getConsole(
-  since: number,
-  signal?: AbortSignal,
-): Promise<ConsolePage> {
-  const raw = await getJson<RawConsoleStream>(
-    { request: "getconsole", since: String(since) }, signal);
-  return {
-    lines: (raw.lines ?? []).map(normalizeConsoleLine),
-    lastId: raw.last_id ?? 0,
-    dropped: raw.dropped ?? 0,
   };
 }
 
@@ -373,10 +358,10 @@ function normalizeChat(raw: RawChatMessage, time: number | null): ChatEntry {
 // ------------------------------------------------------------ server log
 
 /**
- * log-Server.txt through the mod's getlog. No cursor: its last 64 KB. `since`
- * and `file`: what was written after `since` in that file. `before`: the page
- * ending there. A reply that is neither shape -- a stock server answering
- * with the state blob -- is an error, not an empty log.
+ * The server's log through the mod's getlog. No cursor: its last 64 KB.
+ * `since` and `file`: what was written after `since` in that file. `before`:
+ * the page ending there. A reply that is not a page -- a stock server
+ * answering with the state blob -- is an error, not an empty log.
  */
 export async function getLog(
   cursor: { since?: number; before?: number; file?: string },
@@ -386,16 +371,11 @@ export async function getLog(
   if (cursor.since !== undefined) params["since"] = String(cursor.since);
   if (cursor.before !== undefined) params["before"] = String(cursor.before);
   if (cursor.file !== undefined) params["file"] = cursor.file;
-  const raw = await getJson<RawLogPage | RawLogUnavailable>(params, signal);
-  if (raw?.source === "none") {
-    return { source: "none", path: raw.path ?? "", error: raw.error ?? "",
-             stale: raw.stale === true };
-  }
+  const raw = await getJson<RawLogPage>(params, signal);
   if (raw?.source !== "file" || !Array.isArray(raw.lines)) {
     throw new ApiError("getlog did not return the log", 200, false);
   }
   return {
-    source: "file",
     fileId: raw.file_id ?? "",
     size: raw.size,
     from: raw.from,
@@ -436,18 +416,14 @@ export async function getPerf(since: number, esince: number,
   };
 }
 
-// dkjson writes an empty list as [] here (measured), but a list that is not
-// one is no records rather than a crash.
+// The engine's JSON writer writes an empty list as [] (measured), but a list
+// that is not one is no records rather than a crash.
 const list = <T>(v: T[] | undefined): T[] => Array.isArray(v) ? v : [];
 const stamped = <T extends { time: number }>(r: T): T & { at: number } =>
   ({ ...r, at: r.time * 1000 });
 
 function normalizePerfEngine(e: RawPerfEngine): PerfEngine {
   return {
-    source: e.source === "log" ? "log" : "none",
-    path: e.path,
-    error: e.error ?? null,
-    stale: e.stale === true,
     scanSeconds: e.scan_s,
     lastId: e.last_id,
     more: e.more === true,
@@ -551,6 +527,7 @@ export async function getInstalledMods(signal?: AbortSignal): Promise<InstalledM
     id: m.id,
     name: m.name,
     active: typeof m.active === "boolean" ? m.active : null,
+    whitelisted: typeof m.whitelisted === "boolean" ? m.whitelisted : null,
   }));
 }
 
@@ -563,31 +540,6 @@ export async function getMapVote(signal?: AbortSignal): Promise<MapVote> {
     roundLimit: raw.round_limit ?? 0,
     nextMap: raw.next_map ?? null,
     options: raw.options ?? [],
-  };
-}
-
-const isIdList = (v: unknown): v is string[] =>
-  Array.isArray(v) && v.every((id) => typeof id === "string" && /^\d+$/.test(id));
-
-/**
- * The ranked-mod whitelist, as the server last read it from Steam. Mod only.
- * The first call starts a read when the server's copy is missing or more than
- * an hour old; until it lands, `fetching` is true and the old copy, if any,
- * is what comes back.
- */
-export async function getWhitelist(signal?: AbortSignal): Promise<ServerWhitelist> {
-  const raw = await getJson<RawWhitelist>({ request: "getwhitelist" }, signal);
-  if (typeof raw !== "object" || raw === null || typeof raw.now !== "number") {
-    throw new ApiError("getwhitelist did not return a whitelist", 200, false);
-  }
-  const lists = typeof raw.read_at === "number" && isIdList(raw.whitelist)
-    && raw.whitelist.length > 0 && isIdList(raw.hotfix);
-  return {
-    readAt: lists ? raw.read_at! : null,
-    whitelist: lists ? raw.whitelist! : [],
-    hotfix: lists ? raw.hotfix! : [],
-    fetching: raw.fetching === true,
-    error: typeof raw.error === "string" ? raw.error : null,
   };
 }
 
@@ -608,6 +560,7 @@ function normalizeWorkshopItem(m: RawWorkshopItem): WorkshopItem {
     childCount: Number(m.childcount) || 0,
     thumbnailUrl: String(m.thumbnailurl ?? ""),
     updatedAt: Number(m.version) > 0 ? Number(m.version) : null,
+    whitelisted: typeof m.whitelisted === "boolean" ? m.whitelisted : null,
   };
 }
 

@@ -11,7 +11,8 @@
       "tags": "Passes Default Consistency,Look and Feel",
       "childcount": 0,
       "version": 1350105651,
-      "id": "61a75aa"
+      "id": "61a75aa",
+      "whitelisted": false
     },
     {
       "title": "Combat Pistol 'Spitfire'",
@@ -23,7 +24,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1350102165,
-      "id": "5f9cba3"
+      "id": "5f9cba3",
+      "whitelisted": false
     },
     {
       "title": "NS2: Combat",
@@ -35,7 +37,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1705775253,
-      "id": "8ae61f8f"
+      "id": "8ae61f8f",
+      "whitelisted": false
     },
     {
       "title": "Combat Equipment",
@@ -47,7 +50,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1704829838,
-      "id": "84f2921e"
+      "id": "84f2921e",
+      "whitelisted": false
     },
     {
       "title": "Red's Combat Upgrades",
@@ -59,7 +63,8 @@
       "tags": "Custom Game Mode",
       "childcount": 0,
       "version": 1670731547,
-      "id": "a4d37bd0"
+      "id": "a4d37bd0",
+      "whitelisted": false
     },
     {
       "title": "Red's Combat Upgrade Level Requirements",
@@ -71,7 +76,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1699140516,
-      "id": "a5d7d62e"
+      "id": "a5d7d62e",
+      "whitelisted": false
     },
     {
       "title": "Red and Shrimm's Combat Ability Levels",
@@ -83,7 +89,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1700971325,
-      "id": "a4ffc429"
+      "id": "a4ffc429",
+      "whitelisted": false
     },
     {
       "title": "Classic NS2 Combat",
@@ -95,7 +102,8 @@
       "tags": "Custom Game Mode,Must be run on Server",
       "childcount": 0,
       "version": 1575138287,
-      "id": "520abdce"
+      "id": "520abdce",
+      "whitelisted": false
     },
     {
       "title": "NS2 Combat H3llEvator",
@@ -107,7 +115,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1365126530,
-      "id": "82077b8"
+      "id": "82077b8",
+      "whitelisted": false
     },
     {
       "title": "Combat Welcome Message (229)",
@@ -119,7 +128,8 @@
       "tags": "script",
       "childcount": 0,
       "version": 1353060681,
-      "id": "6779a2e"
+      "id": "6779a2e",
+      "whitelisted": false
     },
     {
       "title": "NS2 Combat Mode + Config",
@@ -131,7 +141,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1384026785,
-      "id": "b87fe93"
+      "id": "b87fe93",
+      "whitelisted": false
     },
     {
       "title": "Combat: Reforged",
@@ -143,7 +154,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1785946000,
-      "id": "e0f757b6"
+      "id": "e0f757b6",
+      "whitelisted": false
     },
     {
       "title": "Magneto_Combat_Maps",
@@ -155,7 +167,8 @@
       "tags": "map,Passes Default Consistency",
       "childcount": 0,
       "version": 1529507189,
-      "id": "547850f7"
+      "id": "547850f7",
+      "whitelisted": false
     },
     {
       "title": "Combat Mod Balanced",
@@ -167,7 +180,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1394386508,
-      "id": "e1ad15a"
+      "id": "e1ad15a",
+      "whitelisted": false
     },
     {
       "title": "Ghoul's NS2 Combat Fork",
@@ -179,7 +193,8 @@
       "tags": "Custom Game Mode,Must be run on Server",
       "childcount": 0,
       "version": 1591899551,
-      "id": "527102a8"
+      "id": "527102a8",
+      "whitelisted": false
     },
     {
       "title": "Joshua-Boo-Boos Combat Injector",
@@ -191,7 +206,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1773689178,
-      "id": "db8f4d81"
+      "id": "db8f4d81",
+      "whitelisted": false
     },
     {
       "title": "Combat Fix",
@@ -203,7 +219,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1441020960,
-      "id": "1e62a2ce"
+      "id": "1e62a2ce",
+      "whitelisted": false
     },
     {
       "title": "Combat Balance Mod",
@@ -215,7 +232,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1394388299,
-      "id": "e16b871"
+      "id": "e16b871",
+      "whitelisted": false
     },
     {
       "title": "Meteru's NS2 Combat Fork - Beta",
@@ -227,7 +245,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1670110614,
-      "id": "93f05553"
+      "id": "93f05553",
+      "whitelisted": false
     },
     {
       "title": "NS2 Combat Competitive",
@@ -239,7 +258,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1677184283,
-      "id": "ae7690f4"
+      "id": "ae7690f4",
+      "whitelisted": false
     },
     {
       "title": "ns1 combat mod",
@@ -251,7 +271,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1435033386,
-      "id": "1573635f"
+      "id": "1573635f",
+      "whitelisted": false
     },
     {
       "title": "Combat Engineer",
@@ -263,7 +284,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1704104385,
-      "id": "ba767a4c"
+      "id": "ba767a4c",
+      "whitelisted": false
     },
     {
       "title": "Combat++",
@@ -275,7 +297,8 @@
       "tags": "Custom Game Mode",
       "childcount": 0,
       "version": 1528511635,
-      "id": "521ea079"
+      "id": "521ea079",
+      "whitelisted": false
     },
     {
       "title": "NS2 SUD Combat Adjustments",
@@ -287,7 +310,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1760218839,
-      "id": "d4f2852c"
+      "id": "d4f2852c",
+      "whitelisted": false
     },
     {
       "title": "Combat Mod Update",
@@ -299,7 +323,8 @@
       "tags": "Passes Default Consistency,Custom Game Mode",
       "childcount": 0,
       "version": 1610094026,
-      "id": "7d7d524a"
+      "id": "7d7d524a",
+      "whitelisted": false
     },
     {
       "title": "Combat map",
@@ -311,7 +336,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1601183779,
-      "id": "858d33a4"
+      "id": "858d33a4",
+      "whitelisted": false
     },
     {
       "title": "The Eastern Hive - Combat Enhancer",
@@ -323,7 +349,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1790516195,
-      "id": "e2e629dc"
+      "id": "e2e629dc",
+      "whitelisted": false
     },
     {
       "title": "RPG Combat - Shine Plugin",
@@ -335,7 +362,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1782102071,
-      "id": "df33d827"
+      "id": "df33d827",
+      "whitelisted": false
     },
     {
       "title": "Combat --",
@@ -347,7 +375,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1661881312,
-      "id": "aa011330"
+      "id": "aa011330",
+      "whitelisted": false
     },
     {
       "title": "co_assault",
@@ -359,7 +388,8 @@
       "tags": "level, cinematic, model",
       "childcount": 0,
       "version": 1364820550,
-      "id": "54da949"
+      "id": "54da949",
+      "whitelisted": false
     },
     {
       "title": "Ns2 co_faceoff remake",
@@ -371,7 +401,8 @@
       "tags": "level, script",
       "childcount": 0,
       "version": 1354741645,
-      "id": "4d41f11"
+      "id": "4d41f11",
+      "whitelisted": false
     },
     {
       "title": "co_docking_station",
@@ -383,7 +414,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1354187934,
-      "id": "6991825"
+      "id": "6991825",
+      "whitelisted": false
     },
     {
       "title": "ns2_ladderwars",
@@ -395,7 +427,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1345035060,
-      "id": "5537beb"
+      "id": "5537beb",
+      "whitelisted": false
     },
     {
       "title": "co_tram_hub",
@@ -407,7 +440,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1352410596,
-      "id": "66591c7"
+      "id": "66591c7",
+      "whitelisted": false
     },
     {
       "title": "co_down_a1",
@@ -419,7 +453,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1349042052,
-      "id": "5f5392e"
+      "id": "5f5392e",
+      "whitelisted": false
     },
     {
       "title": "Co_Minifridge",
@@ -431,7 +466,8 @@
       "tags": "level, material",
       "childcount": 0,
       "version": 1359304234,
-      "id": "6af55b7"
+      "id": "6af55b7",
+      "whitelisted": false
     },
     {
       "title": "Submachinegun",
@@ -443,7 +479,8 @@
       "tags": "Gameplay Tweak,Must be run on Server",
       "childcount": 0,
       "version": 1631953508,
-      "id": "99d33f34"
+      "id": "99d33f34",
+      "whitelisted": false
     },
     {
       "title": "co_angst",
@@ -455,7 +492,8 @@
       "tags": "map",
       "childcount": 0,
       "version": 1652411372,
-      "id": "91c78be4"
+      "id": "91c78be4",
+      "whitelisted": false
     },
     {
       "title": "co_nautica",
@@ -467,7 +505,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1403611069,
-      "id": "104911b0"
+      "id": "104911b0",
+      "whitelisted": false
     },
     {
       "title": "ns2_co_descent",
@@ -479,7 +518,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1364847984,
-      "id": "80ef2e5"
+      "id": "80ef2e5",
+      "whitelisted": false
     },
     {
       "title": "ns2_co_fightbox",
@@ -491,7 +531,8 @@
       "tags": "map,Passes Default Consistency",
       "childcount": 0,
       "version": 1529846005,
-      "id": "a42aa5a"
+      "id": "a42aa5a",
+      "whitelisted": false
     },
     {
       "title": "co_sava",
@@ -503,7 +544,8 @@
       "tags": "map",
       "childcount": 0,
       "version": 1678395134,
-      "id": "91c881e9"
+      "id": "91c881e9",
+      "whitelisted": false
     },
     {
       "title": "co_pulse",
@@ -515,7 +557,8 @@
       "tags": "map",
       "childcount": 0,
       "version": 1665804423,
-      "id": "91c81f8e"
+      "id": "91c81f8e",
+      "whitelisted": false
     },
     {
       "title": "ns2_co_redemptioncombat",
@@ -527,7 +570,8 @@
       "tags": "level",
       "childcount": 0,
       "version": 1360575378,
-      "id": "789d892"
+      "id": "789d892",
+      "whitelisted": false
     },
     {
       "title": "ns2_co_biodome_v2",
@@ -539,7 +583,8 @@
       "tags": "map,Passes Default Consistency",
       "childcount": 0,
       "version": 1529508219,
-      "id": "a683ee4"
+      "id": "a683ee4",
+      "whitelisted": false
     },
     {
       "title": "co_kestrel",
@@ -551,7 +596,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1659581338,
-      "id": "92364b5d"
+      "id": "92364b5d",
+      "whitelisted": false
     },
     {
       "title": "co_rockdown",
@@ -563,7 +609,8 @@
       "tags": "map",
       "childcount": 0,
       "version": 1679165960,
-      "id": "a7e6daf0"
+      "id": "a7e6daf0",
+      "whitelisted": false
     },
     {
       "title": "Co_FortSiege",
@@ -575,7 +622,8 @@
       "tags": "level, material",
       "childcount": 0,
       "version": 1360438482,
-      "id": "70bfa20"
+      "id": "70bfa20",
+      "whitelisted": false
     },
     {
       "title": "co_nest",
@@ -587,7 +635,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1647805675,
-      "id": "91cb4b9a"
+      "id": "91cb4b9a",
+      "whitelisted": false
     },
     {
       "title": "JudgE's Crosshairs For Ninjas",
@@ -599,7 +648,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1417504267,
-      "id": "be1adbd"
+      "id": "be1adbd",
+      "whitelisted": false
     }
   ],
   "count": 50,

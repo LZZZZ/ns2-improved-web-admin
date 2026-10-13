@@ -85,13 +85,13 @@ if [ "$MOD" = 1 ]; then
   code=$(get "runcommand-failed" "request=runcommand&cmd=sv_kick%20NoSuchPlayer"); report "runcommand-failed" "$code"
   code=$(get "runcommand-unknown" "request=runcommand&cmd=sv_nonsense_command"); report "runcommand-unknown" "$code"
   code=$(get "runcommand-slots" "request=runcommand&cmd=sv_reserved_slots%203"); report "runcommand-slots" "$code"
-  code=$(get "getconsole" "request=getconsole&since=0"); report "getconsole" "$code"
+  code=$(get "runcommand-bwlimit" "request=runcommand&cmd=bwlimit"); report "runcommand-bwlimit" "$code"
+  code=$(get "getinstalledmodslist-mod" "request=getinstalledmodslist"); report "getinstalledmodslist-mod" "$code"
   code=$(get "getbans" "request=getbans"); report "getbans" "$code"
   code=$(get "getrecentplayers" "request=getrecentplayers"); report "getrecentplayers" "$code"
   code=$(get "getperf" "request=getperf"); report "getperf" "$code"
-  # The log's tail, or why there is none (-logdir must be the config
-  # directory). Its lines are the server's log verbatim; redact-fixtures.py
-  # rewrites the identifiers in them.
+  # The log's tail. Its lines are the server's log verbatim;
+  # redact-fixtures.py rewrites the identifiers in them.
   code=$(get "getlog" "request=getlog"); report "getlog" "$code"
 fi
 

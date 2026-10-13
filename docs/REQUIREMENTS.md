@@ -13,12 +13,12 @@ measurement names the engine drop it ran on.
 | 2 | Delete / uninstall mods | **Needs an engine change**; not possible from a mod |
 | 3 | Installed mods: loaded first, with the id | Built and verified on the rig (Lua `active` flag, Mods tab) |
 | 4 | Mod browser: details before install | Built and verified on the rig (Workshop tab). No paging: the engine returns 50 hits |
-| 5 | Console commands return their output | Built (Lua wrappers, `runcommand`) |
+| 5 | Console commands return their output | Built (`runcommand`, through the 10-12 engine's `Shared.CaptureConsoleCommand`) |
 | 6 | Ban from a list of recent players | Built and verified on the rig (`getrecentplayers`, a two-slot file) |
-| 7 | Tail the server log | Built and verified on the rig (`getlog`, Console tab) |
+| 7 | Tail the server log | Built and verified on the rig (`getlog` through the 10-12 engine's `Shared.ReadLog`, Console tab) |
 | 8 | Light, fast, dark, full width | Built (front end) |
 | 9 | Per-admin settings in the browser | Built (Settings tab) |
-| 10 | Performance: what `perfmon` measures, drawn | Built and verified on the rig (`getperf`, Performance tab) |
+| 10 | Performance: what `perfmon` measures, drawn | Built and verified on the rig (`getperf`, Performance tab; tickstat through the 10-12 engine's `Server.GetTickStat`) |
 
 ## 1. Long server names
 
@@ -197,7 +197,18 @@ Consequences for the design:
    `sv_nonsense_command` failed silently. "No output" is shown as such,
    never as success.
 5. **Capture covers the synchronous call only.** Anything printed later
-   needs a buffer, which `getconsole` provides.
+   is in the log (item 7).
+
+**Since the 10-12 engine** (asked for in CONSTRAINTS item 18) the mod runs
+the command through `Shared.CaptureConsoleCommand`, which returns one
+string of everything printed, engine lines included (`bwlimit`, `perfmon`,
+`tickstat`), and still writes it to the log. The `Shared.Message` wrapper,
+the ring buffer and `getconsole` are gone. One wrapper stays: Shine's
+`ServerAdminPrint` prints nothing without a client, so the mod puts
+vanilla's nil-client branch back over it each tick, and `sv_listbans`
+under Shine came back with its output on the rig (2026-10-12). A command
+run inside a captured command loses the outer command's own lines; the
+mod never nests.
 
 ## 6. Ban from a list of recent players
 
@@ -286,6 +297,12 @@ game's internals.
 
 ## 7. Tail the server log
 
+**Since the 10-12 engine** the mod reads the log with `Shared.ReadLog(offset,
+maxBytes)`, which returns the bytes and the file's size, a negative offset
+counting from the end, wherever `-logdir` puts the log (measured on the rig,
+2026-10-12). The layout rule, the stale check below and `getconsole` are
+gone. What follows is how it was done before, and what was measured then.
+
 `io.open` refuses absolute paths and paths outside a mounted root, so
 `/srv/ns2/config/log-Server.txt`, `log-Server.txt` and
 `config://logs/log-Server.txt` all return `nil`. Two routes:
@@ -302,11 +319,11 @@ game's internals.
   `Shared.Message`, `Print`, `Log`), not what the engine writes directly
   (`Script tracing`, map load errors, the boot).
 
-Both ship: route 1 is `getlog`, route 2 is `getconsole`, and the command
-line works whatever the log.
+Both shipped until 10-12: route 1 was `getlog`, route 2 `getconsole`.
 
 Measured on the rig (09-26 hotfix; probe `log-branch.lua`, built by
-`make-log-probe.sh`; `logdir-probe.lua` for route 1):
+`make-log-probe.sh`; `logdir-probe.lua` for route 1; all three in git
+history):
 
 | Question | Answer |
 | --- | --- |
@@ -327,8 +344,8 @@ verbatim, and the Console shows them as written, by design
 
 `getlog` is specified in [API.md](API.md#getlog); its harness,
 `tools/spikes/log-harness.lua`, writes the file the way the engine does
-and covers partial lines, the cap, paging back, CRLF, odd bytes, a 300 KB
-line, a cut, a new header and a stale copy.
+and reads it through a `Shared.ReadLog` stub, covering partial lines, the
+cap, paging back, CRLF, odd bytes, a 300 KB line, a cut and a new header.
 
 **Built: the Console tab**, the log with the command line under it. It
 reads the tail when opened, Load earlier pages back to the start of the
@@ -341,16 +358,13 @@ or more than 1 MB written while the tab was away (it skips to the end).
 Each kind has a colour at 4.5:1 or better in both themes; chat is in the
 speaker's team colour, looked up in the player list since the server
 writes no team into chat lines. Save writes every line read, hidden kinds
-too. When the log cannot be read the tab says why; on a stock server it
-explains itself and never asks.
+too. On a stock server it explains itself and never asks.
 
 On the rig the tail and a full page-back matched the file byte for byte;
-a map change kept the cursor; a restart answered `new_file`; `-logdir`
-elsewhere answered `No such file or directory`, or `stale` with a copy
-left behind. The default layout also worked, `tickstat` lines included.
-Fixtures: `getlog-rig-tail.json`, `-since`, `-reset`, `-stale`,
-`getlog-none.json`. Not yet seen: a populated round's log through the
-tab.
+a map change kept the cursor; a restart answered `new_file`. On 10-12, with
+`-logdir` outside the config directory, the tail, `since`, `before` and
+both resets read the live log. Fixtures: `getlog-rig-tail.json`,
+`-since`, `-reset`. Not yet seen: a populated round's log through the tab.
 
 ## 8. Light, fast, dark, full width
 
@@ -433,8 +447,19 @@ not as a verdict.
 
 ### The engine's log lines (09-27 engine)
 
+**Since the 10-12 engine** the tickstat windows come from
+`Server.GetTickStat()`: a table of 40 numbers under the engine's own names
+(`intervalP99`, `busyPct`, `snapBytesP99`, ...), `time` the server time the
+window closed and `window` its length, and nil while `tickstat` is off.
+The mod reads it every second, keeps each new window under the names below
+(the `TICKSTAT|` line's), to three decimals, and counts any field it does
+not know in `unparsed`. On the rig (2026-10-12) a 2 s window matched its
+log line. Rate steps, the bwlimit warning, the `perfmon:` block and
+`tickstat: on|off` are still read from the log, now through
+`Shared.ReadLog`.
+
 `tickstat` lines and the `perfmon:` block are printed by the engine to
-the log, not through Lua, so the mod reads them from the log (item 7).
+the log, not through Lua, so the mod read them from the log (item 7).
 Measured on the rig (`Build: 344 (5dc97682bc beta)`), empty at 30/20, then
 at 80/40/40, interp 85, bwlimit 131072, with one human and 11 bots
 (`tools/spikes/tickstat-branch.lua`, a console FIFO). The real lines are
@@ -444,7 +469,7 @@ in `tools/spikes/tickstat-rig-20260928.txt`.
 | --- | --- |
 | A `tickstat` line in `log-Server.txt` | One bare line, no prefix or timestamp: `TICKSTAT\| win 10.0 s hz 80.00 target 80 \| int p50 12.55 p99 14.40 p999 14.55 max 14.55 ms \| … \| snap bytes p50 192 p99 384 max 2737 choked 0.00% \| … \| creations deferred 0`, 16 segments, the format string in `server_linux`. |
 | How often? | `tickstat 10` prints every 10.0 s, even with nobody on, and replies `tickstat: on`. |
-| Can the mod tell whether it is on? | Yes: a bare `tickstat` prints `tickstat: on` or `off` without toggling. `runcommand tickstat 10` returns no lines, since the engine prints only to the log. |
+| Can the mod tell whether it is on? | Yes: a bare `tickstat` prints `tickstat: on` or `off` without toggling. Before 10-12 `runcommand tickstat 10` returned no lines, since the engine prints only to the log; since 10-12 the capture returns `tickstat: on`. |
 | Across a map change? | It stays on; the window across the load reads `hz 27.99`, `max 664.90 ms`. A restart turns it off. |
 | A rate step | `client 1: snapshot rate 40.0 -> 26.7/s (29% choked, 24.9 ms to clear each, bwlimit 10000)`, and back up within 10 s of restoring `bwlimit`. `client N` is a slot number. |
 | A starved `bwlimit` | At the command: `bwlimit 10000 bytes/sec at sendrate 40 leaves 250 bytes per snapshot, below the 2048 a full game needs: snapshots will choke and arrive late. bwlimit 81920 or more avoids it.` Raising `sendrate` past what bwlimit allows logs the same. Under it: `choked` 0.38-15.75 %, `rate stepped 1 slowest 26.7/s`, `creations deferred` up to 31. |
@@ -465,12 +490,11 @@ perfmon: moves rewound with missing snapshots 0 (since map load)
 perfmon: score 63 = idle 63.0% - delivery 0.0% - overload 0.0% (updates 40, warn 0, fail 0)
 ```
 
-**Built.** The mod scans the log every 2 s and `getperf` serves the lines
+**Built.** `getperf` serves tickstat windows and the log's engine lines
 under `engine` ([API.md](API.md#getperf)); the Performance tab draws them.
 `tickstat` is switched in Settings and the switch controls the server, not
 the browser: on sends `tickstat 10`, off sends `tickstat 0`, which stops
 it for every admin, so it asks first. It defaults to off, shows the
-server's real state as read from the log, and needs the mod and a
-readable log. On the rig every value served matched the raw line (819
+server's real state, and confirms a change from the command's own reply. On the rig every value served matched the raw line (819
 compared); the starved-bwlimit run is `getperf-rig-tickstat.json`.
 Harness: `tools/spikes/tickstat-harness.lua`.

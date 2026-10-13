@@ -33,7 +33,7 @@ WIDTH, HEIGHT = 1440, 900
 
 # port -> the mock's flags
 MOCKS = {
-    8140: ["--mod", "--shine", "--beta-players"],
+    8140: ["--mod", "--shine"],
     8141: ["--mod", "--tickstat", "10"],
     8142: ["--mod", "--shine=ban,reservedslots,mapvote", "--maps=modded"],
     8143: ["--mod"],

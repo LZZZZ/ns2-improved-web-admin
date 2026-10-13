@@ -7,10 +7,11 @@ What the project covers, how it is built and why, and what each tab does.
 The game ships the original 2012 panel (jQuery 1.7.2, jQuery UI 1.9,
 Bootstrap 2; see [CURRENT-UI.md](CURRENT-UI.md)) as static files, over a
 304-line Lua backend that already answers in JSON. A mod can replace both
-without an engine change or a game-file edit, because
-`Shared.SetWebRoot()` resolves through the mod filesystem and a mod can
-shadow `lua/ServerWebInterface.lua`
-([proof](CONSTRAINTS.md#shipping-as-a-mod)).
+without a game-file edit, because `Shared.SetWebRoot()` resolves through the
+mod filesystem and a mod can shadow `lua/ServerWebInterface.lua`
+([proof](CONSTRAINTS.md#shipping-as-a-mod)). The 10-12 beta engine added
+functions for web admin pages at this project's request, and the Lua relies
+on them ([CONSTRAINTS](CONSTRAINTS.md#engine-additions-item-18)).
 
 ## Scope
 
@@ -87,7 +88,10 @@ and says so.
   `getperf` reply.
 - **Ranking.** Request whitelisting once the mod is public and has some
   mileage.
-- **Engine additions** that would replace the mod's biggest workarounds:
-  [CONSTRAINTS.md](CONSTRAINTS.md) items 6 and 18. Uninstalling mods is
-  the only feature that needs one (REQUIREMENTS item 2).
-- Optionally, offer the code for inclusion in the game.
+- **Engine additions still missing** after 10-12: the whitelist's full
+  list and the reason ranking is off, uninstalling mods (REQUIREMENTS
+  item 2), and the Workshop search fixes ([CONSTRAINTS.md](CONSTRAINTS.md)
+  item 18).
+- **Inclusion in the game**: a PR to UWE's game repo is planned, with the
+  panel's source and built files; the maintainer agreed to MIT and to
+  Shine support that works without Shine.

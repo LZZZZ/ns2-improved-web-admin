@@ -29,10 +29,8 @@ MOCKS=(
   "8097|--mod --shine=ban,reservedslots,mapvote"
   "8098|--shine"
   "8099|--mod --shine=ban,reservedslots,mapvote --maps=modded"
-  "8100|--mod --log=off"
   "8101|--no-chat-buffer"
-  "8102|--mod --beta-players"
-  "8103|--mod --whitelist=fail --whitelist-delay 300"
+  "8102|--mod"
 )
 
 pids=()

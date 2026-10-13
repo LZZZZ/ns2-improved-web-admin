@@ -226,7 +226,7 @@ async def defaults_and_refresh(c):
     await asyncio.sleep(11)
     n_log = len(requests_of(c, "getlog", mark))
     n_state = len(requests_of(c, "json", mark))
-    n_other = len(requests_of(c, "getconsole", mark)) + len(requests_of(c, "getchatlist", mark))
+    n_other = len(requests_of(c, "getchatlist", mark))
     check("log every 5 s: two or three reads in 11 s, and nothing else",
           2 <= n_log <= 3 and n_state == 0 and n_other == 0,
           f"{n_log} getlog, {n_state} json, {n_other} other")

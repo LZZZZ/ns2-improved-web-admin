@@ -11,7 +11,8 @@
       "tags": "map",
       "childcount": 0,
       "version": 1534262014,
-      "id": "7b986f5"
+      "id": "7b986f5",
+      "whitelisted": true
     },
     {
       "title": "ns2_jambi_redux",
@@ -23,7 +24,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1572195033,
-      "id": "6d45366f"
+      "id": "6d45366f",
+      "whitelisted": false
     },
     {
       "title": "ns2_dmd_jambi",
@@ -35,7 +37,8 @@
       "tags": "map,Passes Default Consistency",
       "childcount": 0,
       "version": 1524336924,
-      "id": "33305de3"
+      "id": "33305de3",
+      "whitelisted": false
     },
     {
       "title": "JudgE's Transparent Minimaps",
@@ -47,7 +50,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1642864154,
-      "id": "4c58b359"
+      "id": "4c58b359",
+      "whitelisted": false
     },
     {
       "title": "Ayumi",
@@ -59,7 +63,8 @@
       "tags": "",
       "childcount": 0,
       "version": 1685014004,
-      "id": "98ee90a0"
+      "id": "98ee90a0",
+      "whitelisted": false
     },
     {
       "title": "Chinese Minimap Plus DEV",
@@ -71,7 +76,8 @@
       "tags": "Must be run on Server,Localization",
       "childcount": 0,
       "version": 1609991486,
-      "id": "23a43f4f"
+      "id": "23a43f4f",
+      "whitelisted": false
     }
   ],
   "count": 6,

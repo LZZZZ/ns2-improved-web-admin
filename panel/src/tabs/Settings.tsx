@@ -154,10 +154,10 @@ export function Settings({ state }: { state: ServerState | null }) {
 
 /** The time now, ticking while the tab is open, for the clock samples. */
 /**
- * The engine's tickstat, on or off. Not a setting this browser
- * keeps: the switch shows what the server's log last said, because another
- * admin may have changed it, and changing it changes it for everyone. It
- * starts off after every restart, and the panel never turns it on by itself.
+ * The engine's tickstat, on or off. Not a setting this browser keeps: the
+ * switch shows what the server last said, because another admin may have
+ * changed it, and changing it changes it for everyone. It starts off after
+ * every restart, and the panel never turns it on by itself.
  */
 function TickstatSwitch() {
   const perf = usePerf(true);
@@ -165,14 +165,11 @@ function TickstatSwitch() {
   const [outcome, setOutcome] = useState<TickstatOutcome | null>(null);
   const engine = perf.engine;
 
-  if (engine === null || engine.source !== "log") {
+  if (engine === null) {
     return (
       <p class="muted form-hint" data-tickstat-switch="none">
-        {perf.loading ? "Reading the server's log..."
-          : engine === null
-            ? "This server's mod predates reading the engine's log: update it for tickstat."
-            : `The server's log is not readable (${engine.error ?? engine.path}), and the `
-              + "engine writes tickstat only there."}
+        {perf.loading ? "Asking the server..."
+          : "This server's mod predates tickstat: update it."}
       </p>
     );
   }
@@ -197,7 +194,7 @@ function TickstatSwitch() {
         <input type="checkbox" name="tickstat" checked={running} disabled={busy}
                onChange={(e) => void toggle((e.target as HTMLInputElement).checked)} />
         Log tickstat every {kTickstatSeconds} s
-        {busy && <span class="muted"> -- waiting for the server's log...</span>}
+        {busy && <span class="muted"> -- waiting for the server...</span>}
       </label>
       <p class="muted form-hint">
         {statusText(logging, engine, latest)}

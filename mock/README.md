@@ -48,9 +48,8 @@ which is what a panel pointed at the wrong server sees. `--mod` adds them:
 | | |
 | --- | --- |
 | `mod_version`, `max_players` (16), `map_loaded_at` | In the state blob. `map_loaded_at` is `getperf`'s `loaded_at`. |
-| `/` | A request with no parameters gets the page leading to `/index.html` (`fixtures/root-mod.html`). |
-| `runcommand` | What a command printed, tagged `audit`, `admin` or `server`; `dispatched` is the audit line. |
-| `getconsole` | The same capture as a stream, with `since` and `dropped`. |
+| `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the page leading to `/index.html` (`fixtures/root-mod.html`) and anything else the state blob; any other path, a not-found page (`fixtures/notfound-mod.html`). |
+| `runcommand` | What a command printed, as `Shared.CaptureConsoleCommand` returns it, tagged `audit` or `server`; `dispatched` is the audit line. The lines reach the log too. |
 | `getchatlist` | With `since`, the mod's ring of 200 with times; without, the game's 20. Both empty at `sv_changemap`, ids from 1. |
 | `getbans` | The bans in force, from Shine's table under `--shine`, vanilla's otherwise. |
 | `getrecentplayers` | The synthetic `fixtures/getrecentplayers.json` moved to now, plus the humans connected. A kick, ban or map change leaves a player listed, not connected. With `--shine`, an `sh_banid` of an absent listed player is stored under their name. |
@@ -58,12 +57,11 @@ which is what a panel pointed at the wrong server sees. `--mod` adds them:
 | `setmapcycle` | Validated with the Lua's wording: `{"ok": false, "error"}` writes nothing, `{"ok": true, "cycle"}` is the file read back. Unknown keys pass through. Stock answers the empty `200`, and a cycle with no `maps` writes nothing. |
 | `getmapvote` | `{"enabled": false}`, or with `--shine`'s `mapvote` options from the cycle (read at boot and `sv_changemap` only), round limit 2, and Shine's next map. |
 | `getmods`, `installmod` | The mod's replies (CONSTRAINTS item 2). |
-| `getinstalledmodslist` | Rows gain `active`, fixed at map load: the two hotfix mods, the cycle's global mods and the map's own. A cycle edit shows after `sv_changemap`. |
-| `getperf` | Made-up 10 s windows (`--perf-window <s>` to shorten) in the rig's shape, seeded with half an hour of history, at 60/60/60 with interp 85 (the state blob's `frame_rate` follows, so nothing can assume 30). `sv_changemap` starts over. `engine` is what the Lua's log scan finds: `tickstat N` (off until run; `--tickstat <s>` boots with it on and half an hour behind), `perfmon` (its block, stepping the level) and `bwlimit` (the warning under 2048 B a snapshot) write to the log as the 09-27 engine does, and `runcommand` gets no lines for them. `config.bw_limit` follows `bwlimit`. |
-| `getlog` | The Lua's algorithm step for step over a buffer: a header, a boot and 40 rounds of made-up history from `log-seed.txt` (about 75 KB), then every line the console tees, map loads, the engine's `Script tracing` pair every 30 s, and the mod's check line per map load. Offsets are bytes. `--log=off`: the file cannot be opened, with the rig's error. |
-| `getwhitelist` | The rig's read (`fixtures/getwhitelist-rig.json`). With no copy, the first request answers `fetching` and the read lands 1.5 s later (`--whitelist-delay <ms>`). `--whitelist=cached` starts with a copy; `--whitelist=fail` fails with curl's unknown-host message, then waits 5 minutes as the mod does. |
+| `getinstalledmodslist` | Rows gain `active`, fixed at map load: the two hotfix mods, the cycle's global mods and the map's own; and `whitelisted`, from the rig's read of the whitelist and hotfix list (`mock/whitelist-rig.json`). A cycle edit shows after `sv_changemap`. Search results carry `whitelisted` too. |
+| `getperf` | Made-up 10 s windows (`--perf-window <s>` to shorten) in the rig's shape, seeded with half an hour of history, at 60/60/60 with interp 85 (the state blob's `frame_rate` follows, so nothing can assume 30). `sv_changemap` starts over. `engine` is tickstat windows, as `Server.GetTickStat()` hands them over, and what the Lua's log scan finds: `tickstat N` (off until run; `--tickstat <s>` boots with it on and half an hour behind), `perfmon` (its block, stepping the level) and `bwlimit` (the warning under 2048 B a snapshot) print as the engine does, and `runcommand` captures it. `config.bw_limit` follows `bwlimit`. |
+| `getlog` | The Lua's algorithm step for step over a buffer: a header, a boot and 40 rounds of made-up history from `log-seed.txt` (about 75 KB), then every line a command prints, chat, map loads and the engine's `Script tracing` pair every 30 s. Offsets are bytes. |
 | Player `skill` fields | Made up but stable per Steam id; -1 for bots. `skill_tier` through the game's `GetPlayerSkillTier`. |
-| `--beta-players` | The 09-26+ engine's per-player fields, made up: the first human plays a Family Shared copy with 37 time-credit and 2 other rejected moves. |
+| Player engine fields | Family Sharing and rejected moves, made up: the first human plays a Family Shared copy with 37 time-credit and 2 other rejected moves. |
 | The stock bugs | Fixed, as with the mod's Lua. |
 
 ### `--maps=modded`
@@ -131,14 +129,13 @@ GET /__mock/perf?score=-20[&interp_fails=3][&worst_tick_ms=80][&emit=1]
                            field); emit=1 closes it at once; tickrate_config=80
                            and the like change the configured rates
 GET /__mock/tickstat?choked_pct=12[&snap_p99_bytes=4000][&emit=1][&rate=down|up]
-                           the next TICKSTAT line's values (--mod); emit=1
-                           writes it now; rate= logs a player's rate step
+                           the next tickstat window's values (--mod); emit=1
+                           closes it now; rate= logs a player's rate step
 GET /__mock/log?append=<text>[&n=3] | partial=<text> | burst=<bytes>
-               | truncate=1 | restart=1 | stale=1|0
+               | truncate=1 | restart=1
                            write to log-Server.txt: lines, a line with no
-                           newline yet, a burst, a cut to the header, a new
-                           file (restart=<n>: with n rounds of history), or
-                           a copy the server is not writing
+                           newline yet, a burst, a cut to the header, or a
+                           new file (restart=<n>: with n rounds of history)
 ```
 
 - `log` answers with the file's size and id. `partial` then `append` is a

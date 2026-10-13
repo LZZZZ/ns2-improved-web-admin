@@ -21,23 +21,21 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
   * tickrate, the slowest tick, score and players are four lines on one
     chart with one unitless axis (F1, as settled on the rig), the units in
     the legend
-  * the engine's tickstat, from the log: off until the Settings switch turns
-    it on (F2), which moves only once the server's log confirms it; its
+  * the engine's tickstat: off until the Settings switch turns it on (F2),
+    which moves only once the server confirms it; its
     charts join the same grid and hold exactly the lines served; its latest
     line joins the window's in one summary, and the status line goes while
     it logs; a snapshot p99 over what bwlimit allows is an error with the
     bwlimit that fixes it; the engine's bwlimit warning is shown; a map
     change keeps the earlier lines; turning it off is confirmed the same way
   * no table view and no history line (Performance review, 2026-10-08)
-  * a server whose log the mod cannot read says why, here and in Settings;
-    a stock server's Settings says the switch needs the mod
+  * a stock server's Settings says the switch needs the mod
 
 Start the mocks first:
 
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod --perf-window 2
     node mock/server.js --port 8095 --web web
-    node mock/server.js --port 8100 --web web --mod --log=off
 """
 import asyncio, json, os, sys, urllib.request
 from urllib.parse import parse_qs, urlparse
@@ -46,7 +44,6 @@ from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
-LOGOFF = os.environ.get("LOGOFF_URL", "http://127.0.0.1:8100")
 PORT = 9231
 
 results = []
@@ -306,7 +303,7 @@ async def tickstat_checks(c):
 
 
 async def main():
-    for base in (MOD, STOCK, LOGOFF):
+    for base in (MOD, STOCK):
         get(f"{base}/__mock/reset")
 
     proc, _ = launch_chrome(port=PORT)
@@ -507,26 +504,6 @@ async def main():
                           if e["method"] == "Runtime.exceptionThrown"]
             check("no uncaught exceptions on stock", not exceptions,
                   [e["params"]["exceptionDetails"].get("text", "") for e in exceptions][:2])
-
-            print("\n== a server whose log the mod cannot read")
-            await c.send("Page.navigate", url=LOGOFF + "/index.html")
-            await asyncio.sleep(3.5)
-            await open_tab(c, LOGOFF, "Performance")
-            await asyncio.sleep(1)
-            said = await text(c, "[data-engine-error]")
-            check("the engine section says the log is not readable, and why",
-                  await attr(c, ".perf-engine", "engine") == "none"
-                  and "not readable" in said and "No such file" in said, said[:70])
-            check("and offers no tickstat button",
-                  not await c.eval("[...document.querySelectorAll('.perf-tab .btn')]"
-                                   ".some(b=>b.textContent.includes('tickstat'))"))
-            await open_tab(c, LOGOFF, "Settings")
-            await asyncio.sleep(1)
-            said = await text(c, "[data-tickstat-switch]")
-            check("and Settings offers no switch, saying why",
-                  await attr(c, "[data-tickstat-switch]", "tickstatSwitch") == "none"
-                  and "not readable" in said
-                  and not await c.eval("document.querySelector('input[name=tickstat]')"), said[:60])
     finally:
         proc.terminate()
 

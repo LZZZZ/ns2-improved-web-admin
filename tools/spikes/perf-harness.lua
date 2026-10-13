@@ -96,6 +96,7 @@ local function NewVM(opts)
     env.Server = { GetFrameRate = function() return vm.tickrate end }
     env.Log = function() end
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 

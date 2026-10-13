@@ -8,10 +8,10 @@ here="$(cd "${0%/*}" && pwd)"
 src="$here/../../lua/ServerWebInterface.lua"
 out="$here/perf-probe.lua"
 
-grep -q '^local function OnWebRequest(actions)$' "$src"
+grep -q '^local function OnWebRequest(actions, request)$' "$src"
 
 awk -v branch="$here/perf-branch.lua" '
-  /^local function OnWebRequest\(actions\)$/ {
+  /^local function OnWebRequest\(actions, request\)$/ {
     print; while ((getline line < branch) > 0) print line; next
   }
   { print }

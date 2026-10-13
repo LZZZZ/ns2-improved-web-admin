@@ -22,8 +22,6 @@ as about what is shown:
   * Save writes every line read, of every kind, to a file named for the log
   * lines are verbatim: IPs and Steam ids unmasked (by design),
     and markup shown as text
-  * a server whose log cannot be reached says why, and keeps the command line;
-    a stale copy (one the server is not writing) is refused, not shown
   * with log refresh off, nothing is read until Read now
   * nothing is fetched from anywhere but the server
 
@@ -32,7 +30,6 @@ Start the mocks first:
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod --perf-window 2
     node mock/server.js --port 8095 --web web
-    node mock/server.js --port 8100 --web web --mod --log=off
 """
 import asyncio, json, os, sys, urllib.request
 from urllib.parse import parse_qs, quote, urlparse
@@ -41,7 +38,6 @@ from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
-OFF = os.environ.get("OFF_URL", "http://127.0.0.1:8100")
 PORT = 9234
 
 results = []
@@ -131,7 +127,6 @@ def has_line(text):
 
 async def main():
     get(f"{MOD}/__mock/reset")
-    get(f"{OFF}/__mock/reset")
 
     proc, _ = launch_chrome(port=PORT)
     try:
@@ -467,37 +462,6 @@ async def main():
             skip = await text_of(c, ".log-reset p")
             check("naming how much it skipped", "MB were written" in skip, skip[:60])
 
-            print("\n== a log file the server is not writing")
-            mock_log(MOD, stale=1)
-            await c.send("Page.navigate", url=MOD + "/index.html")
-            await asyncio.sleep(3.5)
-            await open_tab(c, "Console")
-            stale = await text_of(c, ".log-stale")
-            check("is refused, and says why", "this server is not writing it" in stale, stale[:60])
-            check("with no line shown", await c.eval("document.querySelectorAll('.log .log-line').length") == 0)
-            mock_log(MOD, stale=0)
-            await c.send("Page.navigate", url=MOD + "/index.html")
-            await asyncio.sleep(3.5)
-            await open_tab(c, "Console")
-            await wait_for(c, "document.querySelectorAll('.log .log-line').length>0")
-            # A fresh page: Other is hidden again, and the check line is Other.
-            await c.eval("document.querySelector('input[name=kind-other]').click()")
-            await asyncio.sleep(0.3)
-            check("a live one shows the mod's check line at the end of the first read",
-                  await c.eval("[...document.querySelectorAll('.log .log-line')]"
-                               ".some(e=>e.textContent.startsWith('improved-webadmin: checking that'))"))
-
-            print("\n== a server whose log cannot be reached")
-            mark = len(c.events)
-            await c.send("Page.navigate", url=OFF + "/index.html")
-            await asyncio.sleep(3.5)
-            await open_tab(c, "Console")
-            banner = await text_of(c, ".log-unavailable")
-            check("says why", "-logdir" in banner and "-config_path" in banner, banner[:60])
-            check("and what the server said", "No such file or directory" in banner)
-            check("and the command line still runs, below it",
-                  await c.eval("!!document.querySelector('.log-tab .console-input input[name=command]')"))
-
             print("\n== a stock server")
             await c.send("Page.navigate", url=STOCK + "/index.html")
             await asyncio.sleep(3.5)
@@ -513,7 +477,7 @@ async def main():
             foreign = [e["params"]["request"]["url"] for e in c.events
                        if e["method"] == "Network.requestWillBeSent"
                        and not any(e["params"]["request"]["url"].startswith(b)
-                                   for b in (MOD, STOCK, OFF))]
+                                   for b in (MOD, STOCK))]
             check("no third-party request", not foreign, str(foreign[:1]))
     finally:
         proc.terminate()

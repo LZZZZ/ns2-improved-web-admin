@@ -3,12 +3,14 @@
 --
 -- Runs the shipped file under LuaJIT with the engine calls it touches stubbed,
 -- as the harnesses do, then plays an hour on one map: 18 players, a perf
--- window every 10 s, a TICKSTAT line every 10 s appended to a real
--- log-Server.txt, the engine scan every 2 s. Then it times
--- the mod's own handlers through the WebRequest and UpdateServer hooks. The
--- stubs answer at once, so what is timed is the Lua and dkjson, not the
--- engine calls they make; the real engine's are extra, and small beside
--- dkjson. Times are this machine's: a server's CPU is likely slower.
+-- window every 10 s, a tickstat window every 10 s from Server.GetTickStat
+-- (its TICKSTAT line appended to a real log-Server.txt, as the engine does),
+-- the log scan every 2 s. Then it times the mod's own handlers through the
+-- WebRequest and UpdateServer hooks. The stubs answer at once, so what is
+-- timed is the Lua, not the engine calls it makes -- except
+-- Shared.JsonEncode, which is dkjson here: the engine's own writer took a
+-- fifth of dkjson's time on the rig (docs/SERVER-COST.md). Shared.ReadLog
+-- reads the file. Times are this machine's: a server's CPU is likely slower.
 --
 -- Usage: luajit tools/spikes/server-cost-bench.lua --core <core/lua>
 --            [--mod <file>] [log-Server.txt] [dir]
@@ -87,6 +89,8 @@ local function Players(n)
             GetUserId = function(self) return self.id end,
             GetIsVirtual = function() return false end,
             GetPing = function() return 80 end,
+            GetMovesRejectedTimeCredit = function() return 0 end,
+            GetMovesRejectedOther = function() return 0 end,
         }
         local player = {
             name = "Player number " .. i, team = i % 2 + 1, client = client,
@@ -104,6 +108,35 @@ local function Players(n)
         list[i] = player
     end
     return list
+end
+
+-- Shared.ReadLog(offset, maxBytes): the bytes, and the file's size.
+local function ReadLog(offset, maxBytes)
+    local f = realOpen(LOG, "rb")
+    local size = f:seek("end")
+    offset = tonumber(offset) or 0
+    if offset < 0 then offset = math.max(0, size + offset) end
+    f:seek("set", math.min(offset, size))
+    local text = f:read(maxBytes or (size - offset)) or ""
+    f:close()
+    return text, size
+end
+
+-- A Server.GetTickStat() window, as the 10-12 engine returns it.
+local function Window(time)
+    return {
+        time = time, window = 10.002, hz = 79.991, target = 80,
+        intervalP50 = 12.55, intervalP99 = 14.4, intervalP999 = 14.55, intervalMax = 14.553,
+        latenessMax = 2.0612, rearms = 0, stretchPct = 0, governorMax = 0,
+        incomplete = 0, loops = 2422, incompleteLate = 0, incompleteWriters = 0, incompleteMoves = 0,
+        waitOverP99 = 2.06, waitOverMax = 2.0601, waits = 1978, busyPct = 29.9,
+        humans = 18, bots = 0, snapPerSecPerHuman = 40, bytesPerSecPerHuman = 7639,
+        movesPerSecPerHuman = 40, movesPerSecPerBot = 0, injectedPct = 0,
+        moveMsPerTick = 1.382, specMovesPerSec = 2.2, specMoveMsPerTick = 0.002,
+        snapBytesP50 = 192, snapBytesP99 = 384, snapBytesMax = 2737, chokedPct = 0,
+        humanMoveMsPerTick = 0.061, sendBufDrops = 0, rateStepped = 0,
+        slowestSendrate = 0, creationsDeferred = 0,
+    }
 end
 
 local function NewVM()
@@ -138,6 +171,7 @@ local function NewVM()
         GetCheatsEnabled = function() return false end,
         GetDevMode = function() return false end,
         ConsoleCommand = function() end,
+        ReadLog = ReadLog,
     }
     env.ServerPerformanceData = function() return PerfData() end
     env.ientitylist = function(list) return ipairs(list) end
@@ -156,9 +190,11 @@ local function NewVM()
         GetOwner = function(p) return p.client end,
         GetClientAddress = function(c) return "191.123.45." .. (c.id % 256) end,
         SaveReservedSlotsConfig = function() end,
+        GetTickStat = function() return vm.stat end,
     }
     env.Log = function() end
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 
@@ -173,6 +209,11 @@ local function NewVM()
                                    movesTime = 150, updTime = 200 })
         end
         for _, fn in ipairs(hooks.UpdateServer) do fn() end
+    end
+    -- A tickstat window closes: the engine's table, and its log line.
+    function vm.window(line)
+        vm.stat = Window(vm.real)
+        append(line .. "\n")
     end
     function vm.request(params)
         local _, body = hooks.WebRequest[1](params)
@@ -198,13 +239,13 @@ for _, p in ipairs(vm.players) do vm.hook("ClientConnect", p.client) end
 -- An hour and a bit: 362 windows, 362 TICKSTAT lines found by the scan.
 local t0 = clock()
 for i = 1, 36200 do
-    if i % 100 == 0 then append(tickstats[math.floor(i / 100) % #tickstats + 1] .. "\n") end
+    if i % 100 == 0 then vm.window(tickstats[math.floor(i / 100) % #tickstats + 1]) end
     vm.tick()
 end
 local simulated = clock() - t0
 local first = dkjson.decode(vm.request({ request = "getperf", since = "999999", esince = "999999" }))
 
-print(("\nAfter an hour on one map: windows up to id %d, tickstat lines up to id %d (360 kept of each)")
+print(("\nAfter an hour on one map: windows up to id %d, tickstat windows up to id %d (360 kept of each)")
     :format(first.last_id, first.engine.last_id))
 
 print("\nPer tick, with or without a panel (UpdateServer hook)")
@@ -234,7 +275,7 @@ bench("a tick that scans 256 KB of TICKSTAT lines (the worst)", 20,
 vm = NewVM()
 for _, p in ipairs(vm.players) do vm.hook("ClientConnect", p.client) end
 for i = 1, 36200 do
-    if i % 100 == 0 then append(tickstats[math.floor(i / 100) % #tickstats + 1] .. "\n") end
+    if i % 100 == 0 then vm.window(tickstats[math.floor(i / 100) % #tickstats + 1]) end
     vm.tick()
 end
 

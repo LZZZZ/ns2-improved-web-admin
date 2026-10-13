@@ -38,11 +38,11 @@ export interface RawPlayer {
   ipaddress: string;
   /** Mod only, and only under Shine's basecommands: Shine's gag. */
   gagged?: boolean;
-  /** Mod on the 09-26+ engine: playing a Steam Family Shared copy. */
+  /** Mod only: playing a Steam Family Shared copy. */
   familyshared?: boolean;
   /** With `familyshared`: the account that owns the game. */
   owner_steamid?: number;
-  /** Mod on the 09-26+ engine: moves rejected for time credit (usually a
+  /** Mod only: moves rejected for time credit (usually a
    * modified client) and for anything else (a poor connection can do it). */
   moves_rejected_time?: number;
   moves_rejected_other?: number;
@@ -305,7 +305,8 @@ export const TEAM_NAMES: Record<TeamNumber, string> = {
 
 // ------------------------------------------------- console (mod only)
 
-export type ConsoleSource = "audit" | "admin" | "server";
+/** "audit": the line every admin command prints before it runs. */
+export type ConsoleSource = "audit" | "server";
 
 export interface RawConsoleLine {
   id: number;
@@ -319,7 +320,6 @@ export interface RawCommandResult {
   dispatched: boolean;
   elapsed?: number;
   lines: RawConsoleLine[];
-  last_id?: number;
 }
 
 /** One entry of getchatlist, as stock and the mod (without `since`) send it. */
@@ -361,14 +361,6 @@ export interface ChatPage {
   available: boolean;
 }
 
-export interface RawConsoleStream {
-  lines: RawConsoleLine[];
-  last_id: number;
-  dropped?: number;
-  filtered?: number;
-  buffer_size?: number;
-}
-
 export interface ConsoleLine {
   id: number;
   /** Milliseconds, converted from the server's unix seconds. */
@@ -390,14 +382,6 @@ export interface CommandResult {
    * nothing at all, and `sv_cheats` reports nothing either way.
    */
   lines: ConsoleLine[];
-  lastId: number;
-}
-
-export interface ConsolePage {
-  lines: ConsoleLine[];
-  lastId: number;
-  /** Lines that fell out of the server's ring buffer before anyone read them. */
-  dropped: number;
 }
 
 // ------------------------------------------------- the server log (mod only)
@@ -409,7 +393,6 @@ export interface RawLogLine {
 
 export interface RawLogPage {
   source: "file";
-  path: string;
   file_id: string;
   size: number;
   from: number;
@@ -422,14 +405,6 @@ export interface RawLogPage {
   max_bytes: number;
 }
 
-export interface RawLogUnavailable {
-  source: "none";
-  path: string;
-  /** It opened, but the server is not writing it. */
-  stale?: boolean;
-  error: string;
-}
-
 /** One line of log-Server.txt, verbatim. */
 export interface LogLine {
   /** Byte offset in the file: unique within one file, the row's key. */
@@ -437,23 +412,20 @@ export interface LogLine {
   text: string;
 }
 
-export type LogPage =
-  | {
-      source: "file";
-      /** The header's Date and Time: names the file across restarts. */
-      fileId: string;
-      size: number;
-      from: number;
-      /** Where the next read starts: after the last complete line served. */
-      to: number;
-      lines: LogLine[];
-      /** The reply stopped at the server's cap; ask again at once. */
-      more: boolean;
-      atStart: boolean;
-      /** The cursor did not fit the file; this reply is a fresh tail. */
-      reset: "new_file" | "truncated" | null;
-    }
-  | { source: "none"; path: string; error: string; stale: boolean };
+export interface LogPage {
+  /** The header's Date and Time: names the file across restarts. */
+  fileId: string;
+  size: number;
+  from: number;
+  /** Where the next read starts: after the last complete line served. */
+  to: number;
+  lines: LogLine[];
+  /** The reply stopped at the server's cap; ask again at once. */
+  more: boolean;
+  atStart: boolean;
+  /** The cursor did not fit the file; this reply is a fresh tail. */
+  reset: "new_file" | "truncated" | null;
+}
 
 // ------------------------------------------------------------ maps
 
@@ -499,28 +471,8 @@ export interface RawInstalledMod {
   name: string;
   /** Mod only: mounted now. Changes only when the map changes. */
   active?: boolean;
-}
-
-/**
- * `getwhitelist` (mod only): the ranked-mod whitelist as the server last read
- * it from Steam. Ids are decimal workshop ids, as Steam spells them.
- */
-export interface RawWhitelist {
-  now: number;
-  /** What ModServices.GetHotfixListModId() returned; absent when it had none. */
-  hotfix_list_id?: string;
-  /** "live" or "beta"; absent when no whitelist is known for that hotfix list. */
-  branch?: string;
-  whitelist_id?: string;
-  /** A read from Steam is running. */
-  fetching?: boolean;
-  /** Why the last read failed, or why there is nothing to read. */
-  error?: string;
-  /** When the lists below were read; absent, and so are they, when none was. */
-  read_at?: number;
-  whitelist?: string[];
-  /** The hotfix mods, which the engine never checks. */
-  hotfix?: string[];
+  /** Mod only: on the ranked-mod whitelist the engine read at boot. */
+  whitelisted?: boolean;
 }
 
 /** `getmapvote` (mod only). */
@@ -551,16 +503,8 @@ export interface InstalledMod {
   name: string;
   /** Mounted now; null on a stock server, which cannot say. */
   active: boolean | null;
-}
-
-export interface ServerWhitelist {
-  /** Unix seconds; null when the server has no list (yet). */
-  readAt: number | null;
-  /** Decimal workshop ids. Empty when readAt is null. */
-  whitelist: string[];
-  hotfix: string[];
-  fetching: boolean;
-  error: string | null;
+  /** The engine's whitelist verdict; null on a stock server. */
+  whitelisted: boolean | null;
 }
 
 export interface MapVote {
@@ -595,6 +539,8 @@ export interface RawWorkshopItem {
   thumbnailurl: string;
   /** Unix seconds of the last update. */
   version: number;
+  /** Mod only: on the ranked-mod whitelist the engine read at boot. */
+  whitelisted?: boolean;
 }
 
 /**
@@ -630,6 +576,8 @@ export interface WorkshopItem {
   thumbnailUrl: string;
   /** Unix seconds, or null when the item carries none. */
   updatedAt: number | null;
+  /** The engine's whitelist verdict; null on a stock server. */
+  whitelisted: boolean | null;
 }
 
 export type WorkshopSearch =
@@ -686,14 +634,15 @@ export interface PerfConfig {
   sendrate: number;
   interp_ms: number;
   max_players: number;
-  /** Server.GetBwLimit(), bytes a second per player: 09-27 engine and later. */
+  /** Server.GetBwLimit(), bytes a second per player. */
   bw_limit?: number;
 }
 
 /**
- * getperf's `engine`: one `TICKSTAT|` line, in the engine's own field names
- * (the table shows them as the engine prints them). A segment the mod did not
- * know leaves its fields out and counts in `unparsed`.
+ * getperf's `engine`: one tickstat window from Server.GetTickStat(), under the
+ * names of the `TICKSTAT|` line's fields (the table shows them as the engine
+ * prints them). A field the mod does not know is left out and counted in
+ * `unparsed`.
  */
 export interface RawTickstat {
   id: number;
@@ -774,10 +723,7 @@ export type RawEngineEvent =
       per_snapshot: number; needed: number; suggested: number };
 
 export interface RawPerfEngine {
-  source: "log" | "none";
-  path: string;
-  error?: string;
-  stale?: boolean;
+  source: "log";
   scan_s: number;
   last_id: number;
   /** More records are held past last_id: ask again from it. Absent before paging. */
@@ -810,10 +756,6 @@ export type PerfmonBlock = RawPerfmonBlock & { at: number };
 export type EngineEvent = RawEngineEvent & { at: number };
 
 export interface PerfEngine {
-  source: "log" | "none";
-  path: string;
-  error: string | null;
-  stale: boolean;
   scanSeconds: number;
   lastId: number;
   /** The reply is one page: more records are held past lastId. */

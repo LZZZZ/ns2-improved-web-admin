@@ -5,23 +5,23 @@ import { PerfChart } from "../ui/PerfChart";
 import type { ChartMarker, ChartSeries } from "../ui/PerfChart";
 
 /**
- * The engine's own reports, from the server's log: `tickstat` lines (tick
- * spacing, snapshot sizes, choke), players' rate steps, the bwlimit warning,
- * and the `perfmon:` block (docs/REQUIREMENTS.md item 10). Mod only. Since
- * 2026-10-07 they are not a section of their own: the charts join the
- * tab's grid, the latest line its summary, and the switch is in Settings.
- * The table view, with rate steps and perfmon blocks, went in the
- * Performance review (2026-10-08).
+ * The engine's own reports: `tickstat` windows (tick spacing, snapshot sizes,
+ * choke) from Server.GetTickStat(), and from the server's log, players' rate
+ * steps, the bwlimit warning and the `perfmon:` block (docs/REQUIREMENTS.md
+ * item 10). Mod only. Since 2026-10-07 they are not a section of their own:
+ * the charts join the tab's grid, the latest window its summary, and the
+ * switch is in Settings. The table view, with rate steps and perfmon blocks,
+ * went in the Performance review (2026-10-08).
  *
- * The lines carry no time of their own: each is placed at the scan that found
- * it, every couple of seconds, so a point can sit up to that much late.
+ * A tickstat window carries the time it closed. Log lines carry none: each is
+ * placed at the scan that found it, every couple of seconds.
  */
 /** How often the Settings switch asks tickstat to log: the getperf window length. */
 export const kTickstatSeconds = 10;
 
 export type Logging = "on" | "starting" | "off" | "quiet" | "none";
 
-/** Whether tickstat is running, from what the server's log has said. */
+/** Whether tickstat is running, from its windows and what the server has said. */
 export function loggingState(e: EngineStatus, latest: Tickstat | null): Logging {
   const win = latest?.win_s ?? kTickstatSeconds;
   const said = e.tickstatSaid;
@@ -53,9 +53,9 @@ export function engineRecords(segments: PerfSegment[]) {
 }
 
 /**
- * Where tickstat stands, in one line: the switch is in
- * Settings, because it is the server's, not this page's. Also what a server
- * without a readable log, or an older mod, cannot show. Mod only.
+ * Where tickstat stands, in one line: the switch is in Settings, because it
+ * is the server's, not this page's. Also what an older mod cannot show. Mod
+ * only.
  */
 export function EngineStatusLine({ engine, segments, onOpenSettings }: {
   engine: EngineStatus | null;
@@ -67,18 +67,6 @@ export function EngineStatusLine({ engine, segments, onOpenSettings }: {
       <p class="perf-engine muted" data-engine="absent">
         This server's mod predates reading the engine's log: update it for
         tickstat, rate steps and perfmon blocks.
-      </p>
-    );
-  }
-  if (engine.source === "none") {
-    return (
-      <p class="perf-engine muted" data-engine="none" data-engine-error>
-        {engine.stale
-          ? `${engine.path} is not the log this server is writing (${engine.error ?? "stale"}), `
-          : `The server's log is not readable here (${engine.error ?? engine.path}), `}
-        so tickstat, players' rate steps and perfmon blocks cannot be shown:
-        the engine writes them only to that log. The mod reads it when the
-        server logs into its config directory, as a default install does.
       </p>
     );
   }
@@ -97,7 +85,7 @@ export function EngineStatusLine({ engine, segments, onOpenSettings }: {
 }
 
 export function statusText(logging: Logging, e: EngineStatus, latest: Tickstat | null): string {
-  const win = latest?.win_s ?? kTickstatSeconds;
+  const win = Math.round(latest?.win_s ?? kTickstatSeconds);
   switch (logging) {
     case "on":
       return `tickstat is logging every ${win} s, for every admin. It stays on through map changes; a restart turns it off.`;

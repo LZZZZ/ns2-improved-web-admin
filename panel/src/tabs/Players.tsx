@@ -58,15 +58,15 @@ const MUTE_REASON =
 const EVEN_REASON =
   "A round is on: forcing even teams now would move players mid-round. Reset the round first.";
 
-// The 09-26+ engine's two counts (its CHANGELOG), shown only by an engine
-// that has them.
+// The engine's two counts (its CHANGELOG), shown only when the server reports
+// them: with the mod.
 const REJECTED_TITLE =
   "Moves the server rejected: for time credit (usually a modified client) · "
   + "for anything else (a poor connection can cause these).";
 
 const SHARED_TITLE =
   "Steam Family Sharing: the player is on a copy another account owns, shown "
-  + "beside it. Reported by the 09-26+ engine.";
+  + "beside it. Reported by the engine.";
 
 /** The 2012 panel's round buttons, with the commands that exist. */
 const ROUND_ACTIONS = [

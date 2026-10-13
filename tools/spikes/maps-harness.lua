@@ -63,6 +63,7 @@ local function NewVM(memory, shine)
         write(dkjson.encode(c, { indent = true }))
     end
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
 

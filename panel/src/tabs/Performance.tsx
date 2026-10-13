@@ -65,7 +65,7 @@ export function Performance({ state, onOpenSettings }: {
     { label: "players", slot: 4, stepped: true, values: pick((p) => p.players) },
   ];
   const engine = engineRecords(perf.segments);
-  const showEngine = mod && perf.engine?.source === "log";
+  const showEngine = mod && perf.engine !== null;
 
   return (
     <section class="wrap perf-tab">
@@ -196,7 +196,7 @@ function Strip({ latest, t, config, mod, windowS, events }: {
   const fails = latest?.interpFails ?? 0;
   const when = [
     latest && (mod ? `the ${windowS} s to ${clock(latest.at)}` : `read at ${clock(latest.at)}`),
-    t && (t.win_s !== undefined ? `tickstat's ${t.win_s} s to about ${clock(t.at)}`
+    t && (t.win_s !== undefined ? `tickstat's ${Math.round(t.win_s)} s to about ${clock(t.at)}`
                                 : `tickstat to about ${clock(t.at)}`),
   ].filter(Boolean).join("; ");
   return (

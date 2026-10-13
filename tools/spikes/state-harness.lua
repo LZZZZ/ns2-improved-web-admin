@@ -1,11 +1,11 @@
 -- Off-rig harness for the fields the mod adds to the state blob in
--- lua/ServerWebInterface.lua: Shine's `gagged`, the beta engine's Family
--- Sharing and rejected-move counts, Hive skill, and `ranking_active`.
+-- lua/ServerWebInterface.lua: Shine's `gagged`, the engine's Family Sharing
+-- and rejected-move counts, Hive skill, and `ranking_active`.
 --
 -- Runs the shipped file under LuaJIT with the engine calls GetServerState
--- touches stubbed. Each case is a fresh VM with a different engine: none of
--- the beta functions, all of them, some erroring. It checks the logic --
--- feature detection, keys left out rather than guessed -- not the engine:
+-- touches stubbed. Each case is a fresh VM with different answers. It checks
+-- the logic -- Shine and ScoringMixin detected, keys left out rather than
+-- guessed -- not the engine:
 -- what the functions return for a real player is a rig question, and needs a
 -- human (headless bots are deleted, docs/TESTING.md).
 --
@@ -28,13 +28,15 @@ local function RingBuffer(n)
     }
 end
 
--- A player entity and its ServerClient. `methods` are extra ServerClient
--- methods, as the beta engine adds them.
+-- A player entity and its ServerClient. `methods` replace ServerClient
+-- methods.
 local function Player(id, name, bot, methods)
     local client = {
         GetUserId = function() return id end,
         GetIsVirtual = function() return bot == true end,
         GetPing = function() return 40 end,
+        GetMovesRejectedTimeCredit = function() return 0 end,
+        GetMovesRejectedOther = function() return 0 end,
         addr = "192.0.2." .. (id % 200),
     }
     for k, v in pairs(methods or { }) do client[k] = v end
@@ -97,6 +99,7 @@ local function NewVM(opts)
     env.IPAddressToString = function(a) return a end
     env.Shine = opts.Shine
     local chunk = assert(loadfile(MOD))
+    dofile(HERE .. "engine-stubs.lua")(env, dkjson)
     setfenv(chunk, env)
     chunk()
     return function()
@@ -110,15 +113,15 @@ local function byName(state, name)
     for _, p in ipairs(state.player_list) do if p.name == name then return p end end
 end
 
--- A stock engine: none of the beta functions.
+-- The engine's defaults: nobody shared, nothing rejected, unranked.
 local state = NewVM({ players = { Player(101, "Alice"), Player(0, "[BOT] Max", true) } })()
 local a = byName(state, "Alice")
 check(a and a.isbot == false and byName(state, "[BOT] Max").isbot == true, "isbot is a real boolean")
-check(a.familyshared == nil and a.owner_steamid == nil, "no Family Sharing keys on an engine without it")
-check(a.moves_rejected_time == nil and a.moves_rejected_other == nil, "no rejected-move keys either")
+check(a.familyshared == false and a.owner_steamid == nil, "not shared: familyshared false, no owner id")
+check(a.moves_rejected_time == 0 and a.moves_rejected_other == 0, "rejected moves: both counts, 0")
 check(a.gagged == nil and state.shine == nil, "no Shine, no gagged and no shine key")
 check(state.map_loaded_at == 1790000000, "map_loaded_at: when the VM, so the map, loaded")
-check(state.ranking_active == nil, "no GetIsRankingActive, no ranking_active")
+check(state.ranking_active == false, "ranking_active false: the engine says unranked")
 check(a.skill == nil and a.skill_offset == nil and a.comm_skill == nil,
       "no ScoringMixin, no skill keys")
 
@@ -171,7 +174,7 @@ check(byName(state, "[BOT] Max").skill_tier == -1, "a bot: -1")
 check(byName(state, "Dan").skill == 900 and byName(state, "Dan").skill_tier == nil,
       "an erroring GetSkillTier leaves only its key out")
 
--- The beta engine: everything present.
+-- A shared copy and rejected moves.
 local moves = {
     GetMovesRejectedTimeCredit = function(self) return self:GetUserId() == 102 and 37 or 0 end,
     GetMovesRejectedOther = function() return 2 end,
@@ -188,37 +191,9 @@ check(b.familyshared == true and b.owner_steamid == 555, "a shared copy: familys
 check(b.moves_rejected_time == 37 and b.moves_rejected_other == 2, "rejected moves, both counts")
 check(byName(state, "[BOT] Max").familyshared == false, "a bot reads as not shared")
 
--- Functions that error, or answer nonsense, leave their key out.
-state = NewVM({
-    players = { Player(101, "Alice", false, {
-        GetMovesRejectedTimeCredit = function() error("not on this client") end,
-        GetMovesRejectedOther = function() return "lots" end,
-    }) },
-    GetIsFamilyShared = function() error("engine says no") end,
-    GetOwnerUserId = function() return 1 end,
-})()
-a = byName(state, "Alice")
-check(a and a.familyshared == nil and a.owner_steamid == nil, "an erroring GetIsFamilyShared leaves both keys out")
-check(a.moves_rejected_time == nil and a.moves_rejected_other == nil, "an error or a non-number leaves the count out")
-check(a.name == "Alice" and a.steamid == 101, "and the row is otherwise whole")
-
--- Shared, but no owner function: shared without a guess at whose.
-state = NewVM({
-    players = { Player(102, "Bob") },
-    GetIsFamilyShared = function() return true end,
-})()
-b = byName(state, "Bob")
-check(b.familyshared == true and b.owner_steamid == nil, "shared with no GetOwnerUserId: no owner key")
-
--- ranking_active: the engine's boolean as it is; anything else leaves it out.
-state = NewVM({ players = { Player(101, "Alice") }, GetIsRankingActive = function() return false end })()
-check(state.ranking_active == false, "ranking_active false: the engine says unranked")
+-- ranking_active: the engine's answer.
 state = NewVM({ players = { Player(101, "Alice") }, GetIsRankingActive = function() return true end })()
 check(state.ranking_active == true, "ranking_active true: the engine says ranked")
-state = NewVM({ players = { Player(101, "Alice") }, GetIsRankingActive = function() error("no game") end })()
-check(state.ranking_active == nil and #state.player_list == 1, "an erroring GetIsRankingActive leaves it out, the blob whole")
-state = NewVM({ players = { Player(101, "Alice") }, GetIsRankingActive = function() return 1 end })()
-check(state.ranking_active == nil, "a non-boolean leaves it out")
 
 -- Shine with basecommands: gagged per player, through IsClientGagged.
 local gagged = { [102] = true }

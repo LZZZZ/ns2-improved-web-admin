@@ -127,15 +127,6 @@ function LogView({ state, onOpenSettings }: {
     updateSettings({ logHiddenKinds: LOG_KINDS.map((k) => k.kind).filter((k) => next.has(k)) });
   };
 
-  if (log.source === "none" && log.unavailable) {
-    return (
-      <section class="wrap console-tab log-tab">
-        <Unavailable {...log.unavailable} />
-        <CommandLine shine={state.shine !== null} />
-      </section>
-    );
-  }
-
   return (
     <section class="wrap console-tab log-tab">
       <div class="toolbar log-filters">
@@ -191,7 +182,7 @@ function LogView({ state, onOpenSettings }: {
       {log.reset && <ResetBanner log={log} />}
 
       <div class="console log" ref={scroller} onScroll={onScroll}>
-        {log.source === "file" && (
+        {log.fileId !== null && (
           <p class="log-edge muted">
             {log.atStart ? (
               "Start of the file."
@@ -319,35 +310,6 @@ function ResetBanner({ log }: { log: LogState }) {
         {text}{" "}
         <button class="btn btn-sm" onClick={acknowledgeReset}>Dismiss</button>
       </p>
-    </div>
-  );
-}
-
-function Unavailable({ path, error, stale }: {
-  path: string;
-  error: string;
-  stale: boolean;
-}) {
-  return (
-    <div class="banner log-unavailable">
-      <h2>The server's log cannot be read</h2>
-      <p>
-        {stale
-          ? <span class="log-stale">Found <code>{path}</code>, but this server is not writing it.</span>
-          // The engine's message usually names the path already.
-          : <span class="mono">{error.includes(path) ? error
-              : `${path}: ${error || "no reason given"}`}</span>}
-      </p>
-      <p>To fix it:</p>
-      <ol>
-        <li>Stop the server.</li>
-        {stale && <li>Delete <code>{path}</code>, an old copy from an earlier run.</li>}
-        <li>
-          Start it with <code>-logdir</code> set to the same directory
-          as <code>-config_path</code>, or with neither flag.
-        </li>
-      </ol>
-      <p>Commands below still run and show their output.</p>
     </div>
   );
 }
