@@ -4,7 +4,7 @@
 # Usage: tools/export-to-ns2-game.sh <ns2-game checkout>
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
-dst=${1:?usage: $0 <ns2-game checkout>}
+dst=$(cd "${1:?usage: $0 <ns2-game checkout>}" && pwd)
 test -f "$dst/ns2/lua/Server.lua" || { echo "$dst: not an ns2-game checkout" >&2; exit 1; }
 
 # CRLF, like the stock file, so the diff shows what changed.
