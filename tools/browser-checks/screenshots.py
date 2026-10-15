@@ -29,7 +29,7 @@ from cdp import CDP, launch_chrome, page_target
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHROME_PORT = 9231
-WIDTH, HEIGHT = 1440, 900
+WIDTH, HEIGHT = 1920, 1080
 
 # port -> the mock's flags
 MOCKS = {
@@ -42,7 +42,7 @@ MOCKS = {
 # name -> (port, tab, seconds to let it settle, page height to keep or None)
 SHOTS = {
     "players":     (8140, "Players", 4, None),
-    "performance": (8141, "Performance", 6, 1312),
+    "performance": (8141, "Performance", 6, 1232),
     "maps":        (8142, "Maps", 4, None),
     "mods":        (8142, "Mods", 6, None),
     "console":     (8143, "Console", 4, None),
