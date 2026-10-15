@@ -1596,7 +1596,7 @@ components:
             request. Absent on a stock server, which is the supported way to
             tell the two apart -- a panel should read this once and say plainly
             what is unavailable rather than offering features that cannot work.
-          examples: ["0.1.0"]
+          examples: ["0.2.0"]
         max_players:
           type: integer
           description: |

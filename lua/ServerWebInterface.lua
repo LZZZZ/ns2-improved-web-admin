@@ -12,7 +12,7 @@
 Script.Load("lua/RingBuffer.lua")
 
 -- Absent from the stock file's state, which is how the panel tells them apart.
-local kModVersion = "0.1.0"
+local kModVersion = "0.2.0"
 
 -- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"

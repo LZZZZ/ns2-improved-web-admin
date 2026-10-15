@@ -124,7 +124,7 @@ engine.
 | --- | --- |
 | A dedicated server fetching an unlisted item | Works: `Queuing download of NS2 Improved Web Admin[3816039702]`, then `Mounting mod ... from <modstorage>/content/4920/3816039702/` |
 | What it downloaded | Byte-identical to `build/workshop/content/`: `web/`, `lua/`, `LICENSE` |
-| `lua/ServerWebInterface.lua` | Shadows the game's: `mod_version: "0.1.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
+| `lua/ServerWebInterface.lua` | Shadows the game's: `mod_version: "0.2.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
 | `web/` | `index.html` and the other 22 files `200`, byte-identical |
 | The mod's data folder | `config://improved-webadmin/whitelist.json` written (116 ids; the mod has not written it since 10-12) |
 | `getinstalledmodslist` | The item listed `active`, as `e3742516` |

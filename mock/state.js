@@ -127,7 +127,7 @@ export function createState(fixturesDir, opts = {}) {
   const kWorkshopLimit = 50;
   let workshopTimeoutS = 30;
   const workshopNext = { search: null, searches: 0, install: null };
-  const kModVersion = "0.1.0";
+  const kModVersion = "0.2.0";
 
   // ------------------------------------------------------------- whitelist
 

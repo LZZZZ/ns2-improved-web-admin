@@ -18,7 +18,7 @@ the functions the engine added for it.
 
 ## Status
 
-Version 0.1.0, an **unlisted** Workshop item:
+Version 0.2.0, an **unlisted** Workshop item:
 [3816039702](https://steamcommunity.com/sharedfiles/filedetails/?id=3816039702)
 (hex `e3742516`). It works on vanilla and Shine servers and covers every
 action of the 2012 panel. Remaining work is in
