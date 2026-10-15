@@ -440,8 +440,8 @@ export function createState(fixturesDir, opts = {}) {
       ...(opts.mod ? {
         mod_version: kModVersion, max_players: maxPlayers, map_loaded_at: perfWin.loadedAt,
         // Unranked, as any server with this mod mounted is until it is
-        // whitelisted (CONSTRAINTS item 18).
-        ranking_active: false,
+        // whitelisted (CONSTRAINTS item 18); --ranked for the game's own copy.
+        ranking_active: opts.ranked === true,
       } : {}),
       // Also the mod's: absent when Shine is not loaded.
       ...(opts.mod && shine ? {
@@ -1280,7 +1280,9 @@ export function createState(fixturesDir, opts = {}) {
         return `Removed reserved slot for ${gone.name}`;
       }
       case "sv_password":
-        return "Password set";
+        // Server.SetPassword prints nothing: only the audit line (rig, 10-15).
+        s.password = args.join(" ");
+        return "";
       case "sv_cheats":
         s.cheats = args[0] === "1" ? "true" : "false";
         return `Cheats ${s.cheats}`;

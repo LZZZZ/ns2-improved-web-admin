@@ -326,6 +326,12 @@ function Editor(p: EditorProps) {
         )}
       </div>
 
+      {!locked && (
+        <p class="muted maps-hint">
+          Drag maps by <GripVertical size={13} aria-hidden="true" /> to reorder the cycle,
+          or between the tables to add or remove them.
+        </p>
+      )}
       <div class={`maps-columns${drag ? " dragging-map" : ""}`}
            onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
         <div class="cycle-pane">

@@ -40,7 +40,8 @@ owners' terms:
    the map overviews in panel/src/minimaps/, the skill tier badges in
    panel/src/assets/skill-tiers.png, the team logos in
    panel/src/assets/logo-marines.png and logo-aliens.png, the NS2 monogram
-   in panel/src/assets/ns2-logo.png, and their built copies in web/assets/.
+   in panel/src/assets/ns2-logo.png, the gorge calling card in
+   panel/src/assets/gorge.png, and their built copies in web/assets/.
    Natural Selection 2 is a trademark of Unknown Worlds Entertainment.
 
 3. Text read from other software: the command help in

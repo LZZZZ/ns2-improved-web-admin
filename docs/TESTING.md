@@ -29,8 +29,9 @@ no Shine, no production config, and stock `ns2/web/` and
 
 **The mod needs the 10-12 drop or later** (`Build: 344.4035` and up): it
 calls the functions that drop added for web admin pages. The rig has run
-the 10-12 hotfix (`124b726321`) since 2026-10-12; `overlay.sh <zip>` in the
-rig applies a drop and checks every file.
+10-15 (`b7173011a9`, `Build: 344.4112`) since 2026-10-15; `overlay.sh <zip>`
+in the rig applies a drop and checks every file, but 10-10 and later zips
+store backslash paths: extract them elsewhere and copy `x64/` over.
 
 The docs' measurements ran on the 09-03 engine drop and later ones (09-26
 hotfix, 09-27, 09-28, 10-12 hotfix), extracted over the install's `x64/`,

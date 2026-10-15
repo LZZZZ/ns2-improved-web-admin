@@ -71,6 +71,11 @@ mods) for a modded server's, captured on the rig: 22 global mods, per-map
 mods, 40 maps of which 23 come from mods, a Shine per-map option (`"min":
 12` on `ns2_veil`) and a map group (`fixtures/getmapcycle-shine-options.json`).
 
+### `--ranked`
+
+With `--mod`, `ranking_active` is true, as for the game's own copy of the
+Lua; otherwise false, as for any server with the mod mounted.
+
 ### `--shine`
 
 A simulated Shine with the plugins named (`--shine=ban,reservedslots,mapvote,basecommands`;

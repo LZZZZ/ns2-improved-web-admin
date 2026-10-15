@@ -4,6 +4,7 @@ import { useEffect, useState } from "preact/hooks";
 // for app 4920 (2026-10-10); a drop-in file, and the favicon too (index.html).
 // Shown at 32 px, so it stays sharp at 2x.
 import logoUrl from "../assets/ns2-logo.png";
+import marinesLogo from "../assets/logo-marines.png";
 import { Activity } from "../tabs/Activity";
 import { Bans } from "../tabs/Bans";
 import { Chat } from "../tabs/Chat";
@@ -23,6 +24,8 @@ import {
 } from "../store/settings";
 import { setActivityTab, useActivity } from "./activity";
 import { clock, duration } from "./format";
+import { MapName } from "./Minimap";
+import { TickSpark } from "./TickSpark";
 
 // The six tabs the shipped panel has, plus what the mod's Lua makes possible:
 // recent players, and the server's log with its command line (one tab since
@@ -95,28 +98,32 @@ export function App() {
       <header class="header">
         <div class="wrap header-row">
           <img class="logo" src={logoUrl} width={32} height={32} alt="Natural Selection 2" />
+          {data?.rankingActive === true && (
+            <img class="ranked" src={marinesLogo} width={22} height={22}
+                 alt="Ranked" title="Server is ranked" />
+          )}
           <h1 class="server-name" title={data?.serverName ?? ""}>
             {data?.serverName ?? "Connecting..."}
           </h1>
           {data && (
             <div class="stats">
-              <span class="stat">map <b>{data.map}</b></span>
+              <span class="stat">map <b><MapName name={data.map} below /></b></span>
               <span class="stat">
                 players <b>{data.playersOnline}</b>
                 {" "}<span class="muted">
                   ({data.marines}v{data.aliens})
                 </span>
               </span>
-              <span class="stat">tickrate <b>{data.frameRate.toFixed(1)}</b></span>
               <span class="stat">uptime <b>{duration(data.uptimeSeconds)}</b></span>
               {data.gameStarted && (
                 <span class="stat">round <b>{duration(data.gameTimeSeconds)}</b></span>
               )}
               {data.shine && (
-                <span class="tag" title={shineTitle(data.shine)}>SHINE</span>
+                <span class="tag" title="Shine is loaded">SHINE</span>
               )}
               {data.cheats && <span class="tag">CHEATS</span>}
               {data.devMode && <span class="tag">DEVMODE</span>}
+              <TickSpark at={state.updatedAt} value={data.frameRate} />
             </div>
           )}
         </div>
@@ -254,15 +261,4 @@ export function App() {
       </footer>
     </div>
   );
-}
-
-function shineTitle(shine: { bans: boolean; reservedSlots: boolean; mapVote: boolean }): string {
-  const owns = [
-    shine.bans && "bans",
-    shine.reservedSlots && "reserved slots",
-    shine.mapVote && "the map vote",
-  ].filter(Boolean);
-  return owns.length
-    ? `Shine is loaded and owns ${owns.join(", ")}.`
-    : "Shine is loaded; none of the plugins that replace the game's own are on.";
 }

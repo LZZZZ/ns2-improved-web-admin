@@ -26,6 +26,8 @@ looks like a failure rather than like a design choice:
   * Mute is disabled without Shine and says why -- the game has no mute,
     and the 2012 panel's sv_mute never existed (defect 18); under Shine's
     basecommands it is sh_gag, and the row shows the gag and offers Unmute
+  * the header: the marine logo by the name only on a ranked server, the
+    tickrate as a sparkline, last, and the map's minimap on hovering its name
 
 Build the panel and start the mock on it first:
 
@@ -34,7 +36,7 @@ Build the panel and start the mock on it first:
 
 Exit status is 0 only if every check passes.
 """
-import asyncio, json, os, sys, urllib.request
+import asyncio, json, os, re, sys, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
@@ -99,7 +101,7 @@ async def main():
                   (await c.eval("document.querySelector('.server-name').textContent"))
                   == "Example NS2 Server")
             check("header stats populated",
-                  "tickrate" in str(await c.eval(
+                  "uptime" in str(await c.eval(
                       "document.querySelector('.stats').textContent")))
 
             print("\n== stock-server honesty")
@@ -426,6 +428,24 @@ async def main():
             check("and bots get no link", await c.eval(
                 f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
                 ".every(r=>!r.querySelector('a.player-link'))"))
+            print("\n== the header")
+            check("an unranked server shows no ranked logo",
+                  await c.eval("!document.querySelector('.header .ranked')"))
+            spark = str(await c.eval(
+                "document.querySelector('.header .tick-spark title')?.textContent||''"))
+            check("the tickrate is a sparkline, its number on hover",
+                  re.match(r"Tickrate \d+\.\d; last \d+ readings", spark) is not None, spark[:50])
+            check("and the last item in the header", await c.eval(
+                "document.querySelector('.header .stats').lastElementChild"
+                ".classList.contains('tick-spark')"))
+            name = "document.querySelector('.header .map-name')"
+            await c.eval(f"{name}.dispatchEvent(new MouseEvent('mouseenter'))")
+            await asyncio.sleep(0.5)
+            src = str(await c.eval(
+                "document.querySelector('.header .minimap-pop img')?.getAttribute('src')||''"))
+            check("hovering the map name shows its minimap", "ns2_summit" in src, src[-40:])
+            await c.eval(f"{name}.dispatchEvent(new MouseEvent('mouseleave'))")
+
             if not EXPECT_MOD:
                 await c.send("Page.navigate", url=BETA + "/index.html")
                 await asyncio.sleep(3.5)
@@ -446,6 +466,9 @@ async def main():
                                     ".every(r=>!r.querySelector('.shared-cell')"
                                     ".textContent.includes('shared copy'))")
                 check("bots read as not shared", bots is True)
+                check("a ranked server shows the marine logo by its name",
+                      await c.eval("document.querySelector('.header .ranked')?.title")
+                      == "Server is ranked")
 
             print("\n== a bare / (CURRENT-UI defect 12)")
             with urllib.request.urlopen(f"{MOCK}/", timeout=5) as r:

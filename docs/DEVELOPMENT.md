@@ -70,6 +70,7 @@ verify.
 | `tools/make-minimaps.sh` | `<server>/ns2/maps/overviews` → `panel/src/minimaps/*.png` (320 px, 64 colours). Re-run when a game update changes a map. |
 | `tools/make-skill-tiers.sh` | `<client>/ns2/ui/skill_tier_icons.dds` (client install; the server has no UI art) → `panel/src/assets/skill-tiers.png`. |
 | `tools/make-team-logos.sh` | `<client>/ns2/ui` (`logo_marine.dds`, `logo_alien.dds`) → `panel/src/assets/logo-marines.png`, `logo-aliens.png`. |
+| `tools/make-gorge.sh` | `<client>/ns2/ui` (`callingcards/callingcards_1.dds`, row 6, column 2) → `panel/src/assets/gorge.png`, the background's sliding gorge. |
 | `tools/make-commands.py` | Regenerate `panel/src/commands.json`, the Console's suggestions: the game's and Shine's admin commands with arguments and help (`--lua <server>/ns2/lua --shine <Shine's lua/shine>`), plus a hand-kept list of engine commands. Re-run after a game or Shine update. |
 | `tools/nonce-under-load.py` | Poll one Digest nonce at the panel's cadence until the server refuses it, then re-authenticate. |
 | `tools/browser-checks/run-all.sh` | Run the gates, above. |

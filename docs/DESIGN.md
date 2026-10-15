@@ -65,6 +65,7 @@ and says so.
 
 | Tab | What it does |
 | --- | --- |
+| (header) | Server name, with the marine logo when the engine says the server is ranked. Map (its minimap on hover), players, uptime, round time, Shine, then the tickrate as a sparkline of the last 90 state polls, unlabelled (the number on hover). |
 | Players | One table per team under the game's team logos. Sort, filter, kick, ban, slay, move, eject, mute (Shine's `sh_gag`), and the round buttons. IPs and Steam ids masked until asked, per row. Bot buttons disabled, with the reason. Links to each player's Steam profile and ns2panel.com page. With the mod: Hive skill with the game's badge, and the marine, alien and commander figures on hover. With the mod: Family Sharing. |
 | Recent players | Everyone seen in the last 24 hours (up to 100), connected or not, so a player who left can still be banned. Search by part of a name, a former name, any Steam id form or an IP. Needs the mod. |
 | Bans | The bans in force, from the table that decides them (Shine's, under its ban plugin). Ban by any common Steam id form, unban per row. |
@@ -72,7 +73,7 @@ and says so.
 | Maps | The cycle and the available maps side by side. Drag or arrow to reorder, drag in to add, drag out to remove. Every change is written at once, re-read first so a concurrent change is not overwritten, and can be undone. Shine's per-map options and map groups survive. Warnings for a missing map, a mod map whose mod is not loaded, and a duplicate. A stock map's minimap on hover. Shine's mapvote explained. |
 | Mods | Installed mods in mount order: which are loaded now, load or stop loading with every map, and whether each is on the ranked whitelist. |
 | Workshop | Search the Workshop through the server, read a mod's details, install it. Thumbnails from Steam unless turned off in Settings. |
-| Reserved Slots | The amount, and the slots by name. Shine's count when its plugin is on. |
+| Reserved Slots | The server password: set or remove (`sv_password`); the engine has no way to read it back. The slot amount, and the slots by name. Shine's count when its plugin is on. |
 | Performance | What `perfmon` measures, in 10 s windows on one time axis: tickrate, slowest tick, score and players, then frame time, late updates, entities and the Lua heap. With the engine's `tickstat` on (the tab's switch, the server's setting): tick spacing, snapshot size against what `bwlimit` allows, choke, rate steps. Needs the mod for all but the stock readings. |
 | Console | The server's `log-Server.txt`, filtered by kind and coloured, with the command line under it. A command shows what it printed; names and help are suggested as you type. Save writes what was read to a file. |
 | Activity | Every command this page sent and what it printed, newest first. |

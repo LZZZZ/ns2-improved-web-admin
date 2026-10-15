@@ -2,14 +2,14 @@ import { UserMinus } from "lucide-preact";
 import { useState } from "preact/hooks";
 import type { ServerState } from "../api/types";
 import {
-  addSlotCommand, removeSlotCommand, sendCommand, slotAmountCommand,
+  addSlotCommand, passwordCommand, removeSlotCommand, sendCommand, slotAmountCommand,
 } from "../store/commands";
 import { useResource } from "../store/poll";
 import { reservedSlots } from "../store/resources";
 import { updateSettings, useSettings } from "../store/settings";
 import { IconButton } from "../ui/Icon";
 import { Masked } from "../ui/Masked";
-import { maskSteamId, parseSteamId, slotName } from "../ui/format";
+import { consoleArg, maskSteamId, parseSteamId, slotName } from "../ui/format";
 
 const SHINE_REASON =
   "Shine's reservedslots plugin grants access by permission; this list is not enforced.";
@@ -26,8 +26,12 @@ export function Slots({ state }: { state: ServerState }) {
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
   const [idInput, setIdInput] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // One console argument, as it reaches SetPassword: no spaces, quotes or `;`.
+  const passwordValid = password !== "" && consoleArg(password) === password
+    && !password.includes(" ");
   const amountValue = Number(amount);
   const amountValid = amount.trim() !== "" && Number.isInteger(amountValue)
     && amountValue >= 0
@@ -57,6 +61,18 @@ export function Slots({ state }: { state: ServerState }) {
     if (outcome.tone !== "error") setAmount("");
   };
 
+  const changePassword = async (e: Event) => {
+    e.preventDefault();
+    if (!passwordValid || busy) return;
+    const outcome = await run(passwordCommand(password));
+    if (outcome.tone !== "error") setPassword("");
+  };
+
+  const removePassword = () => {
+    if (!confirm("Remove the server password? Anyone will be able to join.")) return;
+    void run(passwordCommand(""));
+  };
+
   const add = async (e: Event) => {
     e.preventDefault();
     if (parsedId === null || cleanName === "" || busy) return;
@@ -79,6 +95,28 @@ export function Slots({ state }: { state: ServerState }) {
 
   return (
     <section class="wrap slots-tab">
+      <form class="form-card password-form" onSubmit={changePassword}>
+        <h2>Server password</h2>
+        <div class="form-row">
+          <input
+            type="text"
+            name="password"
+            placeholder="New password"
+            aria-label="New password"
+            autoComplete="off"
+            spellcheck={false}
+            value={password}
+            onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+          />
+          <button class="btn" type="submit" disabled={busy || !passwordValid}>Set</button>
+          <button class="btn btn-danger" type="button" disabled={busy}
+                  onClick={removePassword}>Remove</button>
+        </div>
+        {password !== "" && !passwordValid && (
+          <p class="muted form-hint">One word: no spaces, quotes or ;.</p>
+        )}
+      </form>
+
       {shineOwns && (
         <div class="banner shine-banner">
           <h2>Shine decides reserved slots here</h2>

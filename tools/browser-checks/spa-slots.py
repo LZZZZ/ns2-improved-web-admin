@@ -7,7 +7,9 @@ checks are about what this one claims:
 
   * stock      the amount is set through sv_reserved_slots, which works there,
                and reported as unverified; the removal bug is disclosed
-  * --mod      the amount is capped at max players (the server ignores more
+  * --mod      the server password is set and removed with sv_password, and
+               one that would not survive as one console argument cannot
+               be sent; the amount is capped at max players (the server ignores more
                without a word), a set reports what the server printed and
                reads back, a slot name loses its `;` and spaces before it
                becomes a console argument, a duplicate name is flagged, and a
@@ -47,6 +49,11 @@ def check(label, ok, detail=""):
 def reset(base):
     with urllib.request.urlopen(f"{base}/__mock/reset", timeout=5) as r:
         r.read()
+
+
+def mock_state(base):
+    with urllib.request.urlopen(f"{base}/__mock/state", timeout=5) as r:
+        return json.loads(r.read())
 
 
 async def type_into(c, selector, text):
@@ -118,6 +125,27 @@ async def mod(c):
     await open_slots(c, MOD)
     check("no stock or Shine banner", await banners(c) == "", await banners(c) or "(none)")
 
+    pw = "document.querySelector('input[name=password]')"
+    await type_into(c, "input[name=password]", "two words")
+    await asyncio.sleep(0.2)
+    check("a password with a space cannot be sent",
+          await c.eval(f"{pw}.form.querySelector('button[type=submit]').disabled") is True)
+    hint = str(await c.eval(f"{pw}.form.querySelector('.form-hint').textContent"))
+    check("and the hint says why", hint.startswith("One word"), hint[:40])
+    await type_into(c, "input[name=password]", "hunter2")
+    await asyncio.sleep(0.2)
+    await c.eval(f"{pw}.form.querySelector('button[type=submit]').click()")
+    await asyncio.sleep(1.5)
+    cmd, _ = await last_activity(c)
+    check("a password is set with sv_password", cmd == "sv_password hunter2", cmd)
+    check("and reaches the server", mock_state(MOD).get("password") == "hunter2")
+    check("and the field clears", await c.eval(f"{pw}.value") == "")
+    await c.eval(f"[...{pw}.form.querySelectorAll('button')]"
+                 ".find(b=>b.textContent==='Remove').click()")
+    await asyncio.sleep(1.5)
+    cmd, _ = await last_activity(c)
+    check("Remove sends sv_password with no argument", cmd == "sv_password", cmd)
+    check("which clears it", mock_state(MOD).get("password") == "")
     await type_into(c, "input[name=amount]", "99")
     await asyncio.sleep(0.2)
     disabled = await c.eval("document.querySelector('input[name=amount]').form"

@@ -24,7 +24,7 @@
 //
 // Usage: node mock/server.js [--port 8080] [--web <dir>] [--auth user:pass]
 //                           [--mod] [--shine[=ban,reservedslots,mapvote,basecommands]]
-//                           [--maps=modded]
+//                           [--maps=modded] [--ranked]
 // See mock/README.md.
 
 import { createServer } from "node:http";
@@ -66,6 +66,7 @@ function parseArgs(argv) {
     else if (a === "--tickstat") o.tickstatSeconds = Number(next());
     else if (a === "--no-chat-buffer") o.noChatBuffer = true;
     else if (a === "--mod") o.mod = true;
+    else if (a === "--ranked") o.ranked = true;
     else if (a === "--log-rounds") o.logRounds = Number(next());
     else if (a === "--maps" || a.startsWith("--maps=")) {
       o.maps = a.includes("=") ? a.slice(a.indexOf("=") + 1) : next();

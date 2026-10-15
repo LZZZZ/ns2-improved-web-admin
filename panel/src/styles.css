@@ -103,6 +103,26 @@ button, input, select { font: inherit; color: inherit; }
 
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 
+/* The game's sliding gorge (tools/make-gorge.sh), behind everything, so it
+   shows only where the page is empty; tables get the page's background so it
+   never sits under text. Half transparent, so it does not compete with the
+   page. It clears the status bar and the command line above it (82 px),
+   which end a short page at the bottom of the window. Hidden on a narrow
+   screen. */
+.app::after {
+  content: "";
+  position: fixed;
+  right: 16px;
+  bottom: 92px;
+  width: 480px;
+  aspect-ratio: 507 / 329;
+  background: url("./assets/gorge.png") center / contain no-repeat;
+  opacity: 0.5;
+  z-index: -1;
+  pointer-events: none;
+}
+@media (max-width: 1100px) { .app::after { display: none; } }
+
 /* Full width on purpose: the main content is a wide table and the 2012 panel
    wasted most of a wide screen on a fixed centred container. */
 .wrap { width: 100%; padding: 0 16px; }
@@ -135,9 +155,25 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 .logo { flex: 0 0 auto; display: block; margin-right: -6px; }
+.ranked { flex: 0 0 auto; display: block; margin-right: -8px; }
+.tick-spark { align-self: center; flex: 0 0 auto; }
+.tick-spark rect { fill: var(--bg-inset); stroke: var(--border); }
+.tick-spark polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
 
 .stats { display: flex; gap: 14px; flex-wrap: wrap; color: var(--text-dim); }
 .stat b { color: var(--text); font-weight: 600; }
+/* Centred on the row, and trimmed to the capitals where the browser can, so
+   SHINE sits in the middle of its border rather than above the descender gap. */
+.stats .tag { align-self: center; }
+@supports (text-box: trim-both cap alphabetic) {
+  .stats .tag { text-box: trim-both cap alphabetic; padding: 4px 7px; }
+}
 
 .tabs {
   display: flex;
@@ -237,7 +273,12 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---------------------------------------------------------------- tables */
 
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 6px 10px; white-space: nowrap; }
 thead th {
@@ -539,6 +580,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .form-row input[name="steamid"] { width: 340px; max-width: 100%; }
 .form-row input[name="slotid"] { width: 280px; }
+.form-row input[name="password"] { width: 296px; max-width: 100%; }
 .form-row input[name="amount"], .form-row input[name="minutes"] { width: 90px; }
 .form-hint { margin: 8px 0 0; font-size: 12px; }
 .form-row .btn { height: 34px; }
@@ -610,6 +652,9 @@ tr.current-map .name-cell { font-weight: 600; }
   .maps-columns { grid-template-columns: minmax(0, 1fr); }
 }
 .maps-columns.dragging-map { user-select: none; cursor: grabbing; }
+.maps-hint { margin: 14px 0 0; font-size: 12px; }
+.maps-hint svg { vertical-align: -2px; }
+.maps-hint + .maps-columns .section-title { margin-top: 10px; }
 .available-pane { border-radius: var(--radius); }
 .available-pane.drop-target .table-wrap { outline: 2px dashed var(--danger); outline-offset: 2px; }
 .drop-hint { margin: 6px 0 0; font-size: 12px; color: var(--danger); }

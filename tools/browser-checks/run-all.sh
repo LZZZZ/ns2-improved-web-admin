@@ -30,7 +30,7 @@ MOCKS=(
   "8098|--shine"
   "8099|--mod --shine=ban,reservedslots,mapvote --maps=modded"
   "8101|--no-chat-buffer"
-  "8102|--mod"
+  "8102|--mod --ranked"
 )
 
 pids=()

@@ -118,3 +118,8 @@ export function addSlotCommand(name: string, steamId: number): string {
 export function removeSlotCommand(steamId: number): string {
   return `sv_remove_reserved_slot ${steamId}`;
 }
+
+/** No argument removes it: SetPassword passes "" for a missing one. */
+export function passwordCommand(password: string): string {
+  return password === "" ? "sv_password" : `sv_password ${password}`;
+}

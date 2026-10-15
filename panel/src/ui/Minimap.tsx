@@ -16,7 +16,8 @@ const MINIMAPS = new Map(Object.entries(files).map(([path, url]) =>
 /** Room the popup needs: the image's 320 px plus its frame. */
 const kSize = 340;
 
-export function MapName({ name }: { name: string }) {
+/** `below`: under the name, for the header, where beside it is the window's edge. */
+export function MapName({ name, below = false }: { name: string; below?: boolean }) {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const url = MINIMAPS.get(name);
 
@@ -24,6 +25,10 @@ export function MapName({ name }: { name: string }) {
   const show = (e: Event) => {
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const width = url ? kSize : 200;
+    if (below) {
+      setAt({ x: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)), y: box.bottom + 8 });
+      return;
+    }
     const x = box.right + 12 + width <= window.innerWidth
       ? box.right + 12 : Math.max(8, box.left - 12 - width);
     const y = Math.max(8, Math.min(box.top - 40, window.innerHeight - (url ? kSize : 40) - 8));
