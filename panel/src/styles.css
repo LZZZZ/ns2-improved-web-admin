@@ -103,9 +103,8 @@ button, input, select { font: inherit; color: inherit; }
 
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 
-/* The game's sliding gorge (tools/make-gorge.sh), behind everything, so it
-   shows only where the page is empty; tables get the page's background so it
-   never sits under text. Half transparent, so it does not compete with the
+/* The game's sliding gorge (tools/make-gorge.sh), behind everything: in the
+   empty page, and blurred under the glass boxes below. Half transparent, so it does not compete with the
    page. It clears the status bar and the command line above it (82 px),
    which end a short page at the bottom of the window. Hidden on a narrow
    screen. */
@@ -122,6 +121,23 @@ button, input, select { font: inherit; color: inherit; }
   pointer-events: none;
 }
 @media (max-width: 1100px) { .app::after { display: none; } }
+
+/* Glass: the boxes that hold content are tinted, not opaque, and blur what
+   is behind them, so the gorge shows through; over the plain page they look
+   as before. Opaque where the browser cannot blur or the system asks for
+   less transparency. */
+:root {
+  --glass: 68%;
+  --glass-bg: color-mix(in srgb, var(--bg) var(--glass), transparent);
+  --glass-raised: color-mix(in srgb, var(--bg-raised) var(--glass), transparent);
+  --glass-inset: color-mix(in srgb, var(--bg-inset) var(--glass), transparent);
+}
+@supports not (backdrop-filter: blur(1px)) { :root { --glass: 100%; } }
+@media (prefers-reduced-transparency: reduce) { :root { --glass: 100%; } }
+.table-wrap, .form-card, .banner, .console, .command-output, .perf-strip,
+.perf-chart, .console-paused {
+  backdrop-filter: blur(12px);
+}
 
 /* Full width on purpose: the main content is a wide table and the 2012 panel
    wasted most of a wide screen on a fixed centred container. */
@@ -203,7 +219,7 @@ main { flex: 1; padding: 16px 0 32px; }
 .banner {
   border: 1px solid var(--border);
   border-left: 3px solid var(--warn);
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   border-radius: var(--radius);
   padding: 10px 12px;
   margin: 12px 0;
@@ -277,14 +293,14 @@ select:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--glass-bg);
 }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: 6px 10px; white-space: nowrap; }
 thead th {
   position: sticky;
   top: 0;
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   cursor: pointer;
@@ -412,7 +428,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .console {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-inset);
+  background: var(--glass-inset);
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.55;
@@ -437,12 +453,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .src-server .console-text { color: var(--text-dim); }
 .src-audit .console-text { color: var(--accent); opacity: 0.75; }
 
-.console-input { display: flex; gap: 6px; align-items: center; }
-.console-input .prompt { font-family: var(--mono); color: var(--text-dim); }
+/* Stretched, so the select and the button beside it are the input's height. */
+.console-input { display: flex; gap: 6px; align-items: stretch; }
+.console-input .prompt { align-self: center; font-family: var(--mono); color: var(--text-dim); }
 .console-input input {
   flex: 1;
   font-family: var(--mono);
-  background: var(--bg-inset);
+  background: var(--glass-inset);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 7px 9px;
@@ -491,7 +509,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   padding: 6px 9px;
   max-height: 240px;
   overflow: auto;
-  background: var(--bg-inset);
+  background: var(--glass-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   font-family: var(--mono);
@@ -559,7 +577,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .form-card {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   padding: 10px 12px;
   margin: 16px 0;
 }
@@ -767,7 +785,7 @@ tbody tr.detail-row { border-top: none; background: var(--bg-raised); }
   flex-wrap: wrap;
   align-items: baseline;
   padding: 10px 12px;
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -788,7 +806,7 @@ tbody tr.detail-row { border-top: none; background: var(--bg-raised); }
   margin: 0;
   min-width: 0;
   padding: 8px 8px 4px;
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -850,7 +868,7 @@ tbody tr.detail-row { border-top: none; background: var(--bg-raised); }
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-raised);
+  background: var(--glass-raised);
   color: var(--text-dim);
   font-size: 13px;
 }
