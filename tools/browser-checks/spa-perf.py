@@ -21,7 +21,7 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
   * tickrate, the slowest tick, score and players are four lines on one
     chart with one unitless axis (F1, as settled on the rig), the units in
     the legend
-  * the engine's tickstat: off until the Settings switch turns it on (F2),
+  * the engine's tickstat: off until the tab's switch turns it on,
     which moves only once the server confirms it; its
     charts join the same grid and hold exactly the lines served; its latest
     line joins the window's in one summary, and the status line goes while
@@ -29,7 +29,7 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
     bwlimit that fixes it; the engine's bwlimit warning is shown; a map
     change keeps the earlier lines; turning it off is confirmed the same way
   * no table view and no history line (Performance review, 2026-10-08)
-  * a stock server's Settings says the switch needs the mod
+  * a stock server shows no tickstat switch
 
 Start the mocks first:
 
@@ -167,8 +167,8 @@ async def after_regular_line():
 
 
 async def flip_tickstat(c):
-    """Click the Settings switch and wait for its outcome; (commands sent, outcome)."""
-    await open_tab(c, MOD, "Settings")
+    """Click the tab's tickstat switch and wait for its outcome; (commands sent, outcome)."""
+    await open_tab(c, MOD, "Performance")
     await c.eval("document.querySelector('[data-tickstat-outcome]')?.remove()")
     mark = len(c.events)
     await c.eval("document.querySelector('input[name=tickstat]').click()")
@@ -186,28 +186,20 @@ async def tickstat_checks(c):
     print("\n== tickstat, from the server's log")
     await open_tab(c, MOD, "Performance")
     await asyncio.sleep(1)
-    check("the engine status reads the log",
-          await attr(c, ".perf-engine", "engine") == "log")
-    status = await text(c, ".tickstat-status")
-    check("no tickstat yet, it says a restart turns it off, and where to turn it on",
-          await attr(c, ".perf-engine", "tickstatState") == "none"
-          and "off after every restart" in status and "Settings turns it on" in status, status[:60])
-    check("the tab has no tickstat button of its own (F2)",
-          not await c.eval("[...document.querySelectorAll('.perf-tab .btn')]"
-                           ".some(b=>b.textContent.includes('tickstat'))"))
-
-    await open_tab(c, MOD, "Settings")
-    check("Settings shows the server's tickstat, off",
-          await attr(c, "[data-tickstat-switch]", "tickstatSwitch") == "log"
-          and await c.eval("document.querySelector('input[name=tickstat]').checked") is False)
+    check("no tickstat yet, and no note about it: off after a restart is the norm",
+          not await c.eval("!!document.querySelector('.tickstat-status')"))
+    check("the tab's tickstat switch shows the server's state, off",
+          await attr(c, ".tickstat-switch", "tickstatState") == "none"
+          and await c.eval("document.querySelector('.perf-tab input[name=tickstat]').checked") is False)
+    check("and Settings has no tickstat switch",
+          not await c.eval("!!document.querySelector('.settings-tab input[name=tickstat]')"))
     sent, outcome = await flip_tickstat(c)
     check("its switch runs tickstat 10", sent == ["tickstat 10"], sent)
     check("and says it is on only once the server's log says so",
           outcome == "confirmed", f"{outcome}: {await text(c, '[data-tickstat-outcome]')}")
     check("the switch reads on", await c.eval("document.querySelector('input[name=tickstat]').checked") is True)
-    await open_tab(c, MOD, "Performance")
-    check("the state reads starting, or the line is gone because it is on",
-          await attr(c, ".perf-engine", "tickstatState") in ("starting", None))
+    check("the state reads starting, or on",
+          await attr(c, ".tickstat-switch", "tickstatState") in ("starting", "on"))
 
     for _ in range(3):
         get(f"{MOD}/__mock/tickstat?emit=1")
@@ -215,12 +207,12 @@ async def tickstat_checks(c):
     await asyncio.sleep(2.6)
     check("seven more charts once lines arrive, in the same grid",
           await c.eval("document.querySelectorAll('.perf-grid .perf-chart').length") == 12)
-    check("logging, the tab says nothing of it (the status line is gone)",
-          await c.eval("document.querySelector('.perf-engine')") is None)
+    check("logging, the tab says nothing more of it",
+          await c.eval("document.querySelector('.tickstat-status')") is None)
     strip = await text(c, ".perf-strip")
     check("the latest line joins the window's, in one summary, delivered against the target",
           await c.eval("document.querySelectorAll('.perf-strip').length") == 1
-          and "tickrate" in strip and "/ 60 Hz" in strip and "tickstat's" in strip
+          and "tickrate" in strip and "/ 60 Hz" in strip and "delivered" in strip
           and "--" not in strip and await c.eval(
               "document.querySelector('.perf-strip').compareDocumentPosition("
               "document.querySelector('.perf-grid')) & Node.DOCUMENT_POSITION_FOLLOWING"),
@@ -243,7 +235,7 @@ async def tickstat_checks(c):
 
     print("\n== bwlimit and choke")
     await after_regular_line()
-    get(f"{MOD}/__mock/tickstat?snap_p99_bytes=4000&choked_pct=12.5&emit=1")
+    get(f"{MOD}/__mock/tickstat?snapBytesP99=4000&chokedPct=12.5&emit=1")
     await asyncio.sleep(2.6)
     fix = await attr(c, "[data-bwlimit-fix]", "bwlimitFix")
     note = await text(c, "[data-bwlimit-fix]")
@@ -261,7 +253,7 @@ async def tickstat_checks(c):
           await attr(c, "[data-bwlimit-warning]", "bwlimitWarning") == "10000"
           and "bwlimit 122880 or more" in warn, warn[:60])
     await after_regular_line()
-    get(f"{MOD}/__mock/tickstat?snap_p99_bytes=900&emit=1")
+    get(f"{MOD}/__mock/tickstat?snapBytesP99=900&emit=1")
     await asyncio.sleep(2.6)
     fix = await attr(c, "[data-bwlimit-fix]", "bwlimitFix")
     note = await text(c, "[data-bwlimit-fix]")
@@ -294,8 +286,7 @@ async def tickstat_checks(c):
           await c.eval("window.__asked") == 1, str(await c.eval("window.__asked")))
     check("and runs tickstat 0, confirmed by the log",
           sent == ["tickstat 0"] and outcome == "confirmed", f"{sent} {outcome}")
-    await open_tab(c, MOD, "Performance")
-    check("and the state reads off", await attr(c, ".perf-engine", "tickstatState") == "off")
+    check("and the state reads off", await attr(c, ".tickstat-switch", "tickstatState") == "off")
 
     exceptions = c.take_events("Runtime.exceptionThrown")
     check("no uncaught exceptions with tickstat", not exceptions,
@@ -353,9 +344,14 @@ async def main():
             check("the full width of the grid",
                   await c.eval("(f=>getComputedStyle(f).gridColumnStart)"
                                "(document.querySelector('.perf-chart.perf-wide'))") == "1")
-            rates = str(await c.eval("document.querySelector('.perf-rates')?.textContent||''"))
-            check("the configured rates are shown", "tick 60" in rates and "interp 85 ms" in rates,
-                  rates[:60])
+            strip = str(await c.eval("document.querySelector('.perf-strip')?.textContent||''"))
+            check("the configured rates are in the strip, the tickrate once",
+                  "move 60, send 60, interp 85 ms" in strip and "tick 60" not in strip
+                  and not await c.eval("!!document.querySelector('.perf-rates')"), strip[-60:])
+            check("no Refresh button and no zoom hint",
+                  not await c.eval("[...document.querySelectorAll('.perf-tab .btn')]"
+                                   ".some(b=>b.textContent==='Refresh')")
+                  and "drag across" not in await text(c, ".perf-tab"))
 
             check("no table view and no history line",
                   not await c.eval("[...document.querySelectorAll('.perf-tab .btn')]"
@@ -475,15 +471,12 @@ async def main():
                   await c.eval("document.querySelectorAll('.perf-chart').length") == 2)
             check("no engine section on stock",
                   await c.eval("document.querySelector('.perf-engine')") is None)
-            await open_tab(c, STOCK, "Settings")
-            said = await text(c, "[data-tickstat-switch]")
-            check("Settings says tickstat needs the mod",
-                  await attr(c, "[data-tickstat-switch]", "tickstatSwitch") == "stock"
-                  and "Needs this panel's mod" in said, said[:50])
-            await open_tab(c, STOCK, "Performance")
+            check("no tickstat switch on stock",
+                  not await c.eval("!!document.querySelector('input[name=tickstat]')"))
             for _ in range(3):
-                await c.eval("[...document.querySelectorAll('.perf-tab .btn')]"
-                             ".find(b=>b.textContent==='Refresh').click()")
+                # Coming back to the tab reads again (stock polls once a minute).
+                await open_tab(c, STOCK, "Settings")
+                await open_tab(c, STOCK, "Performance")
                 await asyncio.sleep(0.6)
             served = len(json.loads(get(f"{STOCK}/?request=getperfdata")))
             rows = await window_points(c)

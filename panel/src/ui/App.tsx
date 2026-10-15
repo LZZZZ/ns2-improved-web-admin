@@ -177,7 +177,7 @@ export function App() {
         )}
         {data && tab === "slots" && <Slots state={data} />}
         {data && tab === "performance" && (
-          <Performance state={data} onOpenSettings={() => goTo("settings")} />
+          <Performance state={data} />
         )}
         {data && tab === "chat" && (
           <Chat state={data} onOpenSettings={() => goTo("settings")} />
@@ -186,7 +186,7 @@ export function App() {
           <Log state={data} onOpenSettings={() => goTo("settings")} />
         )}
         {tab === "activity" && <Activity tabLabel={tabLabel} />}
-        {tab === "settings" && <Settings state={state.error ? null : data} />}
+        {tab === "settings" && <Settings />}
       </main>
 
       {lastHere && !NO_CONFIRMATION.has(tab) && (

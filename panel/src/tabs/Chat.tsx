@@ -4,7 +4,7 @@ import { TEAM_NAMES } from "../api/types";
 import type { CommandOutcome } from "../store/commands";
 import { sendCommand } from "../store/commands";
 import {
-  acknowledgeChatRestart, getChatState, refreshChat, setChatIntervalMs, setChatMod,
+  getChatState, refreshChat, setChatIntervalMs, setChatMod,
   useChat,
 } from "../store/chat";
 import { useSettings } from "../store/settings";
@@ -111,7 +111,6 @@ export function Chat({ state, onOpenSettings }: {
       <div class="toolbar">
         <span class="muted">
           {chat.entries.length} message{chat.entries.length === 1 ? "" : "s"}
-          {chat.bufferSize !== null && ` · the server keeps the last ${chat.bufferSize}`}
           {chat.dropped > 0
             && ` · ${chat.dropped} dropped by the server before they were read`}
         </span>
@@ -138,20 +137,6 @@ export function Chat({ state, onOpenSettings }: {
         </p>
       )}
 
-      {chat.restarted && (
-        <div class="banner">
-          <h2>The chat restarted</h2>
-          <p>
-            Message numbering went backwards, which means the map changed: the
-            server keeps chat in Lua state and the map change rebuilt it.
-            What was said before the change is gone from here; the Log tab
-            still has it.{" "}
-            <button class="btn btn-sm" onClick={acknowledgeChatRestart}>
-              Dismiss
-            </button>
-          </p>
-        </div>
-      )}
 
       <div class="console chat" ref={scroller} onScroll={onScroll}>
         {chat.entries.length === 0 && (
@@ -203,12 +188,10 @@ export function Chat({ state, onOpenSettings }: {
           Send
         </button>
       </div>
-      {last && (
+      {last && !landed && (
         <p class={last.tone === "error" ? "console-status tone-error" : "console-status"}>
           <span class="mono">{last.command}</span>{" "}
-          {landed
-            ? "was said: it is in the server's chat above."
-            : (last.output.length > 0 ? `printed: ${last.note}` : last.note)}
+          {last.output.length > 0 ? `printed: ${last.note}` : last.note}
         </p>
       )}
     </section>

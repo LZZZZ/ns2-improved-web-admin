@@ -12,8 +12,9 @@ export type Theme = "dark" | "light" | "system";
 export type ClockFormat = "locale" | "24h" | "utc";
 
 export interface Settings {
-  /** IPs and Steam ids masked until revealed. Default on -- see API.md. */
-  maskIdentifiers: boolean;
+  /** IPs and Steam ids masked until revealed. Off by default; renamed from
+   *  hideIdentifiers, which defaulted on, so that stored value is not read. */
+  hideIdentifiers: boolean;
   /** Seconds between server-state polls (header, Players). 0 stops polling. */
   refreshSeconds: number;
   /**
@@ -43,7 +44,7 @@ const THEMES: readonly Theme[] = ["dark", "light", "system"];
 const CLOCKS: readonly ClockFormat[] = ["locale", "24h", "utc"];
 
 export const DEFAULTS: Settings = {
-  maskIdentifiers: true,
+  hideIdentifiers: false,
   refreshSeconds: 2,
   consoleRefreshSeconds: 2,
   logRefreshSeconds: 2,
@@ -92,7 +93,7 @@ function sanitize(raw: unknown): Settings {
 
   const refreshSeconds = refresh(r["refreshSeconds"], DEFAULTS.refreshSeconds);
   return {
-    maskIdentifiers: bool("maskIdentifiers"),
+    hideIdentifiers: bool("hideIdentifiers"),
     refreshSeconds,
     // Absent in what builds before the console had its own knob stored: keep
     // the rate it ran at then, rather than changing it silently.

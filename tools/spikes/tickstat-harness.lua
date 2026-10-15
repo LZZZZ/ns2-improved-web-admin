@@ -177,8 +177,8 @@ do
     local vm = NewVM({ bw = 131072 })
     vm.run(3)
     local e, body = vm.perf()
-    check(e.source == "log" and e.scan_s == 2 and e.now == math.floor(vm.unix),
-          "source log, a 2 s scan, the server's clock")
+    check(e.scan_s == 2 and e.now == math.floor(vm.unix),
+          "a 2 s scan, the server's clock")
     check(#e.tickstats == 0 and #e.events == 0 and e.last_id == 0 and e.tickstat_last_at == nil,
           "nothing while tickstat is off, nothing from before the load")
     check(body:find('"tickstats":%[%]') and body:find('"perfmon":%[%]') and body:find('"events":%[%]'),
@@ -200,26 +200,17 @@ do
     check(#e.tickstats == 1 and t.id == 1 and e.last_id == 1, "one record, id 1, though polled three times")
     check(t.time >= math.floor(closed) - 1 and t.time <= closed and e.tickstat_last_at == t.time,
           "stamped when the window closed, on the system clock")
-    local fields = { "win_s", "hz", "target", "int_p50_ms", "int_p99_ms", "int_p999_ms",
-        "int_max_ms", "late_max_ms", "rearm", "stretch_pct", "gov_max", "incomplete",
-        "incomplete_of", "late", "writers", "moves", "wait_p99_ms", "wait_max_ms", "wait_n",
-        "busy_pct", "humans", "bots", "snaps_per_s_human", "bytes_per_s_human",
-        "moves_per_s_human", "moves_per_s_bot", "injected_pct", "move_ms_tick",
-        "spec_moves_per_s", "spec_move_ms_tick", "snap_p50_bytes", "snap_p99_bytes",
-        "snap_max_bytes", "choked_pct", "human_move_ms_tick", "sendbuf_drops",
-        "rate_stepped", "slowest_rate", "creations_deferred" }
     local missing = { }
-    for _, k in ipairs(fields) do if type(t[k]) ~= "number" then missing[#missing + 1] = k end end
-    check(#missing == 0 and t.unparsed == 0,
-          "all 39 fields numbers, none unparsed" .. (#missing > 0 and (": " .. table.concat(missing, ",")) or ""))
-    check(t.humans == 1 and t.bots == 11 and t.target == 80 and near(t.win_s, 10.002),
-          "humans, bots, target, window")
-    check(near(t.hz, 79.991) and near(t.int_p99_ms, 14.4) and near(t.late_max_ms, 2.061)
-          and t.incomplete_of == 2422 and t.wait_n == 1978 and t.bytes_per_s_human == 7639
-          and t.snap_max_bytes == 2737, "values kept, to three decimals")
+    for k in pairs(Window(0)) do
+        if k ~= "time" and type(t[k]) ~= "number" then missing[#missing + 1] = k end
+    end
+    check(#missing == 0, "every field the engine gave, by its own name"
+          .. (#missing > 0 and (": " .. table.concat(missing, ",")) or ""))
+    check(t.humans == 1 and t.bots == 11 and t.target == 80 and near(t.window, 10.002)
+          and near(t.intervalP99, 14.4) and t.loops == 2422, "values as the engine gave them")
 end
 
--- 3. A field from a newer engine is counted, the rest kept.
+-- 3. A field from a newer engine is sent too.
 do
     write(header("06:56:27 AM"))
     local vm = NewVM()
@@ -227,8 +218,7 @@ do
     vm.window({ futureThing = 3 })
     vm.run(1.5)
     local t = vm.perf().tickstats[1]
-    check(t and t.unparsed == 1 and t.humans == 1 and t.futureThing == nil,
-          "an unknown field: counted in unparsed, left out")
+    check(t and t.futureThing == 3 and t.humans == 1, "a field from a newer engine passes through")
 end
 
 -- 4. The log's own TICKSTAT lines are not read: the windows come from the engine.
@@ -263,8 +253,8 @@ do
     vm.run(1.5)
     e = vm.perf()
     local t = e.tickstats[1]
-    check(t and near(t.choked_pct, 15.75) and t.rate_stepped == 1 and near(t.slowest_rate, 26.7)
-          and t.creations_deferred == 31, "a choked window: 15.75%, stepped, 31 deferred")
+    check(t and near(t.chokedPct, 15.75) and t.rateStepped == 1 and near(t.slowestSendrate, 26.7)
+          and t.creationsDeferred == 31, "a choked window: 15.75%, stepped, 31 deferred")
     local ids = { }
     for _, r in ipairs(e.events) do ids[#ids + 1] = r.id end
     ids[#ids + 1] = t and t.id

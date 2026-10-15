@@ -28,7 +28,7 @@ const COLUMNS: { key: SortKey; label: string; num?: boolean; title?: string; wid
   { key: "resources", label: "Res", num: true, width: 56 },
   { key: "ping", label: "Ping", num: true, width: 62 },
 ];
-const WIDTH = { rejected: 92, shared: 190, steamId: 150, ip: 140, actions: 180 };
+const WIDTH = { shared: 190, steamId: 150, ip: 140, actions: 180 };
 // Below this the Player column would be squeezed to nothing: the table
 // scrolls sideways instead.
 const NAME_MIN_WIDTH = 200;
@@ -57,12 +57,6 @@ const MUTE_REASON =
 // move players between teams in the middle of play.
 const EVEN_REASON =
   "A round is on: forcing even teams now would move players mid-round. Reset the round first.";
-
-// The engine's two counts (its CHANGELOG), shown only when the server reports
-// them: with the mod.
-const REJECTED_TITLE =
-  "Moves the server rejected: for time credit (usually a modified client) · "
-  + "for anything else (a poor connection can cause these).";
 
 const SHARED_TITLE =
   "Steam Family Sharing: the player is on a copy another account owns, shown "
@@ -127,14 +121,13 @@ export function Players({ state }: { state: ServerState }) {
   };
 
   const canMute = state.shine?.baseCommands === true;
-  const showRejected = state.players.some((p) => p.movesRejected !== null);
   const showShared = state.players.some((p) => p.familyShared !== null);
   // The mod sends skill; a stock server does not, and gets no column.
   const showSkill = state.players.some((p) => p.skill !== null);
   const columns = COLUMNS.filter((c) => c.key !== "skill" || showSkill);
   const tableWidth = NAME_MIN_WIDTH
     + columns.reduce((sum, c) => sum + (c.width ?? 0), 0)
-    + (showRejected ? WIDTH.rejected : 0) + (showShared ? WIDTH.shared : 0)
+    + (showShared ? WIDTH.shared : 0)
     + WIDTH.steamId + WIDTH.ip + WIDTH.actions;
 
   return (
@@ -179,16 +172,6 @@ export function Players({ state }: { state: ServerState }) {
             && ` · server reports ${state.playersOnline}`}
         </span>
         <span class="spacer" />
-        <label>
-          <input
-            type="checkbox"
-            checked={!settings.maskIdentifiers}
-            onChange={(e) => updateSettings({
-              maskIdentifiers: !(e.target as HTMLInputElement).checked,
-            })}
-          />{" "}
-          Show Steam ids and IPs
-        </label>
       </div>
 
       {rows.length === 0 ? (
@@ -215,7 +198,6 @@ export function Players({ state }: { state: ServerState }) {
                     {columns.map((c) => (
                       <col key={c.key} style={c.width ? `width: ${c.width}px` : undefined} />
                     ))}
-                    {showRejected && <col style={`width: ${WIDTH.rejected}px`} />}
                     {showShared && <col style={`width: ${WIDTH.shared}px`} />}
                     <col style={`width: ${WIDTH.steamId}px`} />
                     <col style={`width: ${WIDTH.ip}px`} />
@@ -237,9 +219,6 @@ export function Players({ state }: { state: ServerState }) {
                           {sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
                         </th>
                       ))}
-                      {showRejected && (
-                        <th class="static num" title={REJECTED_TITLE}>Rejected</th>
-                      )}
                       {showShared && <th class="static" title={SHARED_TITLE}>Shared</th>}
                       <th class="static">Steam id</th>
                       <th class="static">IP</th>
@@ -262,17 +241,6 @@ export function Players({ state }: { state: ServerState }) {
                         <td class="num">{p.deaths}</td>
                         <td class="num">{Math.round(p.resources)}</td>
                         <td class="num">{p.ping}</td>
-                        {showRejected && (
-                          <td
-                            class={p.movesRejected && p.movesRejected.time > 0
-                              ? "num rejected-cell tone-error" : "num rejected-cell"}
-                            title={REJECTED_TITLE}
-                          >
-                            {p.movesRejected
-                              ? `${p.movesRejected.time} · ${p.movesRejected.other}`
-                              : "--"}
-                          </td>
-                        )}
                         {showShared && (
                           <td class="shared-cell">
                             {p.familyShared ? (

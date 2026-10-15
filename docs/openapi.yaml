@@ -121,27 +121,25 @@ paths:
         whoever opens it (CURRENT-UI defect 12).
 
         **With the mod** *(2026-10-12, CONSTRAINTS item 6)*: at `/`, a
-        browser (`Accept` naming `text/html`) gets a page holding no server
-        data, whose meta refresh leads to `/index.html`; anything else gets
-        the state blob, as stock serves it, which auto-shutdown scripts read.
-        Any other path gets a not-found page. A parameter with any value,
+        browser (`Accept` naming `text/html`) gets the panel itself, the
+        Lua reading `web/index.html` (or, if it cannot, a page whose meta
+        refresh leads to `/index.html`); anything else gets the state blob,
+        as stock serves it, which auto-shutdown scripts read. Any other path
+        gets the panel too. A parameter with any value,
         even empty (`?foo=`), is not this case. Lua returns only a type and
         a body, so this cannot be an HTTP redirect or a `404`.
       responses:
         "200":
           description: >
-            With the mod, a page for a browser at `/` and for any other path,
+            With the mod, the panel for a browser at `/` and for any other path,
             the state blob for a script at `/`. Stock, the state blob.
           content:
             text/html:
               schema: { type: string }
               examples:
-                mod:
-                  summary: A browser at `/`, measured on the rig, 10-12 engine
+                mod-fallback:
+                  summary: A browser at `/` when web/index.html cannot be read
                   externalValue: ../fixtures/root-mod.html
-                mod-not-found:
-                  summary: Any other path, measured on the rig, 10-12 engine
-                  externalValue: ../fixtures/notfound-mod.html
             application/json:
               schema: { $ref: "#/components/schemas/ServerState" }
         "401": { $ref: "#/components/responses/DigestChallenge" }
@@ -440,10 +438,10 @@ paths:
         This list is also the shipped panel's "console": since console commands
         return no output, chat is the only server-side text a client can read.
 
-        **With the mod and `since`** *(2026-10-06)*: a `ChatStream` instead,
-        from the mod's own ring of 200, which records every call to
-        `Server.AddChatToHistory` -- player chat, `sv_say`, `sv_tsay` and
-        Shine's `sh_say` -- with a time. Poll with the previous reply's
+        **With the mod and `since`**: a `ChatStream` instead, from the same
+        ring, which the PR to ns2-game makes 200 entries with a time each. It holds
+        every call to `Server.AddChatToHistory` -- player chat, `sv_say`,
+        `sv_tsay` and Shine's `sh_say`. Poll with the previous reply's
         `last_id`. Ids restart from 1 at every map
         change (the ring is Lua state), so a `last_id` below the cursor
         means the map changed. Without `since` the mod answers exactly as
@@ -1857,7 +1855,7 @@ components:
 
     ChatEntry:
       type: object
-      description: One entry of the mod's chat ring. **Mod only.**
+      description: One entry of the chat ring, with its time. **Mod only.**
       required: [id, time, message, player, steamId, team, teamOnly]
       additionalProperties: false
       properties:
@@ -1873,7 +1871,7 @@ components:
 
     ChatStream:
       type: object
-      description: A page of the mod's chat ring, from `getchatlist&since=`. **Mod only.**
+      description: A page of the chat ring, from `getchatlist&since=`. **Mod only.**
       required: [entries, last_id, dropped, buffer_size]
       additionalProperties: false
       properties:
@@ -1949,10 +1947,9 @@ components:
         (`time`, unix seconds): the lines carry no time of their own. One id
         sequence across all three lists. Absent from replies of a mod that
         predates it.
-      required: [source, scan_s, last_id, now, tickstats, perfmon, events]
+      required: [scan_s, last_id, now, tickstats, perfmon, events]
       properties:
         now: { type: integer, description: "The server's clock, `Shared.GetSystemTime()`." }
-        source: { const: log }
         scan_s: { type: integer, description: Seconds between scans. }
         last_id:
           type: integer
@@ -1987,53 +1984,52 @@ components:
     Tickstat:
       type: object
       description: |
-        One tickstat window from `Server.GetTickStat()`, under the names of
-        the `TICKSTAT|` line's fields, to three decimals. A field the mod does
-        not know is counted in `unparsed` and left out.
-      required: [id, time, unparsed]
+        One tickstat window, `Server.GetTickStat()` as the engine gives it,
+        any field a newer engine adds included. `time` is the window's end on
+        the server's system clock (the engine's own is server time).
+      required: [id, time]
       properties:
         id: { type: integer }
         time: { type: integer }
-        unparsed: { type: integer }
-        win_s: { type: number, description: Seconds the line covers. }
+        window: { type: number, description: Seconds the window covers. }
         hz: { type: number, description: Ticks delivered per second. }
         target: { type: integer, description: The configured tickrate. }
-        int_p50_ms: { type: number, description: Tick spacing, median. }
-        int_p99_ms: { type: number }
-        int_p999_ms: { type: number }
-        int_max_ms: { type: number }
-        late_max_ms: { type: number }
-        rearm: { type: integer }
-        stretch_pct: { type: number, description: Share of ticks the server stretched. }
-        gov_max: { type: integer }
+        intervalP50: { type: number, description: Tick spacing, median, ms. }
+        intervalP99: { type: number }
+        intervalP999: { type: number }
+        intervalMax: { type: number }
+        latenessMax: { type: number }
+        rearms: { type: integer }
+        stretchPct: { type: number, description: Share of ticks the server stretched. }
+        governorMax: { type: integer }
         incomplete: { type: integer }
-        incomplete_of: { type: integer }
-        late: { type: integer }
-        writers: { type: integer }
-        moves: { type: integer }
-        wait_p99_ms: { type: number }
-        wait_max_ms: { type: number }
-        wait_n: { type: integer }
-        busy_pct: { type: number }
+        loops: { type: integer }
+        incompleteLate: { type: integer }
+        incompleteWriters: { type: integer }
+        incompleteMoves: { type: integer }
+        waitOverP99: { type: number }
+        waitOverMax: { type: number }
+        waits: { type: integer }
+        busyPct: { type: number }
         humans: { type: integer }
         bots: { type: integer }
-        snaps_per_s_human: { type: number }
-        bytes_per_s_human: { type: number }
-        moves_per_s_human: { type: number }
-        moves_per_s_bot: { type: number }
-        injected_pct: { type: number }
-        move_ms_tick: { type: number }
-        spec_moves_per_s: { type: number }
-        spec_move_ms_tick: { type: number }
-        snap_p50_bytes: { type: number }
-        snap_p99_bytes: { type: number, description: "Size `bwlimit` from this: at least p99 x sendrate." }
-        snap_max_bytes: { type: integer }
-        choked_pct: { type: number, description: Share of updates held back by bwlimit. }
-        human_move_ms_tick: { type: number }
-        sendbuf_drops: { type: integer }
-        rate_stepped: { type: integer, description: Players whose update rate was lowered. }
-        slowest_rate: { type: number, description: The lowest update rate a player was at. }
-        creations_deferred: { type: integer }
+        snapPerSecPerHuman: { type: number }
+        bytesPerSecPerHuman: { type: number }
+        movesPerSecPerHuman: { type: number }
+        movesPerSecPerBot: { type: number }
+        injectedPct: { type: number }
+        moveMsPerTick: { type: number }
+        specMovesPerSec: { type: number }
+        specMoveMsPerTick: { type: number }
+        snapBytesP50: { type: number }
+        snapBytesP99: { type: number, description: "Size `bwlimit` from this: at least p99 x sendrate." }
+        snapBytesMax: { type: integer }
+        chokedPct: { type: number, description: Share of updates held back by bwlimit. }
+        humanMoveMsPerTick: { type: number }
+        sendBufDrops: { type: integer }
+        rateStepped: { type: integer, description: Players whose update rate was lowered. }
+        slowestSendrate: { type: number, description: The lowest update rate a player was at. }
+        creationsDeferred: { type: integer }
 
     PerfmonBlock:
       type: object

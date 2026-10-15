@@ -189,11 +189,27 @@ export function PerfChart(props: PerfChartProps) {
   });
 
   return (
-    <figure class={props.wide ? "perf-chart perf-wide" : "perf-chart"}>
+    <figure class={props.wide ? "perf-chart perf-wide" : "perf-chart"}
+            style={`--legend-value: ${legendValueWidth(props)}ch`}>
       <figcaption>{props.title}</figcaption>
       <div ref={host} />
     </figure>
   );
+}
+
+/** The longest readout this chart can show, in characters: the legend keeps
+ *  room for it, so hovering does not widen the legend and wrap it. */
+function legendValueWidth(props: PerfChartProps): number {
+  let width = 2;
+  for (const s of props.series) {
+    const format = s.format ?? props.format;
+    const vs = s.values.filter((v): v is number => v !== null);
+    if (vs.length > 0) {
+      width = Math.max(width, format(Math.min(...vs)).length, format(Math.max(...vs)).length);
+    }
+  }
+  // One more: `ch` is a digit's width, and units and "%" are wider.
+  return width + 1;
 }
 
 /** Map changes as labelled vertical lines, reference values as dashed ones. */

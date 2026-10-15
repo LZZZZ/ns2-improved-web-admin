@@ -117,6 +117,19 @@ async def send(c, audience, text):
     return str(await c.eval("document.querySelector('.console-status')?.textContent||''"))
 
 
+def sent(c, mark):
+    """Console commands the page sent since `mark`."""
+    out = []
+    for e in c.events[mark:]:
+        if e["method"] != "Network.requestWillBeSent":
+            continue
+        r = e["params"]["request"]
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(r["url"]).query)
+        q.update(urllib.parse.parse_qs(r.get("postData", "")))
+        out += q.get("cmd", []) + q.get("rcon", [])
+    return out
+
+
 def chat_requests(c, mark):
     return [e["params"]["request"]["url"] for e in c.events[mark:]
             if e["method"] == "Network.requestWillBeSent"
@@ -131,7 +144,7 @@ async def mod(c):
 
     check("the tab is reachable", await c.eval("!!document.querySelector('.chat')"))
     status = str(await c.eval("document.querySelector('.chat-tab .toolbar').textContent"))
-    check("the ring size is the server's", "keeps the last 200" in status, status[:60])
+    check("the ring size is not shown", "keeps the last" not in status, status[:60])
     check("no stock-server note", not await c.eval("!!document.querySelector('.chat-stock')"))
     got = await texts(c)
     check("what the server holds is shown", "Test message as a player" in got,
@@ -156,14 +169,15 @@ async def mod(c):
           sorted({u.split("since=")[-1] for u in urls})[:4])
 
     print("\n== talking to the server")
+    m = len(c.events)
     note = await send(c, "all", "hello everyone")
-    check("All goes out as sv_say", "sv_say hello everyone" in note, note[:60])
-    check("and is confirmed from the chat itself",
-          "is in the server's chat" in note, note[-50:])
+    check("All goes out as sv_say", "sv_say hello everyone" in sent(c, m), sent(c, m)[-1:])
+    check("and once it is in the chat, no note is left", note == "", note[:60])
     admin = await line_with(c, "hello everyone")
     check("the message appears, from Admin", admin and admin["player"] == "Admin", admin)
-    note = await send(c, "1", "marines only")
-    check("Marines goes out as sv_tsay 1", "sv_tsay 1 marines only" in note, note[:60])
+    m = len(c.events)
+    await send(c, "1", "marines only")
+    check("Marines goes out as sv_tsay 1", "sv_tsay 1 marines only" in sent(c, m), sent(c, m)[-1:])
     line = await line_with(c, "marines only")
     check("and is marked as team chat", line and line["team"], line)
     seen = await ids(c)
@@ -183,7 +197,7 @@ async def mod(c):
     await asyncio.sleep(3)
     banner = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
                               ".map(h=>h.textContent).join('|')"))
-    check("the restart is said, not hidden", "The chat restarted" in banner, banner[:60])
+    check("no notice of the restart", "The chat restarted" not in banner, banner[:60])
     check("and the new map's chat is shown", "new map" in await texts(c))
 
 
@@ -204,10 +218,10 @@ async def stock(c):
     urls = chat_requests(c, mark)
     check("and read without a cursor", urls and not any("since=" in u for u in urls),
           f"{len(urls)} reads")
+    m = len(c.events)
     note = await send(c, "2", "aliens only")
-    check("a message sent is confirmed by reading the chat back",
-          "sv_tsay 2 aliens only" in note and "is in the server's chat" in note,
-          note[-60:])
+    check("a message sent goes out, and once read back no note is left",
+          "sv_tsay 2 aliens only" in sent(c, m) and note == "", note[-60:])
     await asyncio.sleep(2.5)
     seen = await ids(c)
     check("re-reading the whole list shows nothing twice",
@@ -219,8 +233,8 @@ async def shine(c):
     control(SHINE, "reset")
     await open_tab(c, SHINE)
     note = await send(c, "all", "shine says hi")
-    check("sv_say is confirmed from the chat, though Shine prints only its receipt",
-          "is in the server's chat" in note, note[-50:])
+    check("sv_say is read back from the chat, though Shine prints only its receipt",
+          note == "" and await line_with(c, "shine says hi"), note[-50:])
     command(SHINE, "sh_gag 10000000")
     chat(SHINE, text="you cannot hear me", player="Skulkovich", team=1, steamid=10000000)
     chat(SHINE, text="but me you can", player="Gorgeous", team=2, steamid=10000001)
@@ -250,7 +264,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await mod(c)
             await stock(c)
             await shine(c)

@@ -451,9 +451,8 @@ not as a verdict.
 `Server.GetTickStat()`: a table of 40 numbers under the engine's own names
 (`intervalP99`, `busyPct`, `snapBytesP99`, ...), `time` the server time the
 window closed and `window` its length, and nil while `tickstat` is off.
-The mod reads it every second, keeps each new window under the names below
-(the `TICKSTAT|` line's), to three decimals, and counts any field it does
-not know in `unparsed`. On the rig (2026-10-12) a 2 s window matched its
+The mod reads it every second and sends each new window as the engine
+gives it, with `time` moved to the system clock. On the rig (2026-10-12) a 2 s window matched its
 log line. Rate steps, the bwlimit warning, the `perfmon:` block and
 `tickstat: on|off` are still read from the log, now through
 `Shared.ReadLog`.
@@ -492,7 +491,7 @@ perfmon: score 63 = idle 63.0% - delivery 0.0% - overload 0.0% (updates 40, warn
 
 **Built.** `getperf` serves tickstat windows and the log's engine lines
 under `engine` ([API.md](API.md#getperf)); the Performance tab draws them.
-`tickstat` is switched in Settings and the switch controls the server, not
+`tickstat` is switched on the Performance tab and the switch controls the server, not
 the browser: on sends `tickstat 10`, off sends `tickstat 0`, which stops
 it for every admin, so it asks first. It defaults to off, shows the
 server's real state, and confirms a change from the command's own reply. On the rig every value served matched the raw line (819

@@ -162,7 +162,7 @@ async def defaults_and_refresh(c):
         "hide-bots": await checked(c, "hide-bots"),
     }
     check("the defaults", values == {
-        "mask": True, "refresh-state": "2", "refresh-chat": "2", "refresh-log": "2",
+        "mask": False, "refresh-state": "2", "refresh-chat": "2", "refresh-log": "2",
         "theme": "dark",
         "clock": "locale", "thumbnails": True, "reopen": True, "hide-bots": False}, values)
     check("the page is dark", await theme(c) == "dark")
@@ -352,25 +352,26 @@ async def persistence(c):
     await load(c, MOD + "/index.html")
     check("with Reopen off: Players", await current_tab(c) == "Players")
 
-    print("\n== the tabs' shortcuts are the same values")
-    await c.eval("[...document.querySelectorAll('.toolbar label')]"
-                 ".find(l=>l.textContent.includes('Show Steam ids')).querySelector('input').click()")
-    await asyncio.sleep(0.3)
-    masked_players = await c.eval("document.querySelectorAll('.masked').length")
+    print("\n== masking lives in Settings only")
+    await open_tab(c, "Players")
+    check("Players has no Show Steam ids box, and shows them by default",
+          not await c.eval("[...document.querySelectorAll('.toolbar label')]"
+                           ".some(l=>l.textContent.includes('Show Steam ids'))")
+          and await c.eval("document.querySelectorAll('.masked').length") == 0)
     await open_tab(c, "Settings")
-    check("Players' Show Steam ids unticks Mask", await checked(c, "mask") is False
-          and masked_players == 0, f"{masked_players} masked on Players")
     await set_check(c, "mask", True)
     await open_tab(c, "Players")
-    check("and Mask in Settings masks Players again",
+    check("and Mask in Settings masks Players",
           await c.eval("document.querySelectorAll('.masked').length") > 0)
+    await open_tab(c, "Settings")
+    await set_check(c, "mask", False)
 
 
 async def storage_cases(c):
     print("\n== what storage can hold")
     mark = len(c.events)
     await c.eval(f"localStorage.setItem({KEY!r}, JSON.stringify({{refreshSeconds:'abc',"
-                 "theme:'blue',clock:'utc',maskIdentifiers:false,consoleRefreshSeconds:7,"
+                 "theme:'blue',clock:'utc',hideIdentifiers:true,consoleRefreshSeconds:7,"
                  "logRefreshSeconds:10,lastTab:'nonsense',reopenLastTab:true}))")
     await load(c, MOD + "/index.html")
     check("an unknown last tab: Players", await current_tab(c) == "Players")
@@ -379,14 +380,14 @@ async def storage_cases(c):
            await radio_value(c, "clock"), await checked(c, "mask"),
            await select_value(c, "refresh-chat"), await select_value(c, "refresh-log"))
     check("bad fields defaulted, good ones kept",
-          got == ("2", "dark", "utc", False, "2", "10"), got)
+          got == ("2", "dark", "utc", True, "2", "10"), got)
 
     await c.eval(f"localStorage.setItem({KEY!r}, '{{not json')")
     await load(c, MOD + "/index.html")
     await open_tab(c, "Settings")
     got = (await select_value(c, "refresh-state"), await radio_value(c, "clock"),
            await checked(c, "mask"))
-    check("junk: the defaults", got == ("2", "locale", True), got)
+    check("junk: the defaults", got == ("2", "locale", False), got)
 
     await c.eval(f"localStorage.setItem({KEY!r}, JSON.stringify({{refreshSeconds:5}}))")
     await load(c, MOD + "/index.html")

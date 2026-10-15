@@ -154,9 +154,9 @@ export function Slots({ state }: { state: ServerState }) {
         <label>
           <input
             type="checkbox"
-            checked={!settings.maskIdentifiers}
+            checked={!settings.hideIdentifiers}
             onChange={(e) => updateSettings({
-              maskIdentifiers: !(e.target as HTMLInputElement).checked,
+              hideIdentifiers: !(e.target as HTMLInputElement).checked,
             })}
           />{" "}
           Show Steam ids

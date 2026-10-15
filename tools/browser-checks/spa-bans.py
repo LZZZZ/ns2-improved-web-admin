@@ -113,7 +113,7 @@ async def common(c, base):
     """What must hold on every server."""
     masked = await c.eval(f"[...{ROWS}].map(r=>r.cells[1].textContent).join('|')")
     ids = str(await row_ids(c)).split(",")
-    check("Steam ids are masked by default",
+    check("Steam ids are masked with Mask on",
           not any(i and i in str(masked) for i in ids), str(masked)[:40])
 
 
@@ -141,7 +141,7 @@ async def stock(c):
     check("the new ban is listed, with Unban disabled", button is True)
     reason = await c.eval("document.querySelector('.bans-table tr[data-steamid=\"99999991\"] .unban')"
                           "?.title||''")
-    check("and the button says why", "stock" in str(reason).lower(), str(reason)[:50])
+    check("and the button says why", "too old to unban" in str(reason), str(reason)[:50])
     await common(c, STOCK)
 
 
@@ -267,7 +267,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await stock(c)
             await mod(c)
             await shine(c)

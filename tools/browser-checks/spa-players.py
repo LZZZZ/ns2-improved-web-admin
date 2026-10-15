@@ -5,7 +5,7 @@ The same gate as mock-acceptance.py, pointed at the replacement instead of the
 2012 panel. It asserts the things the old panel got wrong, so a regression
 looks like a failure rather than like a design choice:
 
-  * identifiers masked until asked for (defect 6)
+  * identifiers masked until asked for, with Mask on (defect 6)
   * a bot's per-player buttons are disabled rather than inert (defect 7)
   * a command is reported as sent and unverified, never as succeeded
   * sort order and a half-typed filter survive a poll
@@ -83,7 +83,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await c.send("Page.navigate", url=BASE)
             await asyncio.sleep(4)
 
@@ -116,11 +116,11 @@ async def main():
             check("player rows", rows == 12, f"{rows} rows")
             masked = await c.eval(
                 f"[...{ROWS}].map(r=>{STEAMID_CELL}.textContent).join('|')")
-            check("Steam ids are masked by default (defect 6)",
+            check("Steam ids are masked with Mask on (defect 6)",
                   "10000000" not in str(masked), str(masked)[:48])
             ips = await c.eval(
                 f"[...{ROWS}].map(r=>{IP_CELL}.textContent).join('|')")
-            check("IPs are masked by default (defect 6)",
+            check("IPs are masked with Mask on (defect 6)",
                   "0.0.0.0" not in str(ips), str(ips)[:48])
             await c.eval(
                 f"[...{ROWS}].map(r=>{STEAMID_CELL}.querySelector('button'))"
@@ -368,12 +368,11 @@ async def main():
                                         ".some(t=>t.textContent==='Rejected')")
             has_shared = await c.eval("[...document.querySelectorAll('thead th')]"
                                       ".some(t=>t.textContent==='Shared')")
+            check("no Rejected column", not has_rejected)
             if EXPECT_MOD:
-                check("the mod always counts rejected moves: a Rejected column", has_rejected)
-                check("and a Shared column", has_shared)
+                check("a Shared column", has_shared)
             else:
-                check("no Rejected column from a server that does not count", not has_rejected)
-                check("and no Shared column", not has_shared)
+                check("no Shared column", not has_shared)
             has_skill = await c.eval("[...document.querySelectorAll('thead th')]"
                                      ".some(t=>t.textContent.startsWith('Skill'))")
             if EXPECT_MOD:
@@ -430,15 +429,6 @@ async def main():
             if not EXPECT_MOD:
                 await c.send("Page.navigate", url=BETA + "/index.html")
                 await asyncio.sleep(3.5)
-                check("a server that counts gets the Rejected column",
-                      await c.eval("[...document.querySelectorAll('thead th')]"
-                                   ".some(t=>t.textContent==='Rejected')"))
-                cell = await c.eval(f"{human}.querySelector('.rejected-cell')"
-                                    "?.textContent||''")
-                check("time credit · other, for the player", cell == "37 · 2", cell)
-                check("time-credit rejections stand out",
-                      await c.eval(f"{human}.querySelector('.rejected-cell')"
-                                   ".classList.contains('tone-error')"))
                 check("a server that reports Family Sharing gets the Shared column",
                       await c.eval("[...document.querySelectorAll('thead th')]"
                                    ".some(t=>t.textContent==='Shared')"))
@@ -475,13 +465,13 @@ async def main():
                       and "ipaddress" not in body, ctype)
                 with urllib.request.urlopen(f"{MOCK}/nothing-here", timeout=5) as r:
                     ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
-                check("any other path is a not-found page",
-                      ctype.startswith("text/html") and "Nothing here" in body, ctype)
+                check("any other path gets the panel too",
+                      ctype.startswith("text/html") and 'id="app"' in body, ctype)
                 await c.send("Page.navigate", url=MOCK + "/")
                 await asyncio.sleep(3)
                 landed = str(await c.eval("location.pathname"))
-                check("and a browser there lands on the panel", landed == "/index.html",
-                      landed)
+                check("and a browser there gets the panel, staying at /",
+                      landed == "/" and await c.eval("!!document.querySelector('.tab')"), landed)
             else:
                 check("on stock, / is the state blob, as on a real server",
                       '"player_list"' in body, ctype)

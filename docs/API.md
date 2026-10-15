@@ -305,8 +305,7 @@ sequence covers the three lists:
 
 | Field | What it is |
 | --- | --- |
-| `source` | `log` |
-| `tickstats[]` | One tickstat window each (`tickstat N` must be on), under the `TICKSTAT|` line's names: `win_s`, `hz`/`target`, tick spacing `int_p50_ms`..`int_max_ms`, `stretch_pct`, `busy_pct`, `humans`, `bots`, `snaps_per_s_human`, `moves_per_s_human`, `snap_p50_bytes`/`snap_p99_bytes`/`snap_max_bytes`, `choked_pct`, `rate_stepped`, `creations_deferred`, move costs and the rest, to three decimals; `unparsed` counts fields the mod does not know |
+| `tickstats[]` | One tickstat window each (`tickstat N` must be on): `Server.GetTickStat()` as the engine gives it (`window`, `hz`/`target`, tick spacing `intervalP50`..`intervalMax`, `busyPct`, `snapBytesP99`, `chokedPct`, `rateStepped`, ...), with `time` on the system clock |
 | `perfmon[]` | The `perfmon:` block, printed only when `perfmon` is typed and covering the last second |
 | `events[]` | `kind: "rate"`, a player's snapshot rate stepped (`client` is a slot number); `kind: "bwlimit_low"`, the engine's warning that `bwlimit` is too low, with the value it `suggested` |
 | `tickstat_said` | The last `tickstat: on` or `off` printed |

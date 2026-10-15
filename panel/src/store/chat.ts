@@ -27,15 +27,13 @@ export interface ChatState {
   bufferSize: number | null;
   /** False when the server has no chat buffer at all (`{ }`). */
   available: boolean;
-  /** Set when the server's ids went backwards, i.e. the map changed. */
-  restarted: boolean;
   error: Error | null;
   loading: boolean;
 }
 
 let state: ChatState = {
   entries: [], cursor: 0, dropped: 0, bufferSize: null, available: true,
-  restarted: false, error: null, loading: true,
+  error: null, loading: true,
 };
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -71,7 +69,7 @@ async function poll(): Promise<void> {
       // That reply was cut at the old cursor, so read the new map's from 0.
       if (hasMod) page = await getChat(0);
       emit({
-        entries: page.entries, cursor: page.lastId, restarted: true,
+        entries: page.entries, cursor: page.lastId,
         dropped: page.dropped, bufferSize: page.bufferSize, available: true,
         error: null, loading: false,
       });
@@ -109,10 +107,6 @@ export function getChatState(): ChatState {
   return state;
 }
 
-export function acknowledgeChatRestart() {
-  emit({ restarted: false });
-}
-
 /** Read now, outside the schedule: after a send, or while refresh is off. */
 export function refreshChat(): Promise<void> {
   return poll();
@@ -130,7 +124,7 @@ export function setChatIntervalMs(ms: number) {
 export function setChatMod(mod: boolean) {
   if (mod === hasMod) return;
   hasMod = mod;
-  emit({ entries: [], cursor: 0, dropped: 0, bufferSize: null, restarted: false });
+  emit({ entries: [], cursor: 0, dropped: 0, bufferSize: null });
   if (listeners.size > 0) void poll();
 }
 

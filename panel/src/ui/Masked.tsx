@@ -13,7 +13,7 @@ export function Masked(props: { value: string; masked: string; label: string }) 
   const settings = useSettings();
   const [revealed, setRevealed] = useState(false);
 
-  if (!settings.maskIdentifiers || revealed) {
+  if (!settings.hideIdentifiers || revealed) {
     return <span class="revealed" title={props.label}>{props.value}</span>;
   }
   return (

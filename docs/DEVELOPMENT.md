@@ -71,7 +71,6 @@ verify.
 | `tools/make-skill-tiers.sh` | `<client>/ns2/ui/skill_tier_icons.dds` (client install; the server has no UI art) → `panel/src/assets/skill-tiers.png`. |
 | `tools/make-team-logos.sh` | `<client>/ns2/ui` (`logo_marine.dds`, `logo_alien.dds`) → `panel/src/assets/logo-marines.png`, `logo-aliens.png`. |
 | `tools/make-commands.py` | Regenerate `panel/src/commands.json`, the Console's suggestions: the game's and Shine's admin commands with arguments and help (`--lua <server>/ns2/lua --shine <Shine's lua/shine>`), plus a hand-kept list of engine commands. Re-run after a game or Shine update. |
-| `tools/make-whitelist.py` | Regenerate `panel/src/whitelist.json`, the dated whitelist copy the panel uses on a stock server, from Steam's Workshop pages (needs curl). Re-run before a release. |
 | `tools/nonce-under-load.py` | Poll one Digest nonce at the panel's cadence until the server refuses it, then re-authenticate. |
 | `tools/browser-checks/run-all.sh` | Run the gates, above. |
 | `tools/browser-checks/spa-*.py` | One gate per tab, in headless Chrome against the mocks: `spa-players`, `spa-recent`, `spa-bans`, `spa-chat`, `spa-maps`, `spa-mods`, `spa-workshop`, `spa-slots`, `spa-perf`, `spa-console` (command line), `spa-log` (the Console's log), `spa-settings`. Each script's docstring lists what it asserts. |

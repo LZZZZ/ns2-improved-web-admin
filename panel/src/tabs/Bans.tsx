@@ -16,7 +16,7 @@ type SortKey = "order" | "name" | "expires" | "issued" | "bannedBy";
 // keyed by number, so it can never match (docs/CONSTRAINTS.md item 8). The
 // button would do nothing; it is disabled and says so.
 const STOCK_UNBAN_REASON =
-  "The stock server Lua cannot match a ban to unban it. Mount this mod's lua/ to unban from here.";
+  "This server's Lua is too old to unban: it cannot match a ban.";
 
 function compare(a: Ban, b: Ban, key: SortKey): number {
   switch (key) {
@@ -140,9 +140,9 @@ export function Bans({ state }: { state: ServerState }) {
         <label>
           <input
             type="checkbox"
-            checked={!settings.maskIdentifiers}
+            checked={!settings.hideIdentifiers}
             onChange={(e) => updateSettings({
-              maskIdentifiers: !(e.target as HTMLInputElement).checked,
+              hideIdentifiers: !(e.target as HTMLInputElement).checked,
             })}
           />{" "}
           Show Steam ids
@@ -249,7 +249,6 @@ export function Bans({ state }: { state: ServerState }) {
             : parsedId === null
               ? "Not a Steam id this panel recognises."
               : `Bans account ${parsedId}.`}
-          {hasMod && ` Sent as ${state.shine?.bans ? "sh_banid (Shine)" : "sv_ban"}.`}
         </p>
       </form>
     </section>

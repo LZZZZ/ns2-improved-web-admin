@@ -160,10 +160,9 @@ backward compatible where that is cheap.
    id and answer. The 2012 panel reads only `loading` and `items`, both
    kept. Measurements: REQUIREMENTS item 4.
 3. **A cursor for `getchatlist`.** `getchatlist&since=<id>` answers from
-   the mod's ring of 200, with times, `last_id` and `dropped`. The ring
-   wraps `Server.AddChatToHistory` after it is defined (this file loads at
-   `Server.lua:35`, the function at `:82`) and re-wraps it when replaced,
-   since two workshop mods ship their own `Server.lua`. Without `since`
+   the game's `Server.recentChatMessages`, with `last_id` and `dropped`.
+   The PR to ns2-game makes that ring 200 messages with a time each
+   (`Server.lua`); a released game keeps 20, with no times. Without `since`
    the reply is stock's. On 09-27, `sv_say` and `sv_tsay 1` arrived as
    `Admin` with times, and a map change restarted the ids.
 4. **Consistent types.** Stock sends `cheats`, `devmode` and `isbot` as
@@ -178,11 +177,13 @@ backward compatible where that is cheap.
    `path`, `method` and `headers` (names in lower case, without
    `authorization` and `cookie`; measured 2026-10-12). The mod answers a
    request with no parameters by them: at `/`, `Accept` naming
-   `text/html` (a browser navigation) gets a page holding no server data,
-   whose meta refresh leads to `/index.html` (`fixtures/root-mod.html`),
-   and anything else (`*/*` from `curl` and `fetch()`) the state blob, as
+   `text/html` (a browser navigation) gets the panel itself: Lua reads
+   `web/index.html` through the game's file system (`io.open` resolves
+   mod files; measured 2026-10-13), so the address stays `/`. If it cannot,
+   a page whose meta refresh leads to `/index.html`
+   (`fixtures/root-mod.html`). Anything else (`*/*` from `curl` and `fetch()`) the state blob, as
    stock serves it, which auto-shutdown scripts read; any other path gets
-   a not-found page (`fixtures/notfound-mod.html`). Lua still cannot set
+   the panel too. Lua still cannot set
    a status or a header, so no redirect, no `404` and no `Vary`
    (harmless, since every reply is no-cache).
 
@@ -219,10 +220,8 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
    (`ServerAdminCommands.lua:446`) and keys `bannedPlayersMap` by it, but
    `UnBan` passes the console argument, a string, to `UnbanUser`
    (`:485`), so it answers `No matching Steam Id in ban list` about a ban
-   plainly listed. Fixed by wrapping the global `UnbanUser` to call
-   `tonumber`. `ServerAdminCommands.lua` loads at `Server.lua:34`, before
-   our file at `:35`, and nobody keeps a local alias, so the wrapper also
-   fixes the game console's `sv_unban`, with no copy of that file shipped.
+   plainly listed. Fixed in the PR to ns2-game: `UnbanUser` looks the id up with
+   `tonumber`.
 9. **Expired bans stay in `getbanlist`.** `GetIsUserBanned` checks
    `ban.time`, so they no longer block anyone, but the list showed them.
    The mod filters them out; the raw list still has them.
@@ -241,19 +240,14 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
     On the rig, after an unban `getbanlist` returned `[]` and
     `GetIsUserBanned` still answered `true`. Stock never hits this
     because item 8 makes unbans fail first; fixing 8 alone would have
-    turned a visible failure into an invisible one. The mod replaces both
-    globals with versions that scan the live ban list (a busy server's
-    list held 119 bans; the scan runs only on connect). Shine's ban
-    plugin keys that list by string ids, so the comparison is
-    `tonumber(ban.id) == id`.
+    turned a visible failure into an invisible one. Fixed in the PR to ns2-game:
+    `GenerateBannedPlayersMap` clears the map before rebuilding it.
 11. **A removed reserved slot comes back after a restart.**
     `RemoveReservedSlot` (`ServerAdminCommands.lua:657`) saves with
     `Server.SaveConfigSettings()` instead of
     `Server.SaveReservedSlotsConfig()`, so the removal never reaches
-    `ReservedSlotsConfig.json` until some other change saves it. The
-    function is a local, so the mod adds a second hook on
-    `Console_sv_remove_reserved_slot` that saves the file on the next
-    tick.
+    `ReservedSlotsConfig.json` until some other change saves it. Fixed in
+    the PR to ns2-game.
 12. **Reading the map cycle rewrites it.** `getmapcycle` hex-encodes a
     `table.copyDict` of the live cycle, and that copy is shallow
     (`ns2/lua/Table.lua:441` stores `v`, not `vCopy`). So every read
@@ -351,13 +345,9 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
       "unknown": if the engine could not read the list, every mod reads
       `false`. Of a Workshop search for `shine administration`, 20 of 50
       hits read `true`.
-    - **A stock server** says nothing, so the panel uses the dated copy it
-      ships (`panel/src/whitelist.json`, from `tools/make-whitelist.py`,
-      which reads the items' public Steam Community pages: the keyless
-      `ISteamRemoteStorage` calls answer `result 9` for unlisted items).
-      Steam Community rate-limits: a dozen reads in a few minutes got
-      `429`, and Python's urllib kept getting 429 where curl, same address
-      and User-Agent, got 200, so the tool uses curl.
+    - **A stock server** says nothing, and the panel shows nothing. (It
+      used to ship a dated copy of the list, scraped from the items' Steam
+      Community pages; that went once the engine could answer.)
 
     Before 10-12 the mod read the same pages itself (`getwhitelist`, with
     a cache file and a 5-minute back-off after a failure). That code, its

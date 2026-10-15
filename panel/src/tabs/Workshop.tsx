@@ -9,9 +9,7 @@ import {
 } from "../store/workshop";
 import { dateTime, duration, fileSize } from "../ui/format";
 import { StatusIcon } from "../ui/Icon";
-import {
-  useWhitelist, whitelistVerdict, WhitelistIcon, WhitelistSource, type Whitelist,
-} from "../ui/whitelist";
+import { WhitelistIcon } from "../ui/whitelist";
 import { workshopId } from "./Mods";
 
 // Search the Steam workshop through the server, read a mod's details, and
@@ -31,11 +29,8 @@ import { workshopId } from "./Mods";
 // Thumbnails are the one thing this browser fetches from Steam; Settings
 // turns them off (REQUIREMENTS items 4 and 9). The search does not start
 // until the tab is opened.
-//
-// Each result says whether it is whitelisted before it is installed: the
-// server's verdict, or the copy the panel ships.
 
-/** Where to find a mod the first 50 do not reach. */
+/** Where to find a mod the search does not reach. */
 const kWorkshopUrl = "https://steamcommunity.com/app/4920/workshop/";
 
 /** Steam BBCode as plain text. Rendered as a text node, so markup stays text. */
@@ -66,7 +61,6 @@ export function Workshop({ state, onOpenMods }: {
   const settings = useSettings();
   const { search, installs } = useWorkshop();
   const mods = useResource(installedMods);
-  const whitelist = useWhitelist(hasMod);
   const [query, setQuery] = useState(search.status === "idle" ? "" : search.query);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -101,15 +95,14 @@ export function Workshop({ state, onOpenMods }: {
   };
 
   const install = (item: WorkshopItem) => {
-    const verdict = whitelistVerdict(whitelist, item.id, item.whitelisted);
     if (!confirm(
       `Download "${item.title}" to the server?\n\n`
       + "This only downloads it. It loads once the Mods tab adds it, at the next "
       + "map change.\n"
       + "Nothing in the game can delete a downloaded mod afterwards.\n"
-      + (verdict === "not"
+      + (item.whitelisted === false
         ? "It is not whitelisted: loading it turns ranking off."
-        : verdict === "unknown"
+        : item.whitelisted === null
           ? "Loading a mod that is not whitelisted turns ranking off."
           : "It is whitelisted: loading it keeps the server ranked."))) {
       return;
@@ -160,7 +153,6 @@ export function Workshop({ state, onOpenMods }: {
                 return (
                   <ResultRow key={id} item={item} thumbnails={settings.modThumbnails}
                              open={open === id}
-                             whitelist={whitelist}
                              installed={installed.get(id) ?? null}
                              install={installs.get(id) ?? null}
                              onToggle={() => setOpen(open === id ? null : id)}
@@ -172,8 +164,6 @@ export function Workshop({ state, onOpenMods }: {
           </table>
         </div>
       )}
-
-      <WhitelistSource list={whitelist} />
     </section>
   );
 }
@@ -196,20 +186,7 @@ function SearchStatus(
           </p>
         );
       }
-      return (
-        <p class="search-status">
-          <b>{search.items.length}</b> {search.items.length === 1 ? "result" : "results"}{" "}
-          {what(search.query)}.
-          {search.capped && (
-            <span class="muted">
-              {" "}Only the first 50: if the mod is not here, find it on the{" "}
-              <a href={kWorkshopUrl} target="_blank" rel="noreferrer noopener"
-                 title="Opens Steam (leaves this panel)">Steam Workshop</a> and
-              search for its title.
-            </span>
-          )}
-        </p>
-      );
+      return null;
     case "error":
       return (
         <p class="search-status tone-error">
@@ -232,7 +209,6 @@ interface RowProps {
   item: WorkshopItem;
   thumbnails: boolean;
   open: boolean;
-  whitelist: Whitelist;
   installed: InstalledMod | null;
   install: Install | null;
   onToggle: () => void;
@@ -306,7 +282,7 @@ function ResultRow(p: RowProps) {
         <td>{item.updatedAt ? dateTime(item.updatedAt) : <span class="muted">--</span>}</td>
         <td class="notes-cell status-cell">
           <span class="icon-row">
-            <WhitelistIcon list={p.whitelist} hexId={item.id} server={item.whitelisted} />
+            <WhitelistIcon whitelisted={item.whitelisted} />
             {status}
           </span>
         </td>

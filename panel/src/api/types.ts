@@ -639,54 +639,51 @@ export interface PerfConfig {
 }
 
 /**
- * getperf's `engine`: one tickstat window from Server.GetTickStat(), under the
- * names of the `TICKSTAT|` line's fields (the table shows them as the engine
- * prints them). A field the mod does not know is left out and counted in
- * `unparsed`.
+ * getperf's `engine`: one tickstat window, Server.GetTickStat() as the engine
+ * gives it. `time` is the window's end on the server's system clock.
  */
 export interface RawTickstat {
   id: number;
   time: number;
-  unparsed: number;
-  win_s?: number;
+  window?: number;
   hz?: number;
   target?: number;
-  int_p50_ms?: number;
-  int_p99_ms?: number;
-  int_p999_ms?: number;
-  int_max_ms?: number;
-  late_max_ms?: number;
-  rearm?: number;
-  stretch_pct?: number;
-  gov_max?: number;
+  intervalP50?: number;
+  intervalP99?: number;
+  intervalP999?: number;
+  intervalMax?: number;
+  latenessMax?: number;
+  rearms?: number;
+  stretchPct?: number;
+  governorMax?: number;
   incomplete?: number;
-  incomplete_of?: number;
-  late?: number;
-  writers?: number;
-  moves?: number;
-  wait_p99_ms?: number;
-  wait_max_ms?: number;
-  wait_n?: number;
-  busy_pct?: number;
+  loops?: number;
+  incompleteLate?: number;
+  incompleteWriters?: number;
+  incompleteMoves?: number;
+  waitOverP99?: number;
+  waitOverMax?: number;
+  waits?: number;
+  busyPct?: number;
   humans?: number;
   bots?: number;
-  snaps_per_s_human?: number;
-  bytes_per_s_human?: number;
-  moves_per_s_human?: number;
-  moves_per_s_bot?: number;
-  injected_pct?: number;
-  move_ms_tick?: number;
-  spec_moves_per_s?: number;
-  spec_move_ms_tick?: number;
-  snap_p50_bytes?: number;
-  snap_p99_bytes?: number;
-  snap_max_bytes?: number;
-  choked_pct?: number;
-  human_move_ms_tick?: number;
-  sendbuf_drops?: number;
-  rate_stepped?: number;
-  slowest_rate?: number;
-  creations_deferred?: number;
+  snapPerSecPerHuman?: number;
+  bytesPerSecPerHuman?: number;
+  movesPerSecPerHuman?: number;
+  movesPerSecPerBot?: number;
+  injectedPct?: number;
+  moveMsPerTick?: number;
+  specMovesPerSec?: number;
+  specMoveMsPerTick?: number;
+  snapBytesP50?: number;
+  snapBytesP99?: number;
+  snapBytesMax?: number;
+  chokedPct?: number;
+  humanMoveMsPerTick?: number;
+  sendBufDrops?: number;
+  rateStepped?: number;
+  slowestSendrate?: number;
+  creationsDeferred?: number;
 }
 
 /** The engine's `perfmon:` block: printed when `perfmon` is typed; the last second. */
@@ -723,7 +720,6 @@ export type RawEngineEvent =
       per_snapshot: number; needed: number; suggested: number };
 
 export interface RawPerfEngine {
-  source: "log";
   scan_s: number;
   last_id: number;
   /** More records are held past last_id: ask again from it. Absent before paging. */

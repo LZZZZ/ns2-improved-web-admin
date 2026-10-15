@@ -48,9 +48,9 @@ which is what a panel pointed at the wrong server sees. `--mod` adds them:
 | | |
 | --- | --- |
 | `mod_version`, `max_players` (16), `map_loaded_at` | In the state blob. `map_loaded_at` is `getperf`'s `loaded_at`. |
-| `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the page leading to `/index.html` (`fixtures/root-mod.html`) and anything else the state blob; any other path, a not-found page (`fixtures/notfound-mod.html`). |
+| `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the panel's `index.html` from `--web` (or `fixtures/root-mod.html` without one) and anything else the state blob; any other path, the panel too. |
 | `runcommand` | What a command printed, as `Shared.CaptureConsoleCommand` returns it, tagged `audit` or `server`; `dispatched` is the audit line. The lines reach the log too. |
-| `getchatlist` | With `since`, the mod's ring of 200 with times; without, the game's 20. Both empty at `sv_changemap`, ids from 1. |
+| `getchatlist` | With `since`, a ring of 200 with times (the game's, after the ns2-game PR); without, the stock 20. Both empty at `sv_changemap`, ids from 1. |
 | `getbans` | The bans in force, from Shine's table under `--shine`, vanilla's otherwise. |
 | `getrecentplayers` | The synthetic `fixtures/getrecentplayers.json` moved to now, plus the humans connected. A kick, ban or map change leaves a player listed, not connected. With `--shine`, an `sh_banid` of an absent listed player is stored under their name. |
 | `getmapcycle` | Reads the file. Stock answers from the copy loaded with the map, so a hand edit (`/__mock/cycle-file`) shows only with `--mod` (CONSTRAINTS item 13). |
@@ -128,7 +128,7 @@ GET /__mock/perf?score=-20[&interp_fails=3][&worst_tick_ms=80][&emit=1]
                            the next getperf window's values (any numeric
                            field); emit=1 closes it at once; tickrate_config=80
                            and the like change the configured rates
-GET /__mock/tickstat?choked_pct=12[&snap_p99_bytes=4000][&emit=1][&rate=down|up]
+GET /__mock/tickstat?chokedPct=12[&snapBytesP99=4000][&emit=1][&rate=down|up]
                            the next tickstat window's values (--mod); emit=1
                            closes it now; rate= logs a player's rate step
 GET /__mock/log?append=<text>[&n=3] | partial=<text> | burst=<bytes>

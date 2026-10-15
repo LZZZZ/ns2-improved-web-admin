@@ -37,7 +37,7 @@ action of the 2012 panel. Remaining work is in
 - Map cycle editing that keeps Shine's options
 - Shine support throughout
 - Steam ids and IPs masked until asked
-- Fixes for the stock Lua: reserved slots, unban, expired bans
+- Fixes for the stock Lua: the reserved slot amount, expired bans, the map cycle (unban and slot removal are fixed in the PR to the game)
 - Nothing fetched from third parties but Workshop thumbnails (Settings turns them off)
 - Dark and light themes, settings kept in the browser
 

@@ -117,6 +117,7 @@ async def mod(c):
     reset(MOD)
     await open_slots(c, MOD)
     check("no stock or Shine banner", await banners(c) == "", await banners(c) or "(none)")
+
     await type_into(c, "input[name=amount]", "99")
     await asyncio.sleep(0.2)
     disabled = await c.eval("document.querySelector('input[name=amount]').form"
@@ -145,7 +146,7 @@ async def mod(c):
           note == "Added reserved slot for Two_Words_x with Id 99999992", note)
     check("the slot is listed", await c.eval(f"{ROWS}.length") == 1)
     masked = str(await c.eval(f"[...{ROWS}].map(r=>r.cells[1].textContent).join('|')"))
-    check("its Steam id is masked by default", "99999992" not in masked, masked)
+    check("its Steam id is masked with Mask on", "99999992" not in masked, masked)
 
     await type_into(c, "input[name=slotname]", "Two_Words_x")
     await asyncio.sleep(0.2)
@@ -198,7 +199,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await stock(c)
             await mod(c)
             await shine(c)

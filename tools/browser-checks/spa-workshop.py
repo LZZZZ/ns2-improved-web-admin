@@ -124,7 +124,7 @@ async def toggle_thumbnails(c):
 async def settled(c, timeout=5.0):
     """Wait for a search to leave `loading`."""
     await asyncio.sleep(0.2)
-    return await wait_for(c, "(s=>s&&!s.textContent.startsWith('Searching'))"
+    return await wait_for(c, "(s=>!s||!s.textContent.startsWith('Searching'))"
                              "(document.querySelector('.search-status'))", timeout)
 
 
@@ -182,13 +182,13 @@ async def stock(c):
           len(s) >= 1 and all(q.get("searchtext", [""]) == [""] for q in s), f"{len(s)} polls")
     t = await table(c)
     st = await status(c)
-    check("the first 50 are shown, and the cap is stated",
-          len(t) == 50 and "Only the first 50" in st and "Steam Workshop" in st, f"{len(t)} rows")
+    check("the first 50 are shown, with no results line under the search",
+          len(t) == 50 and st == "", f"{len(t)} rows")
     links = json.loads(await c.eval(
         "JSON.stringify([...document.querySelectorAll('.workshop-tab a')]"
         ".filter(a=>a.textContent==='Steam Workshop').map(a=>[a.href,a.rel,a.target]))"))
     check("which links to the workshop, out of the panel and without a referrer",
-          len(links) == 2 and all(l[0] == "https://steamcommunity.com/app/4920/workshop/"
+          len(links) == 1 and all(l[0] == "https://steamcommunity.com/app/4920/workshop/"
                                   and "noreferrer" in l[1] and l[2] == "_blank" for l in links),
           f"{len(links)} links")
 
@@ -202,7 +202,7 @@ async def stock(c):
     st = await status(c)
     check("a narrow search: three results, no cap note",
           [r[0] for r in t] == ["5ea0001", "5ea0002", "5ea0003"]
-          and st.startswith("3 results for halcyon") and "first 50" not in st, st[:40])
+          and st == "", st[:40])
     nav = await c.eval("[...document.querySelectorAll('.workshop-tab button')]"
                        ".some(b=>/next|previous|page/i.test(b.textContent))")
     check("no paging offered: the engine has none", nav is False)
@@ -217,13 +217,10 @@ async def stock(c):
     await search(c, "halcyon")
     r = await row(c, SMALL)
     check("an uninstalled result offers Install", "not installed" in r[2] and "Install" in r[3])
-    check("and says, before installing, that it is not whitelisted",
-          "not whitelisted" in r[2], r[2][:40])
-    src = json.loads(await c.eval(
-        "JSON.stringify((p=>p?[p.dataset.source,p.textContent]:['',''])"
-        "(document.querySelector('.workshop-tab .whitelist-source')))"))
-    check("from the shipped whitelist, dated, on a stock server",
-          src[0] == "shipped" and "stock server cannot say" in src[1], src[1][:60])
+    check("a stock server cannot say whether it is whitelisted: no icon",
+          "whitelisted" not in r[2], r[2][:40])
+    check("and no whitelist line",
+          not await c.eval("!!document.querySelector('.workshop-tab .whitelist-source')"))
     await c.eval("window.__confirms = []")
     mark = len(c.events)
     await click_row(c, SMALL, "Install")
@@ -231,7 +228,7 @@ async def stock(c):
     check("Install asks first, with what it does and costs",
           len(asked) == 1 and "only downloads it" in asked[0]
           and "can delete" in asked[0]
-          and "It is not whitelisted: loading it turns ranking off." in asked[0],
+          and "Loading a mod that is not whitelisted turns ranking off." in asked[0],
           (asked or [""])[0][:40])
     posted = [r for r in requests(c, mark) if r.get("method") == "POST"]
     body = urllib.parse.parse_qs(posted[0].get("postData", "")) if posted else {}
@@ -270,11 +267,11 @@ async def stock(c):
     await settled(c)
     await search(c, "badges")
     r = await row(c, WHITELISTED)
-    check("a whitelisted result says so",
-          r and "whitelisted" in r[2] and "not whitelisted" not in r[2], (r or ["", "", ""])[2][:40])
+    check("and no whitelist verdict on a stock server, either way",
+          r and "whitelisted" not in r[2], (r or ["", "", ""])[2][:40])
     await search(c, "halcyon")
-    back = await status(c)
-    check("coming back shows the last search again", back.startswith("3 results"), back[:30])
+    back = [r[0] for r in await table(c)]
+    check("coming back shows the last search again", len(back) == 3, json.dumps(back))
     # Two: the stock Lua restarts it at 30 s, and Steam is still not answering.
     workshop(STOCK, search="hang", n=2)
     await search(c, "never answers")
@@ -306,9 +303,8 @@ async def mod(c):
     check("its title is text, markup and all",
           title == ["Markup <b>test</b> & <i>friends</i>", 0], json.dumps(title))
     check("Steam's problem with it is flagged", "Steam problem" in t[0][1])
-    ok = await wait_for(c, "document.querySelector('.workshop-tab .whitelist-source')"
-                           "?.dataset.source==='server'", timeout=5)
-    check("with the mod, the whitelist is the server's verdict", ok)
+    check("with the mod, the row carries the server's whitelist verdict",
+          "whitelisted" in t[0][2], t[0][2][:40])
 
     await click_row(c, MARKUP, "Details")
     detail = json.loads(await c.eval(

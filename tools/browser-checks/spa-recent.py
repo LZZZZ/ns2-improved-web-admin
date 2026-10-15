@@ -175,7 +175,7 @@ async def mod(c):
     check("IPs are shown in the clear", await cell(c, 10000020, 2) == "192.0.2.10",
           await cell(c, 10000020, 2))
     masked = await cell(c, 10000020, 1)
-    check("Steam ids are masked by default", "10000020" not in masked, masked)
+    check("Steam ids are masked with Mask on", "10000020" not in masked, masked)
     links = json.loads(await c.eval(
         f"JSON.stringify([...{row(10000020)}.cells[1].querySelectorAll('a')]"
         ".map(a=>[a.href,a.rel,a.target]))"))
@@ -285,7 +285,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await stock(c)
             await mod(c)
             await shine(c)

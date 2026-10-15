@@ -5,7 +5,6 @@ import type { Ban, RecentPlayer, RecentPlayers, ServerState } from "../api/types
 import { banCommand, sendCommand } from "../store/commands";
 import { useResource } from "../store/poll";
 import { bans as bansResource, recentPlayers } from "../store/resources";
-import { updateSettings, useSettings } from "../store/settings";
 import { BanFields, DEFAULT_TERMS, banMinutes, banSpan } from "../ui/BanFields";
 import { IconButton, StatusIcon } from "../ui/Icon";
 import { Masked } from "../ui/Masked";
@@ -94,7 +93,6 @@ export function Recent({ state }: { state: ServerState }) {
 }
 
 function RecentList({ state }: { state: ServerState }) {
-  const settings = useSettings();
   const list = useResource(recentPlayers);
   const banList = useResource(bansResource);
   const data = list.data;
@@ -176,16 +174,6 @@ function RecentList({ state }: { state: ServerState }) {
         </span>
         <span class="spacer" />
         {list.error && <span class="tone-error">{list.error.message}</span>}
-        <label>
-          <input
-            type="checkbox"
-            checked={!settings.maskIdentifiers}
-            onChange={(e) => updateSettings({
-              maskIdentifiers: !(e.target as HTMLInputElement).checked,
-            })}
-          />{" "}
-          Show Steam ids
-        </label>
       </div>
 
       {notes.map((n) => <p key={n} class="tone-error storage-note">{n}</p>)}

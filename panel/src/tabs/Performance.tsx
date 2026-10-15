@@ -1,13 +1,12 @@
 import { useState } from "preact/hooks";
 import type { EngineEvent, PerfConfig, PerfPoint, ServerState, Tickstat } from "../api/types";
-import { refreshPerf, usePerf } from "../store/perf";
+import { usePerf } from "../store/perf";
 import type { PerfSegment } from "../store/perf";
 import { useResolvedTheme, useSettings } from "../store/settings";
-import { clock } from "../ui/format";
 import { PerfChart } from "../ui/PerfChart";
 import type { ChartMarker, ChartSeries } from "../ui/PerfChart";
 import {
-  BwlimitWarning, EngineStatusLine, TickstatCharts, TickstatNotes, TickstatStats, engineRecords,
+  BwlimitWarning, TickstatCharts, TickstatNotes, TickstatStats, TickstatSwitch, engineRecords,
 } from "./Tickstat";
 
 /**
@@ -18,10 +17,7 @@ import {
  * whatever this page has already read from earlier maps. On a stock server:
  * the vanilla getperfdata, three numbers a minute, as the server holds them.
  */
-export function Performance({ state, onOpenSettings }: {
-  state: ServerState;
-  onOpenSettings: () => void;
-}) {
+export function Performance({ state }: { state: ServerState }) {
   const hasMod = state.modVersion !== null;
   const perf = usePerf(hasMod);
   const settings = useSettings();
@@ -84,33 +80,18 @@ export function Performance({ state, onOpenSettings }: {
         </div>
       )}
 
-      {mod && config && (
-        <p class="perf-rates">
-          <span>tick <b>{config.tickrate}</b></span>
-          <span>move <b>{config.moverate}</b></span>
-          <span>send <b>{config.sendrate}</b></span>
-          <span>interp <b>{config.interp_ms} ms</b></span>
-          <span>max <b>{config.max_players}</b> players</span>
-          <span class="muted">as the server runs now</span>
-        </p>
-      )}
-
       {showEngine && <BwlimitWarning events={engine.events} config={config} />}
-      {(latest || (showEngine && engine.latest)) && (
+      {(mod || latest) && (
         <Strip latest={latest} t={showEngine ? engine.latest : null} config={config}
-               mod={mod} windowS={windowS} events={engine.events} />
+               mod={mod} events={engine.events} />
       )}
-      {mod && <EngineStatusLine engine={perf.engine} segments={perf.segments}
-                                onOpenSettings={onOpenSettings} />}
-
-      <div class="toolbar">
-        <span class="spacer" />
-        {perf.error && <span class="tone-error">{perf.error.message}</span>}
-        {zoom
-          ? <button class="btn btn-sm" onClick={() => setZoom(null)}>Reset zoom</button>
-          : rows.length > 1 && <span class="muted">drag across a chart to zoom</span>}
-        <button class="btn btn-sm" onClick={() => void refreshPerf()}>Refresh</button>
-      </div>
+      {(perf.error || zoom) && (
+        <div class="toolbar">
+          <span class="spacer" />
+          {perf.error && <span class="tone-error">{perf.error.message}</span>}
+          {zoom && <button class="btn btn-sm" onClick={() => setZoom(null)}>Reset zoom</button>}
+        </div>
+      )}
 
       {perf.loading && rows.length === 0 && <p class="muted">Loading performance data...</p>}
       {!perf.loading && rows.length === 0 && !perf.error && (
@@ -188,19 +169,15 @@ function scoreLevel(score: number): { word: string; tone: string } {
  * The latest perfmon window and the latest tickstat line, as one summary:
  * only what the server has given, so a stat with no value is left out.
  */
-function Strip({ latest, t, config, mod, windowS, events }: {
+function Strip({ latest, t, config, mod, events }: {
   latest: PerfPoint | null; t: Tickstat | null; config: PerfConfig | null;
-  mod: boolean; windowS: number; events: EngineEvent[];
+  mod: boolean; events: EngineEvent[];
 }) {
   const level = latest && latest.score !== null && latest.players > 0 ? scoreLevel(latest.score) : null;
   const fails = latest?.interpFails ?? 0;
-  const when = [
-    latest && (mod ? `the ${windowS} s to ${clock(latest.at)}` : `read at ${clock(latest.at)}`),
-    t && (t.win_s !== undefined ? `tickstat's ${Math.round(t.win_s)} s to about ${clock(t.at)}`
-                                : `tickstat to about ${clock(t.at)}`),
-  ].filter(Boolean).join("; ");
   return (
     <div class="perf-strip" aria-label="Latest window and tickstat line">
+      {mod && <TickstatSwitch />}
       {latest && (
         <div class="perf-stat">
           <span class="label">tickrate</span>
@@ -268,7 +245,12 @@ function Strip({ latest, t, config, mod, windowS, events }: {
           <b>{(latest.luaKb / 1024).toFixed(0)} MB</b>
         </div>
       )}
-      <div class="perf-stat muted">{when}</div>
+      {mod && config && (
+        <div class="perf-stat">
+          <span class="label">rates</span>
+          <b>move {config.moverate}, send {config.sendrate}, interp {config.interp_ms} ms</b>
+        </div>
+      )}
       {t && <TickstatNotes t={t} config={config} events={events} />}
     </div>
   );

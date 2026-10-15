@@ -181,17 +181,9 @@ async def stock(c):
     counts = str(await c.eval("document.querySelector('.mod-counts').textContent"))
     check("the counts do not claim a loaded number", "loaded" not in counts, counts)
     src = await wl_source(c)
-    check("whitelist: the shipped copy, dated, and why",
-          src[0] == "shipped" and "stock server cannot say" in src[1]
-          and "(115 mods)" in src[1] and "whitelisted since then" in src[1], src[1][:70])
-    hot = await wl_title(c, "d41d68cd")
-    check("a hotfix mod counts as whitelisted, and says why",
-          hot[0] == "whitelisted" and "hotfix mods" in hot[1], hot[1][:50])
-    other = await wl_title(c, CATALOGUE_ID)
-    check("a mod not on the list says so, and that the list may be old",
-          other[0] == "not whitelisted" and "ranking off" in other[1]
-          and "shipped with the panel" in other[1] and "unless it was whitelisted since" in other[1],
-          other[1][:50])
+    check("no whitelist line: a stock server cannot say", src[0] == "", src[1][:60])
+    check("and no whitelist icon on any row",
+          (await wl_title(c, "d41d68cd"))[0] == "" and (await wl_title(c, CATALOGUE_ID))[0] == "")
 
     mark = len(c.events)
     await click_row(c, CATALOGUE_ID, "Load with every map")
@@ -274,11 +266,10 @@ async def mod_whitelist(c):
     mark = len(c.events)
     await open_mods(c, MOD)
     src = await wl_source(c)
-    check("the whitelist is the server's, read at boot",
-          src[0] == "server" and "the server read when it started" in src[1], src[1][:60])
+    check("no whitelist source line", src[0] == "", src[1][:60])
     hot = await wl_title(c, "d41d68cd")
     check("the hotfix mod is whitelisted, by the server's verdict",
-          hot[0] == "whitelisted" and "read at boot" in hot[1], hot[1][:60])
+          hot[0] == "whitelisted" and "ranked servers can load it" in hot[1], hot[1][:60])
     asked = [e["params"]["request"]["url"] for e in c.events[mark:]
              if e["method"] == "Network.requestWillBeSent"
              and "request=getwhitelist" in e["params"]["request"]["url"]]
@@ -341,7 +332,7 @@ async def shine(c):
     panel = await wl_title(c, "aa473d86")
     check("Combat Fix is not, NS2Panel is",
           combat[0] == "not whitelisted" and panel[0] == "whitelisted"
-          and "the whitelist the server read at boot" in panel[1], panel[1][:50])
+          and "ranked servers can load it" in panel[1], panel[1][:50])
     check("Shine's option, the groups and the per-map mods survived",
           after["maps"][0] == {"map": "ns2_veil", "min": 12}
           and after.get("groups") == before.get("groups")

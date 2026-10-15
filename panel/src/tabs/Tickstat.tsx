@@ -1,6 +1,8 @@
 import type { EngineEvent, PerfConfig, Tickstat } from "../api/types";
-import type { EngineStatus, PerfSegment } from "../store/perf";
-import { clock, span } from "../ui/format";
+import { useState } from "preact/hooks";
+import { setTickstat, usePerf } from "../store/perf";
+import type { EngineStatus, PerfSegment, TickstatOutcome } from "../store/perf";
+import { clock } from "../ui/format";
 import { PerfChart } from "../ui/PerfChart";
 import type { ChartMarker, ChartSeries } from "../ui/PerfChart";
 
@@ -10,20 +12,20 @@ import type { ChartMarker, ChartSeries } from "../ui/PerfChart";
  * steps, the bwlimit warning and the `perfmon:` block (docs/REQUIREMENTS.md
  * item 10). Mod only. Since 2026-10-07 they are not a section of their own:
  * the charts join the tab's grid, the latest window its summary, and the
- * switch is in Settings. The table view, with rate steps and perfmon blocks,
+ * switch leads the summary strip. The table view, with rate steps and perfmon blocks,
  * went in the Performance review (2026-10-08).
  *
  * A tickstat window carries the time it closed. Log lines carry none: each is
  * placed at the scan that found it, every couple of seconds.
  */
-/** How often the Settings switch asks tickstat to log: the getperf window length. */
+/** How often the switch asks tickstat to log: the getperf window length. */
 export const kTickstatSeconds = 10;
 
 export type Logging = "on" | "starting" | "off" | "quiet" | "none";
 
 /** Whether tickstat is running, from its windows and what the server has said. */
 export function loggingState(e: EngineStatus, latest: Tickstat | null): Logging {
-  const win = latest?.win_s ?? kTickstatSeconds;
+  const win = latest?.window ?? kTickstatSeconds;
   const said = e.tickstatSaid;
   const last = e.tickstatLastAt;
   if (said?.text === "off" && (last === null || said.at >= last)) return "off";
@@ -53,53 +55,45 @@ export function engineRecords(segments: PerfSegment[]) {
 }
 
 /**
- * Where tickstat stands, in one line: the switch is in Settings, because it
- * is the server's, not this page's. Also what an older mod cannot show. Mod
- * only.
+ * tickstat on or off, with where it stands. Not a setting this browser keeps:
+ * it is the server's, so it shows what the server last said (another admin
+ * may have changed it) and a change applies to every admin. Off after every
+ * restart; the panel never turns it on by itself. Mod only.
  */
-export function EngineStatusLine({ engine, segments, onOpenSettings }: {
-  engine: EngineStatus | null;
-  segments: PerfSegment[];
-  onOpenSettings: () => void;
-}) {
-  if (engine === null) {
-    return (
-      <p class="perf-engine muted" data-engine="absent">
-        This server's mod predates reading the engine's log: update it for
-        tickstat, rate steps and perfmon blocks.
-      </p>
-    );
-  }
-  const { latest } = engineRecords(segments);
-  const logging = loggingState(engine, latest);
-  // Logging, the charts and the summary say so; Settings has the rest.
-  if (logging === "on") return null;
-  return (
-    <p class="perf-engine tickstat-status" data-engine="log" data-tickstat-state={logging}>
-      {statusText(logging, engine, latest)}{" "}
-      <button class="link-button" onClick={onOpenSettings}>
-        {isRunning(logging) ? "Settings turns it off." : "Settings turns it on."}
-      </button>
-    </p>
-  );
-}
+export function TickstatSwitch() {
+  const perf = usePerf(true);
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<TickstatOutcome | null>(null);
+  const engine = perf.engine;
+  if (engine === null) return null;
+  const logging = loggingState(engine, engineRecords(perf.segments).latest);
 
-export function statusText(logging: Logging, e: EngineStatus, latest: Tickstat | null): string {
-  const win = Math.round(latest?.win_s ?? kTickstatSeconds);
-  switch (logging) {
-    case "on":
-      return `tickstat is logging every ${win} s, for every admin. It stays on through map changes; a restart turns it off.`;
-    case "starting":
-      return `tickstat was turned on at ${clock(e.tickstatSaid!.at)}; its first line is due within its interval.`;
-    case "off":
-      return `tickstat is off: the server said so at ${clock(e.tickstatSaid!.at)}.`;
-    case "quiet":
-      return `No tickstat line for ${span((e.now - (e.tickstatLastAt ?? e.tickstatSaid!.at)) / 1000)}: `
-        + "it was probably turned off, or the server restarted.";
-    case "none":
-      return "No tickstat line since the map loaded: tickstat is off after every restart. "
-        + "On, it adds tick spacing, snapshot size and choke to the charts.";
-  }
+  const toggle = async (on: boolean) => {
+    if (!on && !confirm("Stop tickstat? It stops for every admin of this server.")) return;
+    setBusy(true);
+    setOutcome(null);
+    try {
+      setOutcome(await setTickstat(on ? kTickstatSeconds : 0));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div class="perf-stat tickstat-switch" data-tickstat-state={logging}>
+      <label class="check" title={`Log tickstat every ${kTickstatSeconds} s: the server's setting, for every admin`}>
+        <input type="checkbox" name="tickstat" checked={isRunning(logging)} disabled={busy}
+               onChange={(e) => void toggle((e.target as HTMLInputElement).checked)} />
+        <span class="label">tickstat</span>
+      </label>
+      {outcome && (
+        <span class={outcome.kind === "confirmed" ? "sr-only" : "tone-warn"}
+              data-tickstat-outcome={outcome.kind}>
+          {" "}{outcome.note}
+        </span>
+      )}
+    </div>
+  );
 }
 
 /** The engine's warning, while bwlimit is still the value it warned about. */
@@ -129,7 +123,7 @@ export function BwlimitWarning({ events, config }: { events: EngineEvent[]; conf
  */
 function snapshotFit(t: Tickstat, config: PerfConfig | null, events: EngineEvent[]) {
   const limit = budget(config);
-  const p99 = t.snap_p99_bytes;
+  const p99 = t.snapBytesP99;
   const over = limit !== null && p99 !== undefined && p99 > limit;
   const p99Need = over && config ? Math.ceil(p99! * config.sendrate) : null;
   const warned = [...events].reverse().find((e) => e.kind === "bwlimit_low");
@@ -148,7 +142,7 @@ export function TickstatStats({ t, config, events, players }: {
 }) {
   const { limit, p99, over } = snapshotFit(t, config, events);
   const slow = t.hz !== undefined && t.target !== undefined && t.hz < t.target * 0.98;
-  const choked = t.choked_pct;
+  const choked = t.chokedPct;
   return (
     <>
       {t.hz !== undefined && (
@@ -158,10 +152,10 @@ export function TickstatStats({ t, config, events, players }: {
           <span class="muted">{t.target !== undefined ? ` / ${t.target}` : ""} Hz</span>
         </div>
       )}
-      {t.int_p99_ms !== undefined && (
+      {t.intervalP99 !== undefined && (
         <div class="perf-stat">
           <span class="label">tick spacing p99</span>
-          <b>{t.int_p99_ms.toFixed(1)} ms</b>
+          <b>{t.intervalP99.toFixed(1)} ms</b>
           {t.target ? <span class="muted"> ({(1000 / t.target).toFixed(1)} on time)</span> : null}
         </div>
       )}
@@ -178,10 +172,10 @@ export function TickstatStats({ t, config, events, players }: {
           <b class={choked > 0 ? "tone-warn" : ""}>{choked.toFixed(2)}%</b>
         </div>
       )}
-      {t.busy_pct !== undefined && (
+      {t.busyPct !== undefined && (
         <div class="perf-stat">
           <span class="label">busy</span>
-          <b>{t.busy_pct.toFixed(0)}%</b>
+          <b>{t.busyPct.toFixed(0)}%</b>
         </div>
       )}
       {players && t.humans !== undefined && (
@@ -212,27 +206,22 @@ export function TickstatNotes({ t, config, events }: {
               + `x sendrate ${config!.sendrate}; p99 alone, ${p99} B, would ask for ${p99Need}).`}
         </p>
       )}
-      {(t.rate_stepped ?? 0) > 0 && (
+      {(t.rateStepped ?? 0) > 0 && (
         <p class="tone-warn strip-note">
-          {t.rate_stepped} player{t.rate_stepped === 1 ? "" : "s"} had their update rate
+          {t.rateStepped} player{t.rateStepped === 1 ? "" : "s"} had their update rate
           lowered to fit bwlimit
-          {t.slowest_rate !== undefined ? `, to ${t.slowest_rate.toFixed(1)}/s at the slowest.` : "."}
+          {t.slowestSendrate !== undefined ? `, to ${t.slowestSendrate.toFixed(1)}/s at the slowest.` : "."}
         </p>
       )}
-      {(t.sendbuf_drops ?? 0) > 0 && (
+      {(t.sendBufDrops ?? 0) > 0 && (
         <p class="tone-error strip-note">
-          {t.sendbuf_drops} packet{t.sendbuf_drops === 1 ? "" : "s"} dropped: the server's send buffer was full.
+          {t.sendBufDrops} packet{t.sendBufDrops === 1 ? "" : "s"} dropped: the server's send buffer was full.
         </p>
       )}
-      {(t.creations_deferred ?? 0) > 0 && (
+      {(t.creationsDeferred ?? 0) > 0 && (
         <p class="muted strip-note">
-          {t.creations_deferred} new object{t.creations_deferred === 1 ? "" : "s"} held back
+          {t.creationsDeferred} new object{t.creationsDeferred === 1 ? "" : "s"} held back
           to a later update to stay within bwlimit.
-        </p>
-      )}
-      {t.unparsed > 0 && (
-        <p class="muted strip-note">
-          {t.unparsed} part{t.unparsed === 1 ? "" : "s"} of the line this panel does not know: a newer engine.
         </p>
       )}
     </>
@@ -247,7 +236,7 @@ function withGaps(segments: PerfSegment[]): Row[] {
   let prev: Tickstat | null = null;
   for (const segment of segments) {
     for (const t of segment.tickstats) {
-      const win = (t.win_s ?? kTickstatSeconds) * 1000;
+      const win = (t.window ?? kTickstatSeconds) * 1000;
       if (prev && (t.at - prev.at > win * 2 + 5000 || t === segment.tickstats[0])) {
         rows.push({ x: (prev.at + t.at) / 2000, t: null });
       }
@@ -288,12 +277,12 @@ export function TickstatCharts(props: TickstatChartsProps & { tickstats: Ticksta
     list.map(([label, f, stepped], i) => ({ label, slot: (i + 1) as 1 | 2 | 3,
                                             values: pick(f), stepped }));
 
-  const spacing = series([["p50", (t) => t.int_p50_ms], ["p99", (t) => t.int_p99_ms],
-                          ["max", (t) => t.int_max_ms]]);
-  const sizes = series([["p50", (t) => t.snap_p50_bytes], ["p99", (t) => t.snap_p99_bytes],
-                        ["max", (t) => t.snap_max_bytes]]);
-  const perSecond = series([["snapshots", (t) => t.snaps_per_s_human],
-                            ["moves", (t) => t.moves_per_s_human]]);
+  const spacing = series([["p50", (t) => t.intervalP50], ["p99", (t) => t.intervalP99],
+                          ["max", (t) => t.intervalMax]]);
+  const sizes = series([["p50", (t) => t.snapBytesP50], ["p99", (t) => t.snapBytesP99],
+                        ["max", (t) => t.snapBytesMax]]);
+  const perSecond = series([["snapshots", (t) => t.snapPerSecPerHuman],
+                            ["moves", (t) => t.movesPerSecPerHuman]]);
 
   return (
     <>
@@ -306,17 +295,17 @@ export function TickstatCharts(props: TickstatChartsProps & { tickstats: Ticksta
         yRange={(_min, max) => [0, Math.max((limit ?? 0) * 1.15, max * 1.1, 100)]}
         refLines={limit !== null ? [{ value: limit, label: `bwlimit allows ${limit}` }] : []} />
       <PerfChart {...common} title="Updates held back by bwlimit (%)"
-        series={series([["choked", (t) => t.choked_pct]])}
+        series={series([["choked", (t) => t.chokedPct]])}
         format={(v) => `${v.toFixed(2)}%`} axisFormat={(v) => v.toFixed(0)}
         yRange={(_min, max) => [0, Math.max(5, max * 1.2)]} />
       <PerfChart {...common} title="Throttling (per line)"
-        series={series([["rate lowered", (t) => t.rate_stepped, true],
-                         ["send buffer drops", (t) => t.sendbuf_drops, true],
-                         ["creations held back", (t) => t.creations_deferred, true]])}
+        series={series([["rate lowered", (t) => t.rateStepped, true],
+                         ["buffer drops", (t) => t.sendBufDrops, true],
+                         ["creations held", (t) => t.creationsDeferred, true]])}
         format={(v) => v.toFixed(0)}
         yRange={(_min, max) => [0, Math.max(4, Math.ceil(max * 1.2))]} />
       <PerfChart {...common} title="Server load (%)"
-        series={series([["busy", (t) => t.busy_pct], ["ticks stretched", (t) => t.stretch_pct]])}
+        series={series([["busy", (t) => t.busyPct], ["ticks stretched", (t) => t.stretchPct]])}
         format={(v) => `${v.toFixed(1)}%`} axisFormat={(v) => v.toFixed(0)}
         yRange={() => [0, 100]} />
       <PerfChart {...common} title="Per human player, per second" series={perSecond}
@@ -327,8 +316,8 @@ export function TickstatCharts(props: TickstatChartsProps & { tickstats: Ticksta
                               ? [{ value: config.moverate, label: `moverate ${config.moverate}` }] : [])]
           : []} />
       <PerfChart {...common} title="Move cost (ms per tick)"
-        series={series([["humans", (t) => t.human_move_ms_tick], ["all", (t) => t.move_ms_tick],
-                         ["spectators", (t) => t.spec_move_ms_tick]])}
+        series={series([["humans", (t) => t.humanMoveMsPerTick], ["all", (t) => t.moveMsPerTick],
+                         ["spectators", (t) => t.specMoveMsPerTick]])}
         format={(v) => `${v.toFixed(3)} ms`} axisFormat={(v) => v.toFixed(2)} />
     </>
   );

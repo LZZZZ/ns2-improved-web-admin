@@ -25,10 +25,8 @@ rewritten, `getmapcycle` and `setmapcycle` hardened, booleans in the state
 blob, the `setreservedslotamount` call). The rest is new:
 
 - **Wrappers on game functions** (the nil-client branch of
-  `ServerAdminPrint`, `Server.AddChatToHistory`, `UnbanUser`, Shine's
-  `Plugin:AddBan`) and replacements of `GetIsUserBanned` and
-  `GetIsUserBannedPermanently`. Only these change what the game itself
-  does (CONSTRAINTS items 7-11, Shine).
+  `ServerAdminPrint`, Shine's `Plugin:AddBan`). Only these change what the
+  game itself does (CONSTRAINTS, Shine).
 - **New request types**, run only when a client asks.
 - **Per-tick work** in the `UpdateServer` hook vanilla already had.
 

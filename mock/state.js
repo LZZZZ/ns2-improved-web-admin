@@ -655,45 +655,45 @@ export function createState(fixturesDir, opts = {}) {
     const i99 = 1000 / target + 1.5 + Math.random();
     const i999 = i99 + Math.random() * 3;
     const r = {
-      win_s: win, hz: round(target - Math.random() * 0.05), target,
-      int_p50_ms: round(1000 / target), int_p99_ms: round(i99),
-      int_p999_ms: round(i999), int_max_ms: round(i999 + Math.random() * 2),
-      late_max_ms: round(1 + Math.random() * 2), rearm: 0, stretch_pct: 0, gov_max: 0,
-      incomplete: 0, incomplete_of: Math.round(target * win * 3), late: 0, writers: 0, moves: 0,
-      wait_p99_ms: 2.06, wait_max_ms: round(2.05 + Math.random() * 0.2),
-      wait_n: Math.round(target * win * 2.5),
-      busy_pct: round(18 + 20 * busy + Math.random() * 3, 1), humans, bots,
-      snaps_per_s_human: humans ? round(perfConfig.sendrate - Math.random() * 0.1) : 0,
-      bytes_per_s_human: humans ? Math.round(perfConfig.sendrate * p99 * 0.4) : 0,
-      moves_per_s_human: humans ? round(perfConfig.moverate - Math.random() * 0.1) : 0,
-      moves_per_s_bot: bots ? round(target - Math.random() * 0.1) : 0, injected_pct: 0,
-      move_ms_tick: round(bots * 0.12, 3), spec_moves_per_s: 0, spec_move_ms_tick: 0,
-      snap_p50_bytes: humans ? Math.round(p99 / 2) : 0, snap_p99_bytes: humans ? p99 : 0,
-      snap_max_bytes: humans ? Math.round(p99 * 3) : 0,
-      choked_pct: humans && p99 > budget ? round(Math.min(40, (p99 / budget - 1) * 30)) : 0,
-      human_move_ms_tick: round(humans * 0.06, 3), sendbuf_drops: 0, rate_stepped: 0,
-      slowest_rate: 0, creations_deferred: 0,
+      window: win, hz: round(target - Math.random() * 0.05), target,
+      intervalP50: round(1000 / target), intervalP99: round(i99),
+      intervalP999: round(i999), intervalMax: round(i999 + Math.random() * 2),
+      latenessMax: round(1 + Math.random() * 2), rearms: 0, stretchPct: 0, governorMax: 0,
+      incomplete: 0, loops: Math.round(target * win * 3), incompleteLate: 0, incompleteWriters: 0, incompleteMoves: 0,
+      waitOverP99: 2.06, waitOverMax: round(2.05 + Math.random() * 0.2),
+      waits: Math.round(target * win * 2.5),
+      busyPct: round(18 + 20 * busy + Math.random() * 3, 1), humans, bots,
+      snapPerSecPerHuman: humans ? round(perfConfig.sendrate - Math.random() * 0.1) : 0,
+      bytesPerSecPerHuman: humans ? Math.round(perfConfig.sendrate * p99 * 0.4) : 0,
+      movesPerSecPerHuman: humans ? round(perfConfig.moverate - Math.random() * 0.1) : 0,
+      movesPerSecPerBot: bots ? round(target - Math.random() * 0.1) : 0, injectedPct: 0,
+      moveMsPerTick: round(bots * 0.12, 3), specMovesPerSec: 0, specMoveMsPerTick: 0,
+      snapBytesP50: humans ? Math.round(p99 / 2) : 0, snapBytesP99: humans ? p99 : 0,
+      snapBytesMax: humans ? Math.round(p99 * 3) : 0,
+      chokedPct: humans && p99 > budget ? round(Math.min(40, (p99 / budget - 1) * 30)) : 0,
+      humanMoveMsPerTick: round(humans * 0.06, 3), sendBufDrops: 0, rateStepped: 0,
+      slowestSendrate: 0, creationsDeferred: 0,
     };
     if (tickstatForced) { Object.assign(r, tickstatForced); tickstatForced = null; }
-    return engineRecord({ ...r, unparsed: 0 }, at);
+    return engineRecord(r, at);
   }
   // The line as the engine writes it, from a record.
   const f2 = (v) => Number(v).toFixed(2);
   function tickstatLine(r) {
-    return `TICKSTAT| win ${Number(r.win_s).toFixed(1)} s hz ${f2(r.hz)} target ${r.target}`
-      + ` | int p50 ${f2(r.int_p50_ms)} p99 ${f2(r.int_p99_ms)} p999 ${f2(r.int_p999_ms)} max ${f2(r.int_max_ms)} ms`
-      + ` | late max ${f2(r.late_max_ms)} ms rearm ${r.rearm} stretch ${f2(r.stretch_pct)}% gov max ${r.gov_max}`
-      + ` | incomplete ${r.incomplete}/${r.incomplete_of} late ${r.late} writers ${r.writers} moves ${r.moves}`
-      + ` | wait over p99 ${f2(r.wait_p99_ms)} max ${f2(r.wait_max_ms)} ms (n=${r.wait_n})`
-      + ` | busy ${Number(r.busy_pct).toFixed(1)}% | humans ${r.humans} bots ${r.bots}`
-      + ` | snap/s/human ${f2(r.snaps_per_s_human)} bytes/s/human ${Math.round(r.bytes_per_s_human)}`
-      + ` | moves/s/human ${f2(r.moves_per_s_human)} moves/s/bot ${f2(r.moves_per_s_bot)} injected ${f2(r.injected_pct)}%`
-      + ` | move ms/tick ${Number(r.move_ms_tick).toFixed(3)}`
-      + ` | spec moves/s ${f2(r.spec_moves_per_s)} spec move ms/tick ${Number(r.spec_move_ms_tick).toFixed(3)}`
-      + ` | snap bytes p50 ${Math.round(r.snap_p50_bytes)} p99 ${Math.round(r.snap_p99_bytes)} max ${r.snap_max_bytes} choked ${f2(r.choked_pct)}%`
-      + ` | human move ms/tick ${Number(r.human_move_ms_tick).toFixed(3)} | sendbuf drops ${r.sendbuf_drops}`
-      + ` | rate stepped ${r.rate_stepped} slowest ${Number(r.slowest_rate).toFixed(1)}/s`
-      + ` | creations deferred ${r.creations_deferred}`;
+    return `TICKSTAT| win ${Number(r.window).toFixed(1)} s hz ${f2(r.hz)} target ${r.target}`
+      + ` | int p50 ${f2(r.intervalP50)} p99 ${f2(r.intervalP99)} p999 ${f2(r.intervalP999)} max ${f2(r.intervalMax)} ms`
+      + ` | late max ${f2(r.latenessMax)} ms rearm ${r.rearms} stretch ${f2(r.stretchPct)}% gov max ${r.governorMax}`
+      + ` | incomplete ${r.incomplete}/${r.loops} late ${r.incompleteLate} writers ${r.incompleteWriters} moves ${r.incompleteMoves}`
+      + ` | wait over p99 ${f2(r.waitOverP99)} max ${f2(r.waitOverMax)} ms (n=${r.waits})`
+      + ` | busy ${Number(r.busyPct).toFixed(1)}% | humans ${r.humans} bots ${r.bots}`
+      + ` | snap/s/human ${f2(r.snapPerSecPerHuman)} bytes/s/human ${Math.round(r.bytesPerSecPerHuman)}`
+      + ` | moves/s/human ${f2(r.movesPerSecPerHuman)} moves/s/bot ${f2(r.movesPerSecPerBot)} injected ${f2(r.injectedPct)}%`
+      + ` | move ms/tick ${Number(r.moveMsPerTick).toFixed(3)}`
+      + ` | spec moves/s ${f2(r.specMovesPerSec)} spec move ms/tick ${Number(r.specMoveMsPerTick).toFixed(3)}`
+      + ` | snap bytes p50 ${Math.round(r.snapBytesP50)} p99 ${Math.round(r.snapBytesP99)} max ${r.snapBytesMax} choked ${f2(r.chokedPct)}%`
+      + ` | human move ms/tick ${Number(r.humanMoveMsPerTick).toFixed(3)} | sendbuf drops ${r.sendBufDrops}`
+      + ` | rate stepped ${r.rateStepped} slowest ${Number(r.slowestSendrate).toFixed(1)}/s`
+      + ` | creations deferred ${r.creationsDeferred}`;
   }
   function pushTickstat(win = tickstatEvery, at = unixNow()) {
     const r = tickstatRecord(win, at);
@@ -797,7 +797,7 @@ export function createState(fixturesDir, opts = {}) {
     const upTo = more ? held[kPerfReplyMax - 1] : base.last_id;
     const page = (r) => r.id > esince && r.id <= upTo;
     return {
-      ...base, source: "log", last_id: upTo, more,
+      ...base, last_id: upTo, more,
       ...(engine.lastAt !== null ? { tickstat_last_at: engine.lastAt } : {}),
       ...(engine.said ? { tickstat_said: engine.said } : {}),
       tickstats: engine.tickstats.filter(page),
@@ -1303,15 +1303,15 @@ export function createState(fixturesDir, opts = {}) {
     const json = (v) => ["application/json", JSON.stringify(v)];
 
     // The mod answers a request with no parameters by its path and Accept: a
-    // browser at `/` gets a page pointing at the panel, a script there the
-    // state blob, as vanilla served it; any other path a not-found page
-    // (CONSTRAINTS item 6). The rig's replies, verbatim.
+    // script at `/` gets the state blob, as vanilla served it; a browser, or
+    // any other path, the panel's own page (CONSTRAINTS item 6), or the
+    // refresh page when it cannot read it.
     if (opts.mod && Object.keys(actions).length === 0) {
-      if (request.path !== "/") {
-        return ["text/html", readFileSync(join(fixturesDir, "notfound-mod.html"), "utf8")];
-      }
-      if (String(request.headers?.accept ?? "").includes("text/html")) {
-        return ["text/html", readFileSync(join(fixturesDir, "root-mod.html"), "utf8")];
+      if (request.path !== "/" || String(request.headers?.accept ?? "").includes("text/html")) {
+        let page;
+        try { page = readFileSync(join(opts.web, "index.html"), "utf8"); }
+        catch { page = readFileSync(join(fixturesDir, "root-mod.html"), "utf8"); }
+        return ["text/html", page];
       }
       return json(serverState());
     }

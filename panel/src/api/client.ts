@@ -321,7 +321,8 @@ export async function getChat(
     const raw = await getJson<RawChatStream>(
       { request: "getchatlist", since: String(since) }, signal);
     return {
-      entries: (raw.entries ?? []).map((e) => normalizeChat(e, e.time)),
+      // No time on a game whose chat ring keeps none.
+      entries: (raw.entries ?? []).map((e) => normalizeChat(e, typeof e.time === "number" ? e.time : null)),
       lastId: raw.last_id ?? 0,
       dropped: raw.dropped ?? 0,
       bufferSize: raw.buffer_size ?? 200,

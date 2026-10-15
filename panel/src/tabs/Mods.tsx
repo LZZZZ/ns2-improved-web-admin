@@ -11,9 +11,7 @@ import { useResource } from "../store/poll";
 import { installedMods, mapList } from "../store/resources";
 import { CycleBanners, CycleNote, UndoReload } from "../ui/cycle";
 import { IconButton, StatusIcon, type LucideIcon } from "../ui/Icon";
-import {
-  useWhitelist, WhitelistIcon, WhitelistSource, type Whitelist,
-} from "../ui/whitelist";
+import { WhitelistIcon } from "../ui/whitelist";
 
 // The installed mods, and the cycle's global `mods`: the list mounted with
 // every map. Three things are easy to conflate here and the tab keeps them
@@ -35,9 +33,6 @@ import {
 // Nothing can uninstall a mod (item 2), so the installed list only grows.
 // Finding and downloading mods is the Workshop tab's: this tab makes no
 // workshop request at all.
-//
-// Each mod says whether it is whitelisted: the server's verdict, or the copy
-// the panel ships (ui/whitelist.tsx).
 
 /**
  * Mounted by the engine whatever the cycle says, and before it, in this order:
@@ -92,7 +87,6 @@ export function Mods(
   const store = useMapCycle();
   const mods = useResource(installedMods);
   const maps = useResource(mapList);
-  const whitelist = useWhitelist(hasMod);
 
   useEffect(() => {
     void loadMapCycle();
@@ -123,7 +117,6 @@ export function Mods(
         mods={mods.data}
         modsError={mods.error?.message ?? null}
         maps={maps.data}
-        whitelist={whitelist}
         initialFilter={initialFilter}
       />
     </section>
@@ -138,7 +131,6 @@ interface ViewProps {
   mods: InstalledMod[] | null;
   modsError: string | null;
   maps: MapInfo[] | null;
-  whitelist: Whitelist;
   initialFilter: string;
 }
 
@@ -258,7 +250,7 @@ function ModsView(p: ViewProps) {
           </thead>
           <tbody>
             {shown.map((r) => (
-              <ModRow key={r.id} r={r} hasMod={hasMod} locked={locked} whitelist={p.whitelist}
+              <ModRow key={r.id} r={r} hasMod={hasMod} locked={locked}
                       onAdd={() => addGlobal(r)}
                       onRemove={() => removeGlobal(r.id, r.mod.name, r.dependents)} />
             ))}
@@ -275,7 +267,6 @@ function ModsView(p: ViewProps) {
         <p class="muted form-hint">
           Changes require a map change. Mods are listed in loading order.
         </p>
-        <WhitelistSource list={p.whitelist} />
       </div>
     </>
   );
@@ -285,12 +276,11 @@ interface RowProps {
   r: Row;
   hasMod: boolean;
   locked: boolean;
-  whitelist: Whitelist;
   onAdd: () => void;
   onRemove: () => void;
 }
 
-function ModRow({ r, hasMod, locked, whitelist, onAdd, onRemove }: RowProps) {
+function ModRow({ r, hasMod, locked, onAdd, onRemove }: RowProps) {
   const ws = workshopId(r.id);
   if (r.missing) return <MissingRow r={r} ws={ws} locked={locked} onRemove={onRemove} />;
   const engine = ENGINE_MOUNTED.has(r.id);
@@ -339,7 +329,7 @@ function ModRow({ r, hasMod, locked, whitelist, onAdd, onRemove }: RowProps) {
       </td>
       <td class="status-cell">
         <span class="icon-row">
-          <WhitelistIcon list={whitelist} hexId={r.id} server={r.mod.whitelisted} />
+          <WhitelistIcon whitelisted={r.mod.whitelisted} />
           {active === true && <StatusIcon icon={CircleCheck} label="loaded now" tone="ok" />}
           {r.global && <StatusIcon icon={Globe} label="every map"
                                    title="The cycle loads it with every map" />}
