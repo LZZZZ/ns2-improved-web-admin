@@ -27,7 +27,7 @@ import { clock, duration } from "./format";
 import { MapName } from "./Minimap";
 import { TickSpark } from "./TickSpark";
 
-// The six tabs the shipped panel has, plus what the panel Lua makes possible:
+// The six tabs the 2012 panel has, plus what this Lua makes possible:
 // recent players, and the server's log with its command line (one tab since
 // 2026-10-07; it was Console and Log). The 2012 Mods tab is two here:
 // Mods loads and unloads what is installed, Workshop finds and downloads; and
@@ -155,21 +155,6 @@ export function App() {
           </div>
         )}
 
-        {data && data.luaVersion === null && (
-          <div class="wrap">
-            <div class="banner">
-              <h2>Stock server Lua</h2>
-              <p>
-                This server runs the game's own web interface, so command
-                results cannot be read back, Unban cannot match a ban, and
-                the panel cannot tell whether Shine owns bans or slots.
-                Commands still send; the panel reports them as unverified
-                rather than guessing.
-              </p>
-            </div>
-          </div>
-        )}
-
         {!data && state.loading && tab !== "settings" && (
           <div class="wrap"><p class="muted">Loading server state...</p></div>
         )}
@@ -180,14 +165,14 @@ export function App() {
         {data && tab === "maps" && <Maps state={data} />}
         {data && tab === "mods" && <Mods state={data} initialFilter={modsFilter} />}
         {data && tab === "workshop" && (
-          <Workshop state={data} onOpenMods={(id) => goTo("mods", id)} />
+          <Workshop onOpenMods={(id) => goTo("mods", id)} />
         )}
         {data && tab === "slots" && <Slots state={data} />}
         {data && tab === "performance" && (
           <Performance state={data} />
         )}
         {data && tab === "chat" && (
-          <Chat state={data} onOpenSettings={() => goTo("settings")} />
+          <Chat onOpenSettings={() => goTo("settings")} />
         )}
         {data && tab === "log" && (
           <Log state={data} onOpenSettings={() => goTo("settings")} />

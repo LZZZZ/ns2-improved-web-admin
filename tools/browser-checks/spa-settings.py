@@ -29,7 +29,6 @@ Start the mocks first:
 
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod --perf-window 2
-    node mock/server.js --port 8095 --web web
 """
 import asyncio, json, os, re, sys, urllib.request
 from urllib.parse import parse_qs, urlparse
@@ -37,7 +36,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 PORT = 9233
 KEY = "webadmin.settings"
 
@@ -438,7 +436,7 @@ async def storage_cases(c):
     await c.send("Page.removeScriptToEvaluateOnNewDocument", identifier=breaker["identifier"])
 
 
-async def unreachable_and_stock(c):
+async def unreachable(c):
     print("\n== the server cannot be reached")
     await c.eval(f"localStorage.removeItem({KEY!r})")
     await c.send("Network.setBlockedURLs", urls=["*request=json*"])
@@ -455,23 +453,9 @@ async def unreachable_and_stock(c):
     await c.send("Network.setBlockedURLs", urls=[])
     await c.eval(f"localStorage.removeItem({KEY!r})")
 
-    print("\n== a stock server")
-    mark = len(c.events)
-    await load(c, STOCK + "/index.html")
-    await open_tab(c, "Settings")
-    check("Settings renders on stock", await c.eval("!!document.querySelector('.settings-tab')"))
-    await open_tab(c, "Console")
-    check("the stock Console explains itself, no paused notice",
-          await c.eval("!document.querySelector('.console-paused')"
-                       " && [...document.querySelectorAll('.banner h2')]"
-                       ".some(h=>h.textContent.includes('cannot serve its log or command output'))"))
-    check("no uncaught exceptions on stock", not exceptions_since(c, mark),
-          exceptions_since(c, mark)[:1])
-
 
 async def main():
-    for base in (MOD, STOCK):
-        get(f"{base}/__mock/reset")
+    get(f"{MOD}/__mock/reset")
 
     proc, _ = launch_chrome(port=PORT)
     try:
@@ -493,16 +477,16 @@ async def main():
             await clocks(c)
             await persistence(c)
             await storage_cases(c)
-            await unreachable_and_stock(c)
+            await unreachable(c)
 
-            print("\n== every server")
+            print("\n== throughout")
             thrown = exceptions_since(c, start)
             check("no uncaught exceptions", not thrown, thrown[:1])
             third = []
             for e in c.events:
                 if e["method"] == "Network.requestWillBeSent":
                     url = e["params"]["request"]["url"]
-                    if not (url.startswith(MOD) or url.startswith(STOCK)
+                    if not (url.startswith(MOD)
                             or url.startswith("data:") or url == "about:blank"):
                         third.append(url)
             check("nothing fetched from a third party", not third, third[:2])

@@ -3,8 +3,7 @@
   "window": 86400,
   "capacity": 100,
   "storage": {
-    "loaded": "ok",
-    "saved_at": 1790514172
+    "loaded": "ok"
   },
   "players": [
     {

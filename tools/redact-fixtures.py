@@ -134,8 +134,8 @@ def walk(node):
     if isinstance(node, dict):
         out = {}
         for k, v in node.items():
-            if k == "player" and isinstance(v, str) and v:
-                out[k] = fake_name(v)              # chat entries
+            if k == "player" and isinstance(v, str) and v and node.get("steamId") != 0:
+                out[k] = fake_name(v)              # chat entries; id 0 is `Admin`
             elif (k == "name" and isinstance(v, str) and v
                   and ("steamid" in node or "reason" in node)):
                 out[k] = fake_name(v)              # a player or a ban record

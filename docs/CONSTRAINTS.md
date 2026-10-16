@@ -181,7 +181,7 @@ backward compatible where that is cheap.
    `web/index.html` through the game's file system (`io.open` resolves
    mod files; measured 2026-10-13), so the address stays `/`. If it cannot,
    a page whose meta refresh leads to `/index.html`
-   (`fixtures/root-mod.html`). Anything else (`*/*` from `curl` and `fetch()`) the state blob, as
+   (`fixtures/root-fallback.html`). Anything else (`*/*` from `curl` and `fetch()`) the state blob, as
    stock serves it, which auto-shutdown scripts read; any other path gets
    the panel too. Lua still cannot set
    a status or a header, so no redirect, no `404` and no `Vary`

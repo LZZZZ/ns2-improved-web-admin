@@ -84,9 +84,8 @@ check(#vm.chat(1).entries == 1, "since=1 returns only what is newer")
 local _, body = vm.request({ request = "getchatlist", since = "2" })
 check(body:find('"entries":%[%]') ~= nil, "since=last_id encodes no entries as []")
 
-local legacy = vm.request({ request = "getchatlist" })
-check(#legacy == 2 and legacy[1].message == "gl hf", "without since: the game's list")
-check(#vm.request({ request = "getchatlist", since = "junk" }) == 2, "a since that is not a number is no cursor")
+check(#vm.request({ request = "getchatlist" }).entries == 2, "no since reads from 0")
+check(#vm.request({ request = "getchatlist", since = "junk" }).entries == 2, "nor does a since that is not a number")
 
 for i = 1, 250 do vm.say("spam " .. i, "Carol", 104, 2, false) end
 r = vm.chat(0)

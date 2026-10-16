@@ -1,6 +1,5 @@
 {
-  "elapsed": 0,
-  "lines": [],
   "dispatched": false,
+  "lines": [],
   "cmd": "sv_nonsense_command"
 }

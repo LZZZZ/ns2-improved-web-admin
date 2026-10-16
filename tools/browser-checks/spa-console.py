@@ -15,24 +15,20 @@ renders:
   * a command's name is suggested as it is typed, Tab and a click complete
     it, its arguments and help show once it is typed, and Shine's commands
     are offered only where Shine is loaded
-  * output from the legacy command path reaches the log, whoever sent it
+  * a command another client runs reaches the log
   * the last map change's time, from the server, moved by a map change
-  * against a stock server the tab explains itself and offers no input
 
-Start a mock with the mod's behaviour first:
+Start the mocks first:
 
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod
-
-and, for the stock half, a second one without --mod on 8095, and one with
---mod --shine on 8096.
+    node mock/server.js --port 8096 --web web --mod --shine
 """
 import asyncio, json, os, sys, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
 PORT = 9227
 
@@ -113,7 +109,7 @@ async def main():
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.removeItem('webadmin.settings'); } catch {}")
 
-            print("\n== against a server carrying the mod's Lua")
+            print("\n== the tab")
             await open_console(c, MOD)
             check("the tab has the log, and a command line under it",
                   await c.eval("!!document.querySelector('.log-tab .log')"
@@ -124,9 +120,6 @@ async def main():
                                ".join()") == "Console")
             check("and no notes under the command line",
                   not await c.eval("!!document.querySelector('.console-note')"))
-            check("no stock-server explanation here",
-                  "cannot return command output" not in str(await c.eval(
-                      "document.querySelector('.banner h2')?.textContent||''")))
 
             print("\n== a command that fails now says why")
             await run(c, "sv_kick NoSuchPlayer")
@@ -201,9 +194,8 @@ async def main():
             await type_(c, "")
 
             print("\n== output nobody typed here still arrives")
-            # The legacy path, i.e. what the 2012 panel sends.
             urllib.request.urlopen(
-                f"{MOD}/?request=json&command=Send&rcon=sv_say+from_elsewhere",
+                f"{MOD}/?request=runcommand&cmd=sv_say+from_elsewhere",
                 timeout=5).read()
             await asyncio.sleep(3)
             check("a command sent by another client reaches the log",
@@ -242,19 +234,6 @@ async def main():
                   str(await suggestions(c)))
             await type_(c, "")
 
-            print("\n== against a stock server")
-            await open_console(c, STOCK)
-            # Two banners are on the page here: the global one naming what
-            # this server cannot do, and the tab's own. Read them all.
-            banners = str(await c.eval(
-                "[...document.querySelectorAll('.banner h2')]"
-                ".map(e=>e.textContent).join(' | ')"))
-            check("the tab explains itself instead of sitting empty",
-                  "cannot serve its log or command output" in banners, banners[:70])
-            check("and offers no command input it cannot honour",
-                  not await c.eval("!!document.querySelector('.console-input')"))
-            check("nor a map change time it cannot know",
-                  not await c.eval("!!document.querySelector('.console-map')"))
     finally:
         proc.terminate()
 

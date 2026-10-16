@@ -4,8 +4,7 @@
 The log is read by byte offset, and the checks are about exactly that as much
 as about what is shown:
 
-  * nothing is read before the tab opens, or after it closes; a stock server
-    is never asked, and says why
+  * nothing is read before the tab opens, or after it closes
   * the first read is the file's last 64 KB, starting at a line; Load earlier
     reaches the start of the file with every line exactly once
   * a line written elsewhere arrives by the next poll; an idle poll carries no
@@ -29,7 +28,6 @@ Start the mocks first:
 
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod --perf-window 2
-    node mock/server.js --port 8095 --web web
 """
 import asyncio, json, os, sys, urllib.request
 from urllib.parse import parse_qs, quote, urlparse
@@ -37,7 +35,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 PORT = 9234
 
 results = []
@@ -462,22 +459,12 @@ async def main():
             skip = await text_of(c, ".log-reset p")
             check("naming how much it skipped", "MB were written" in skip, skip[:60])
 
-            print("\n== a stock server")
-            await c.send("Page.navigate", url=STOCK + "/index.html")
-            await asyncio.sleep(3.5)
-            mark = len(c.events)
-            await open_tab(c, "Console")
-            await asyncio.sleep(2)
-            banners = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
-                                       ".map(e=>e.textContent).join(' | ')"))
-            check("explains itself", "cannot serve its log" in banners, banners[:70])
-            check("and never asks", len(requests_of(c, "getlog", mark)) == 0)
 
             print("\n== nothing from anywhere but the server")
             foreign = [e["params"]["request"]["url"] for e in c.events
                        if e["method"] == "Network.requestWillBeSent"
                        and not any(e["params"]["request"]["url"].startswith(b)
-                                   for b in (MOD, STOCK))]
+                                   for b in (MOD,))]
             check("no third-party request", not foreign, str(foreign[:1]))
     finally:
         proc.terminate()

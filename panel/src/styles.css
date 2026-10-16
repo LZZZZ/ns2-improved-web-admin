@@ -527,7 +527,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .chat-player { flex: 0 0 auto; font-weight: 600; }
 .chat-line .tag { flex: 0 0 auto; }
 .chat-id { flex: 0 0 auto; font-size: 11.5px; }
-.chat-stock { margin: 0; font-size: 12px; }
 .chat-input select { flex: 0 0 auto; }
 
 /* ------------------------------------------------------------------- log */

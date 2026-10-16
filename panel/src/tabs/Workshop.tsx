@@ -1,6 +1,6 @@
 import { CircleCheck, HardDriveDownload } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
-import type { InstalledMod, ServerState, WorkshopItem } from "../api/types";
+import type { InstalledMod, WorkshopItem } from "../api/types";
 import { useResource } from "../store/poll";
 import { installedMods } from "../store/resources";
 import { useSettings } from "../store/settings";
@@ -53,11 +53,7 @@ export function bbcodeToText(source: string): string {
 /** Long enough for any real query; a 3000-character one failed Digest auth. */
 const kMaxQuery = 200;
 
-export function Workshop({ state, onOpenMods }: {
-  state: ServerState;
-  onOpenMods: (id: string) => void;
-}) {
-  const hasLua = state.luaVersion !== null;
+export function Workshop({ onOpenMods }: { onOpenMods: (id: string) => void }) {
   const settings = useSettings();
   const { search, installs } = useWorkshop();
   const mods = useResource(installedMods);
@@ -100,14 +96,12 @@ export function Workshop({ state, onOpenMods }: {
       + "This only downloads it. It loads once the Mods tab adds it, at the next "
       + "map change.\n"
       + "Nothing in the game can delete a downloaded mod afterwards.\n"
-      + (item.whitelisted === false
-        ? "It is not whitelisted: loading it turns ranking off."
-        : item.whitelisted === null
-          ? "Loading a mod that is not whitelisted turns ranking off."
-          : "It is whitelisted: loading it keeps the server ranked."))) {
+      + (item.whitelisted
+        ? "It is whitelisted: loading it keeps the server ranked."
+        : "It is not whitelisted: loading it turns ranking off."))) {
       return;
     }
-    void requestInstall(item, hasLua);
+    void requestInstall(item);
   };
 
   return (
@@ -131,7 +125,7 @@ export function Workshop({ state, onOpenMods }: {
         </p>
       </div>
 
-      <SearchStatus search={search} hasLua={hasLua} onRetry={() => void runSearch(
+      <SearchStatus search={search} onRetry={() => void runSearch(
         search.status === "idle" ? "" : search.query)} />
 
       {search.status === "results" && search.items.length > 0 && (
@@ -169,7 +163,7 @@ export function Workshop({ state, onOpenMods }: {
 }
 
 function SearchStatus(
-  { search, hasLua, onRetry }: { search: SearchState; hasLua: boolean; onRetry: () => void },
+  { search, onRetry }: { search: SearchState; onRetry: () => void },
 ) {
   const what = (q: string) => (q ? <>for <b class="query">{q}</b></> : "for everything");
   switch (search.status) {
@@ -191,14 +185,6 @@ function SearchStatus(
       return (
         <p class="search-status tone-error">
           Search {what(search.query)} failed: {search.error}{" "}
-          <button class="btn btn-sm" onClick={onRetry}>Retry</button>
-        </p>
-      );
-    case "gave-up":
-      return (
-        <p class="search-status tone-error">
-          No answer {what(search.query)} after 35 s.{" "}
-          {hasLua ? "" : "A stock server cannot tell a failed search from a slow one. "}
           <button class="btn btn-sm" onClick={onRetry}>Retry</button>
         </p>
       );

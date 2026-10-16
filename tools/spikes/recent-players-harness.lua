@@ -138,8 +138,18 @@ vm.disconnect(b)
 vm.tick()                      -- urgent save on the next tick
 r = vm.recent()
 check(find(r, 202).connected == false and find(r, 202).played == 100, "disconnect: not connected, played 100 s")
-check(r.storage.saved_at == clock.now, "saved on the tick after a disconnect")
-check(realOpen(DISK .. "/webadmin/recent-players-a.json"), "slot a written")
+local function slotHas(text)
+    for _, slot in ipairs({ "a", "b" }) do
+        local f = realOpen(DISK .. "/webadmin/recent-players-" .. slot .. ".json")
+        if f then
+            local found = f:read("*a"):find(text, 1, true)
+            f:close()
+            if found then return true end
+        end
+    end
+    return false
+end
+check(slotHas('"played":100'), "saved on the tick after a disconnect")
 
 -- Map change: fresh VM over the same disk. Alice reconnects; Bob does not.
 clock.now = clock.now + 20

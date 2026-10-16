@@ -10,10 +10,8 @@
 //   * before each write the cycle is read again, and if it changed since the
 //     panel last saw it -- another admin, or a hand edit of the file -- the
 //     write is not made. The operator reloads and redoes the change.
-//   * what the server holds afterwards is what the panel shows, and the
-//     activity strip says how that was established: the panel Lua returns the file
-//     read back, a stock server returns nothing, so there the cycle is read
-//     again and the note says it is the server's copy, not the file.
+//   * what the server holds afterwards is what the panel shows: the server
+//     answers a write with the file read back.
 //
 // Writes are one at a time. Edits made while one is in flight are applied on
 // top of it and go out together in the next.
@@ -101,21 +99,21 @@ export async function loadMapCycle(): Promise<void> {
  * Apply an edit and write the result. `label` says what the edit was, in the
  * activity strip.
  */
-export function commitMapCycle(edit: Edit, label: string, hasLua: boolean) {
+export function commitMapCycle(edit: Edit, label: string) {
   if (!state.base || state.conflict) return;
   pending.push({ edit, label });
   reshow();
-  if (!state.saving) void flush(hasLua);
+  if (!state.saving) void flush();
 }
 
 /** Write back the cycle as it was before the last write that landed. */
-export function undoMapCycle(hasLua: boolean) {
+export function undoMapCycle() {
   const before = state.undo;
   if (!before) return;
-  commitMapCycle(() => copy(before), "undo the last change", hasLua);
+  commitMapCycle(() => copy(before), "undo the last change");
 }
 
-async function flush(hasLua: boolean): Promise<void> {
+async function flush(): Promise<void> {
   const base = state.base;
   if (!base || pending.length === 0) return;
   const batch = pending;
@@ -142,34 +140,20 @@ async function flush(hasLua: boolean): Promise<void> {
       return;
     }
 
-    const result = await setMapCycle(next, hasLua);
+    const result = await setMapCycle(next);
     if (result.kind === "refused") {
       fail(`refused, nothing written: ${result.error}`);
       return;
     }
 
-    let after: RawMapCycle;
-    let note: string;
-    let tone: "sent" | "error" = "sent";
-    if (result.kind === "written") {
-      after = result.cycle;
-      note = sameCycle(after, next)
-        ? "written; MapCycle.json reads back as sent."
-        : "written, but MapCycle.json reads back differently. Showing the file.";
-    } else {
-      // A stock server's reply is empty whatever happened, and its
-      // getmapcycle answers from memory, not from the file.
-      after = await getMapCycle();
-      note = sameCycle(after, next)
-        ? "sent. The server's copy now matches; this server cannot say "
-          + "whether MapCycle.json was written."
-        : "sent, but the server's copy does not match what was sent. Showing "
-          + "the server's copy.";
-    }
-    if (!sameCycle(after, next)) tone = "error";
+    const after = result.cycle;
+    const clean = sameCycle(after, next);
+    const note = clean
+      ? "written; MapCycle.json reads back as sent."
+      : "written, but MapCycle.json reads back differently. Showing the file.";
+    const tone = clean ? "sent" : "error";
     record(what, note, tone);
     // A write that read back as sent needs no word on the tab; Activity has it.
-    const clean = result.kind === "written" && tone === "sent";
     emit({ base: after, undo: base, last: clean ? null : { note, tone } });
   } catch (e) {
     fail(`could not be sent: ${(e as Error).message}`);
@@ -177,7 +161,7 @@ async function flush(hasLua: boolean): Promise<void> {
     inFlight = null;
     emit({ saving: false });
     reshow();
-    if (pending.length > 0 && !state.conflict) void flush(hasLua);
+    if (pending.length > 0 && !state.conflict) void flush();
     else pending = [];
   }
 }

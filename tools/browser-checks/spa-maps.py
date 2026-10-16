@@ -6,9 +6,6 @@ every save, so anything it did not know -- Shine's per-map options, map groups
 -- was lost, and it read back nothing. So the checks are about what this one
 claims:
 
-  * stock      the tab explains what a stock server cannot confirm; a change
-               is a POST with everything in its body, and is reported as the
-               server's copy, not the file
   * --mod      each change is written and read back; Undo writes the previous
                cycle; time and drag reorder write; the available maps are only
                those not in the cycle, one dragged in lands where it is
@@ -29,7 +26,6 @@ and on all of them: no uncaught exceptions, nothing fetched from a third party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8099 --web web --mod --shine=ban,reservedslots,mapvote --maps=modded
 """
@@ -37,7 +33,6 @@ import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_MAPS_URL", "http://127.0.0.1:8099")
 PORT = 9231
@@ -66,7 +61,7 @@ def edit_file(base, **kw):
 
 
 def server_cycle(base):
-    """What getmapcycle says now: the file on the mod, memory on stock."""
+    """What getmapcycle says now: the file."""
     return json.loads(get(base, "/?request=getmapcycle"))
 
 
@@ -178,44 +173,12 @@ def posts(c, since):
     return out
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    reset(STOCK)
-    await open_maps(c, STOCK)
-    b = await banners(c)
-    check("the stock banner says what a stock server cannot confirm",
-          "Stock server Lua" in b and "hand edit" in b, b[:60])
-    before = await rows(c)
-    check("the cycle renders from getmapcycle", len(before) == 17, f"{len(before)} rows")
-
-    mark = len(c.events)
-    await click_row(c, 1, "Move")
-    sent = posts(c, mark)
-    body = urllib.parse.parse_qs(sent[0].get("postData", "")) if sent else {}
-    check("a change is one POST", len(sent) == 1, f"{len(sent)} POSTs")
-    check("with request and data in the body and nothing in the URL",
-          sent and sent[0]["url"].rstrip("/").endswith(STOCK.split("//")[1])
-          and body.get("request") == ["setmapcycle"] and "data" in body,
-          sent[0]["url"] if sent else "")
-    after = [name(m) for m in server_cycle(STOCK)["maps"]]
-    check("the move reached the server", after[:2] == [before[1], before[0]], str(after[:2]))
-    cmd, note = await last_activity(c)
-    check("reported as the server's copy, not the file",
-          cmd.startswith("setmapcycle (move") and "cannot say whether MapCycle.json" in note,
-          note[:70])
-
-    await click_row(c, 3, "Change to")
-    cmd, note = await last_activity(c)
-    check("Change to sends sv_changemap, unverified",
-          cmd == f"sv_changemap {before[3]}" and "unverified" in note, f"{cmd} -> {note[:30]}")
-
-
 async def mod(c):
     print(f"\n== --mod ({MOD})")
     reset(MOD)
     await open_maps(c, MOD)
     b = await banners(c)
-    check("no stock or Shine banner", b == "", b[:40] or "(none)")
+    check("no banner", b == "", b[:40] or "(none)")
     before = await rows(c)
     next_map = str(await c.eval("document.querySelector('.next-map b').textContent"))
     check("the next map is the one after the current map", next_map == "ns2_tanith", next_map)
@@ -406,7 +369,6 @@ async def main():
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.removeItem('webadmin.settings'); } catch {}")
-            await stock(c)
             await mod(c)
             await shine(c)
 
@@ -417,7 +379,7 @@ async def main():
                                           if exceptions else ""))
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE))})
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

@@ -5,8 +5,6 @@ The tab exists so a player who has already left can still be found and
 banned. So the checks are about finding and banning, and about the tab
 saying plainly what it cannot know:
 
-  * stock      the tab explains that the server keeps no such list, and
-               never asks for one
   * --mod      the window and capacity are stated from the server's reply;
                search finds a player by part of a name, by a former name, by
                a STEAM_X:Y:Z id and by IP; IPs are shown and Steam ids masked,
@@ -25,7 +23,6 @@ party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8096 --web web --mod --shine
 """
@@ -33,7 +30,6 @@ import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
 PORT = 9230
@@ -132,20 +128,6 @@ async def ban_row(c, steam_id, duration="1440", reason=""):
 async def notes(c):
     return str(await c.eval("[...document.querySelectorAll('.storage-note')]"
                             ".map(n=>n.textContent).join('|')"))
-
-
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    control(STOCK, "reset")
-    mark = len(c.events)
-    await open_tab(c, STOCK)
-    banner = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
-                              ".map(h=>h.textContent).join('|')"))
-    check("the tab explains the stock server keeps no list",
-          "keeps no list of recent players" in banner, banner[:60])
-    asked = [e for e in c.events[mark:] if e["method"] == "Network.requestWillBeSent"
-             and "getrecentplayers" in e["params"]["request"]["url"]]
-    check("and never asks for one", not asked, f"{len(asked)} requests")
 
 
 async def mod(c):
@@ -286,7 +268,6 @@ async def main():
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.setItem('webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
-            await stock(c)
             await mod(c)
             await shine(c)
 
@@ -295,7 +276,7 @@ async def main():
             check("no uncaught exceptions", not exceptions, str(len(exceptions)))
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE))})
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

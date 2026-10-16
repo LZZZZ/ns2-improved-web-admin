@@ -1,11 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import type { ServerState } from "../api/types";
 import { TEAM_NAMES } from "../api/types";
 import type { CommandOutcome } from "../store/commands";
 import { sendCommand } from "../store/commands";
 import {
-  getChatState, refreshChat, setChatIntervalMs, setChatLua,
-  useChat,
+  getChatState, refreshChat, setChatIntervalMs, useChat,
 } from "../store/chat";
 import { useSettings } from "../store/settings";
 import { Masked } from "../ui/Masked";
@@ -26,18 +24,11 @@ const AUDIENCES: { value: Audience; label: string }[] = [
  * The chat, as the server records it, and a way to talk to it.
  *
  * The 2012 panel showed this on its Players tab. Its log was the server's
- * last 20 messages, re-read every 2 s; with the panel Lua the server keeps 200, with
- * times, and hands over only what is new.
+ * last 20 messages, re-read every 2 s; the server now keeps 200, with times,
+ * and hands over only what is new.
  */
-export function Chat({ state, onOpenSettings }: {
-  state: ServerState;
-  onOpenSettings: () => void;
-}) {
+export function Chat({ onOpenSettings }: { onOpenSettings: () => void }) {
   const settings = useSettings();
-  const hasLua = state.luaVersion !== null;
-  // A layout effect runs before useChat's effect, so the first read already
-  // asks the right way.
-  useLayoutEffect(() => setChatLua(hasLua), [hasLua]);
   const chat = useChat();
 
   const [audience, setAudience] = useState<Audience>("all");
@@ -79,7 +70,7 @@ export function Chat({ state, onOpenSettings }: {
     setLanded(null);
     wasAtBottom.current = true;
     const before = getChatState().cursor;
-    setLast(await sendCommand(command, hasLua));
+    setLast(await sendCommand(command));
     await refreshChat();
     // The chat itself is the receipt. Under Shine sv_say becomes sh_say and
     // prints nothing but Shine's own line, so the command's output cannot
@@ -89,22 +80,6 @@ export function Chat({ state, onOpenSettings }: {
       e.id > before && e.player === "Admin" && e.message === sent));
     setBusy(false);
   };
-
-  if (!chat.available) {
-    return (
-      <section class="wrap">
-        <div class="banner">
-          <h2>This server keeps no chat</h2>
-          <p>
-            It answered the chat request with an empty object, which is what
-            the stock web interface does when the game's chat buffer does not
-            exist. Chat still reaches the server's log: see the Console
-            tab, with this panel's Lua.
-          </p>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section class="wrap console-tab chat-tab">
@@ -117,14 +92,6 @@ export function Chat({ state, onOpenSettings }: {
         <span class="spacer" />
         {chat.error && <span class="tone-error">{chat.error.message}</span>}
       </div>
-
-      {!hasLua && (
-        <p class="muted chat-stock">
-          A stock server keeps only its last 20 messages and gives them no
-          times; anything said while this tab was closed may already be gone.
-          This panel's Lua keeps 200, with times.
-        </p>
-      )}
 
       {paused && (
         <p class="console-paused">
@@ -146,7 +113,7 @@ export function Chat({ state, onOpenSettings }: {
         )}
         {chat.entries.map((e) => (
           <div key={e.id} class="console-line chat-line" data-id={e.id}>
-            {e.at !== null && <time>{logClock(e.at)}</time>}
+            <time>{logClock(e.at)}</time>
             <span class={`chat-player team-${e.team}`}>{e.player}</span>
             {e.teamOnly && (
               <span class="tag" title={`Team chat: ${TEAM_NAMES[e.team] ?? `team ${e.team}`} only`}>

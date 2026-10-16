@@ -20,9 +20,10 @@ The 10-12 engine's functions (CONSTRAINTS item 18) took out about 400
 lines: the console tee, the log's layout check, the `TICKSTAT|` parser and
 the whitelist reader.
 
-All vanilla code is still there, with about 79 lines edited (`getmods`
-rewritten, `getmapcycle` and `setmapcycle` hardened, booleans in the state
-blob, the `setreservedslotamount` call). The rest is new:
+Of the 2012 file, what the panel does not use is gone (`getbanlist`,
+`getperfdata` and its once-a-minute sample, `setreservedslotamount`, the
+`command`/`rcon` path); `getmods` is rewritten and `getmapcycle` and
+`setmapcycle` hardened. The rest is new:
 
 - **Wrappers on game functions** (the nil-client branch of
   `ServerAdminPrint`, Shine's `Plugin:AddBan`). Only these change what the

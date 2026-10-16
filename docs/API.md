@@ -1,101 +1,46 @@
 # Web admin HTTP API
 
-The API as implemented by the game's `ns2/lua/ServerWebInterface.lua`
-(304 lines, UWE 2012, unchanged in build 344), the only handler, plus what
-the mod adds. Line references are to that file. Every request type has a
-captured response in `fixtures/`, verified against a running server from
-09-03 on ([TESTING.md](TESTING.md)).
-
-This file is the prose. [openapi.yaml](openapi.yaml) is the contract: every
-request type, parameter, response schema and refusal, with the mod's
-additions under the `mod` tag, checked against the fixtures by
-`tools/check-openapi.py`.
-
-## What the mod adds
-
-On a stock server these request types are unknown and fall through to the
-state blob, so a client detects the mod by `lua_version` in the state
-blob, never by a status code.
-
-| Request type | What it returns | Details |
-| --- | --- | --- |
-| `runcommand` | What the command it ran printed | CONSTRAINTS item 1 |
-| `getbans` | The bans in force, from whichever table decides them (Shine's under its ban plugin) | [CONSTRAINTS.md](CONSTRAINTS.md#shine) |
-| `getrecentplayers` | Everyone seen in the last 24 hours, up to 100 | REQUIREMENTS item 6 |
-| `getmapvote` | What Shine's mapvote will do with the cycle | CONSTRAINTS item 13 |
-| `getperf` | `perfmon`'s data in 10 s windows, tickstat windows and the engine's log lines | [below](#getperf) |
-| `getlog` | The server's `log-Server.txt` by byte offset | [below](#getlog) |
-
-Changed stock request types: `getchatlist` takes `since` (item 3),
-`getmods` reports completion (item 2), `installmod` answers (item 2),
-`getmapcycle` reads the file and `setmapcycle` validates and answers
-(items 12, 13), `getinstalledmodslist` marks each mod `active` when
-mounted now (REQUIREMENTS item 3) and `whitelisted` (item 17), as `getmods`
-marks each result, and a request with no parameters is answered by path
-and `Accept` (item 6).
-
-State blob additions: `lua_version`, `max_players`, `map_loaded_at`,
-`ranking_active`, `shine` when Shine is loaded, and real booleans
-(item 4). Player rows gain Hive `skill` with its offsets and `skill_tier`
-(item 16), `gagged` under Shine's basecommands, Family Sharing
-(`familyshared`, `owner_steamid`) and rejected-move counts. Skill and
-`gagged` are absent when the server cannot supply them; meanings are in
-openapi.yaml's `Player` schema.
-
-The mod needs the 10-12 beta engine or later: it calls
+The API as `lua/ServerWebInterface.lua` implements it, the only handler.
+It needs the 10-12 beta engine or later: it calls
 `Shared.CaptureConsoleCommand`, `Shared.ReadLog`, `Shared.JsonEncode`,
 `Server.GetTickStat` and `Server.GetIsModWhitelisted`, and reads
-`WebRequest`'s second argument (CONSTRAINTS item 18).
+`WebRequest`'s second argument (CONSTRAINTS item 18). Every request type
+has a captured response in `fixtures/` ([TESTING.md](TESTING.md)).
+
+This file is the prose. [openapi.yaml](openapi.yaml) is the contract: every
+request type, parameter, response schema and refusal, checked against the
+fixtures by `tools/check-openapi.py`.
 
 ## Shape
 
 ```lua
-Shared.SetWebRoot("web")            -- line 25, the static root
+Shared.SetWebRoot("web")            -- the static root
 Event.Hook("WebRequest", OnWebRequest)
 ```
 
 Every call is `GET` or `POST` to `/`, with the action in the `request`
 parameter. A handled request returns `200` with a JSON body; an
 unrecognised `request` falls through to the server-state blob.
-`OnWebRequest` returns `("application/json", <body>)`, or `""` for the
-writes, which the engine sends as an empty `200`.
 
-### No 404, and no directory index
+### No 404
 
-Any path that is not a file under the web root falls through to the
-handler, which never sees the path. So `/does-not-exist.html` returns
-`200 application/json` with the full state blob, names, SteamIDs and IPs
-included, and so does `/`:
+A path that is not a file under the web root reaches the handler. A
+request with no parameters is answered by its path and `Accept`
+(CONSTRAINTS item 6):
 
-| Path | Status | Content-Type | Size |
-| --- | --- | --- | --- |
-| `/` | 200 | `application/json` | 317 B |
-| `/index.html` | 200 | `text/html` | 12757 B |
-| `/index.htm` | 200 | `application/json` | 317 B |
-| `/js/rcon.js` | 200 | `application/x-javascript` | 12917 B |
-
-- Never use the status code to detect a missing asset: a wrong path gives
-  a JSON body and a parse error, not a 404.
-- The panel is at `/index.html` (`Dedicated_Server_Usage.txt:118`), but the
-  boot log prints `Web server running at <host>:<port>` with no path, so
-  the obvious URL returns player data.
-
-With the mod, a request with no parameters is answered by its path and
-`Accept` (CONSTRAINTS item 6). The page's meta refresh leads to
-`/index.html`:
-
-| Request | With the mod |
+| Request | Answer |
 | --- | --- |
-| `/`, `/?`, `/?foo`, `POST /` with an empty body, from a browser (`Accept` names `text/html`) | `text/html`, the page |
-| The same from a script (`curl`, `fetch()`, an auto-shutdown check) | `application/json`, the state, as stock |
-| `/missing.png`, `/index.htm`, any other path | `text/html`, a not-found page |
+| `/`, `/?`, `/?foo`, `POST /` with an empty body, from a browser (`Accept` names `text/html`) | `text/html`, the panel |
+| The same from a script (`curl`, `fetch()`, an auto-shutdown check) | `application/json`, the state |
+| `/missing.png`, `/index.htm`, any other path | `text/html`, the panel |
 | `/?request=json`, `/?foo=1`, `/?foo=`, `/?request=` | `application/json`, the state |
 
-A key without `=` never reaches Lua; one with `=` does, even empty.
+A key without `=` never reaches Lua; one with `=` does, even empty. Never
+use the status code to detect a missing asset.
 
 ### Response headers
 
-From 09-03 on, every reply carries:
+Every reply carries:
 
 ```
 X-Content-Type-Options: nosniff
@@ -106,101 +51,79 @@ Cache-Control: no-store
 ```
 
 Successful replies also send `Content-Length` and `Keep-Alive: timeout=5,
-max=100`. Builds before 09-03 send only `Content-Type` and `Connection:
-close`.
+max=100`.
 
 ## Request types
 
-11 values plus the fallthrough.
+14 values plus the fallthrough.
 
 | `request` | Method | Parameters | Returns |
 | --- | --- | --- | --- |
-| *(anything unmatched, by convention `json`)* | GET | `command`, `rcon` (optional) | The server state, below |
-| `getbanlist` | GET | -- | Array of ban records |
-| `getreservedslots` | GET | -- | `{ amount, ids: [...] }` |
-| `setreservedslotamount` | GET or POST | `amount` | `""`, and does nothing on stock (CONSTRAINTS item 7) |
-| `getchatlist` | GET | `since` (mod) | The last 20 chat entries, each with an increasing `id`; `{ }` when the buffer does not exist. With the mod and `since`: `{ entries, last_id, dropped, buffer_size }` from a ring of 200, with times |
-| `getperfdata` | GET | -- | Up to 30 samples, one a minute: `{ players, tickrate, time, ent_count }`, reset at a map change |
-| `getinstalledmodslist` | GET | -- | `[{ id, name }]`; the mod adds `active` |
+| *(anything unmatched, by convention `json`)* | GET | -- | The server state, below |
+| `runcommand` | GET or POST | `cmd` | What the command printed (CONSTRAINTS item 1) |
+| `getbans` | GET | -- | The bans in force, from whichever table decides them ([CONSTRAINTS.md](CONSTRAINTS.md#shine)) |
+| `getrecentplayers` | GET | -- | Everyone seen in the last 24 hours, up to 100 (REQUIREMENTS item 6) |
+| `getreservedslots` | GET | -- | `{ amount, ids: [...] }`, and Shine's count under its plugin |
+| `getchatlist` | GET | `since` | `{ entries, last_id, dropped, buffer_size }` from a ring of 200, with times (item 3) |
+| `getperf` | GET | `since`, `esince` | `perfmon`'s data in 10 s windows, and the engine's own reports ([below](#getperf)) |
+| `getlog` | GET | `since`, `before`, `file` | `log-Server.txt` by byte offset ([below](#getlog)) |
+| `getinstalledmodslist` | GET | -- | `[{ id, name, active, whitelisted }]` (REQUIREMENTS item 3, CONSTRAINTS item 17) |
 | `getmaplist` | GET | -- | `[{ name, modId }]` |
-| `getmapcycle` | GET | -- | The map cycle, mod ids hex-encoded |
-| `setmapcycle` | GET or POST | `data` = JSON string | `""`; the mod answers `{ ok, cycle }` or `{ ok: false, error }` |
-| `installmod` | GET or POST | `modid` (hex) | `""`; the mod answers `{ ok, id, already_installed }` or `{ ok: false, error }` |
-| `getmods` | GET | `searchtext`, `p` (page) | Workshop search results, or `{"loading": true}` |
+| `getmapcycle` | GET | -- | `MapCycle.json`, mod ids hex-encoded (items 12, 13) |
+| `setmapcycle` | GET or POST | `data` = JSON string | `{ ok, cycle }` read back, or `{ ok: false, error }` |
+| `getmapvote` | GET | -- | What Shine's mapvote will do with the cycle (item 13) |
+| `installmod` | GET or POST | `modid` (hex) | `{ ok, id, already_installed }` or `{ ok: false, error }` (item 2) |
+| `getmods` | GET | `searchtext` | Workshop search results, or `{ loading, elapsed }` (item 2) |
 
 - **Method is not enforced.** The handler reads parameters however they
-  arrived, so every write also works as a `GET`; the 2012 panel sends
-  `installmod` as one (`modbrowser.js:25`). Methods other than `GET` and
-  `POST` are refused `405` before Lua.
+  arrived, so every write also works as a `GET`. Methods other than `GET`
+  and `POST` are refused `405` before Lua.
 - **A `POST` reads the body only** (09-26). Its query string never reaches
-  Lua: `POST /?request=getbanlist` with an empty body falls through to the
-  state blob. So a `POST` carries `request` and every parameter in the
-  form body, as jQuery already does for the 2012 panel.
-- **Lua sees parameters, and since 10-12 the request** (measured
-  2026-10-12): the hook's second argument is `{path, method, headers}`,
-  header names in lower case, never `authorization` or `cookie`. Before
-  10-12 the hook got the parameters alone. Lua still cannot set a status
-  or a header.
+  Lua, so a `POST` carries `request` and every parameter in the form body.
+- **Lua sees the request** (measured 2026-10-12): the hook's second
+  argument is `{path, method, headers}`, header names in lower case, never
+  `authorization` or `cookie`. Lua cannot set a status or a header.
 
-The panel sets reserved slots through `sv_reserved_slots`,
-`sv_add_reserved_slot` and `sv_remove_reserved_slot` on every server:
-they work on stock and say what they did. What a command line can carry
-is in [CONSTRAINTS.md](CONSTRAINTS.md#console-arguments).
+Reserved slots are set with `sv_reserved_slots`, `sv_add_reserved_slot`
+and `sv_remove_reserved_slot` through `runcommand`, which say what they
+did. What a command line can carry is in
+[CONSTRAINTS.md](CONSTRAINTS.md#console-arguments).
 
 ## Server state
 
-The default response, built by `GetServerState()` (lines 78-135):
+The default response, built by `GetServerState()`:
 
 ```
-webdomain, webport          -- substituted by the engine from [[webdomain]] / [[webport]]
 server_name, map, uptime    -- uptime restarts with each map
-cheats, devmode             -- strings on stock, booleans with the mod
+cheats, devmode
 players_online, marines, aliens
 marine_res, alien_res
 frame_rate
 game_started, game_time
+max_players, map_loaded_at, ranking_active
+shine                       -- only when Shine is loaded
 player_list[]:
-    name, steamid, isbot    -- isbot a string on stock
+    name, steamid, isbot
     team, iscomm
     score, kills, assists, deaths
     resources, ping
     ipaddress               -- full client IP, see Privacy
+    familyshared, owner_steamid, moves_rejected_time, moves_rejected_other
+    skill, skill_offset, comm_skill, comm_skill_offset, skill_tier
+    gagged                  -- under Shine's basecommands
 ```
 
-A client that talks to both kinds of server reads `true` and `"true"`
-alike, as the panel's `wireBool` does.
+Skill is absent when the server holds none; meanings are in openapi.yaml's
+`Player` schema.
 
 ## Console commands
 
-Lines 278-280:
-
-```lua
-if actions.command then
-    Shared.ConsoleCommand(actions.rcon)
-end
-```
-
-- **Both parameters are required.** `command` is only tested for truth
-  (the 2012 panel sends `command=Send`); the text is read from `rcon`.
-- **Nothing is returned**: the response is the ordinary state blob, with
-  no output, success flag or error.
-
-A failed and a successful kick, sent the way the 2012 panel sends them:
-
-| Command | HTTP | Body | What happened |
-| --- | --- | --- | --- |
-| `sv_kick <bot name>` | 200 | server state | failed: `No matching player` |
-| `sv_kick <real steamid>` | 200 | server state | worked |
-
-The two bodies differ only in fields that drift between any two samples,
-and the successful kick still reported `players_online: 12`, because the
-response is rendered before the disconnect completes. So a client cannot
-infer the outcome even by diffing `player_list`; the 2012 panel
-(`rcon.js:290`) ignores the response and refreshes 500 ms later. The
-reason exists on the server: `ServerAdminCommands.lua:172` calls
-`ServerAdminPrint(client, "No matching player")`, which for a web request
-reaches only `log-Server.txt`. Fixtures: `rcon-kick.json`,
-`rcon-kick-success.json`. The mod's fix is CONSTRAINTS item 1.
+`runcommand` runs a command with `Shared.CaptureConsoleCommand` and
+returns `{ cmd, dispatched, lines }`. `dispatched` is true when the game's
+audit line for an admin command appeared; false for a plain console
+command or no such command, which the server cannot tell apart. An empty
+`lines` with `dispatched` is the ordinary case: a kick that works prints
+nothing, only its failure branch does (`ServerAdminCommands.lua:172`).
 
 ## Mod ids are hex strings
 
@@ -215,26 +138,20 @@ Example: `1e62a2ce` is workshop item `509780686`.
 
 ## `getmods` is asynchronous
 
-Lines 217-274. The handler cannot block, so it:
-
-1. answers `{"loading": true}` at once and starts `Server.SearchWorshop`
-   (UWE's spelling);
-2. caches the result for 60 s, keyed by `searchtext..page`;
-3. restarts a search still running after 30 s.
-
-The client polls until it gets something else. Measured on 09-26
-(REQUIREMENTS item 4): at most 50 hits, the page ignored, an empty result
-is `{"items":[]}`, and a search Steam failed looks the same as an empty
-one. Without `searchtext` stock never starts a search; a non-numeric `p`
-is a Lua error and an empty `200`. The mod's additions are CONSTRAINTS
-item 2.
+The handler cannot block, so it answers `{ loading, elapsed }` at once and
+starts `Server.SearchWorshop` (UWE's spelling); the client polls until it
+gets something else. A settled result is cached for 60 s by its text; a
+search with no answer after 30 s is reported once with `error`. Measured on
+09-26 (REQUIREMENTS item 4): at most 50 hits, the page ignored (so only
+page 1 is asked for), and a search Steam failed looks the same as an empty
+one. `capped` says there may be more than 50.
 
 ## Installing a mod is not loading it
 
-- `installmod` downloads the item, returns nothing from the engine, and
-  drops a malformed id silently. The mod appears in
-  `getinstalledmodslist` once downloaded and unpacked, under its real
-  title, and stays on disk. There is no uninstall (REQUIREMENTS item 2).
+- `installmod` hands a hex id to the engine, which downloads the item. The
+  mod appears in `getinstalledmodslist` once downloaded and unpacked,
+  under its real title, and stays on disk. There is no uninstall
+  (REQUIREMENTS item 2).
 - **Loading** needs the id in the cycle's `mods` and a map change.
   `mods: ["1e62a2ce"]` then `sv_changemap` logged `Mounting mod 'Combat
   Fix'[509780686]`; removing it and changing map dropped it.
@@ -242,10 +159,10 @@ item 2.
   344 and NSL Badges, and a map entry's own `mods` load only with that map
   (REQUIREMENTS item 3).
 - **A mod that is not whitelisted unranks the server** (`Ranking disabled:
-  server has non-whitelisted mods mounted`), and nothing in the stock API
-  says so. With the mod, `getinstalledmodslist` and `getmods` mark each mod
-  `whitelisted`, from `Server.GetIsModWhitelisted`, the list the engine
-  read at boot; the hotfix mods read true (CONSTRAINTS item 17).
+  server has non-whitelisted mods mounted`). `getinstalledmodslist` and
+  `getmods` mark each mod `whitelisted`, from `Server.GetIsModWhitelisted`,
+  the list the engine read at boot; the hotfix mods read true
+  (CONSTRAINTS item 17).
 
 ## Authentication
 
@@ -270,15 +187,13 @@ internally. A polling panel needs no re-authentication logic.
 
 ## `getperf`
 
-Stock `getperfdata` returns the same one-a-minute window however often it
-is polled. The mod leaves it alone and adds `getperf`:
 
 | Field | What it is |
 | --- | --- |
 | `window_s`, `capacity` | 10 s windows, 360 kept (an hour) |
 | `loaded_at`, `map` | When this Lua VM loaded. A new value means a map change, and ids restart at 1 |
 | `config` | `tickrate`, `moverate`, `sendrate`, `interp_ms`, `max_players`, `bw_limit` (`Server.GetBwLimit()`, bytes a second per player, 09-27+) as the server runs now. Absent before the engine's first sample |
-| `windows[]` | Per window: `tickrate` counted from ticks, `worst_tick_ms`, `score`, `quality`, `idle_pct`, `moves_pct`, `entities_pct`, `moves_per_s`, `move_ms`, `entities`, `incomplete`, `interp_warns`, `interp_fails` (counts per window), `lua_kb` |
+| `windows[]` | Per window: `tickrate` counted from ticks, `worst_tick_ms`, `score`, `idle_pct`, `moves_pct`, `entities_pct`, `entities`, `interp_warns`, `interp_fails` (counts per window), `lua_kb` |
 | `last_id` | Poll again with `since=<last_id>` |
 | `more` | The reply is one page of at most 60 windows and more are held: ask again at once |
 | `engine` | The engine's log lines, below. Poll with `esince=<engine.last_id>`; `engine.more` pages it the same way, 60 records across its three lists |
@@ -292,8 +207,8 @@ The windows come from `Shared.GetServerPerformanceData()`, accumulated as
 tickrate is counted, because the engine's interval is whole milliseconds
 and reads 62.5 at tickrate 60; and interp warns and fails are counts per
 window, where `perfmon` prints a per-second rate with `%d`, so its `iFail
-0` means under one a second. `score` and `quality` are 0, and meaningless,
-with nobody on. Measurements: REQUIREMENTS item 10.
+0` means under one a second. `score` is 0, and meaningless, with nobody
+on. Measurements: REQUIREMENTS item 10.
 
 `engine` holds the engine's own reports. Tickstat windows come from
 `Server.GetTickStat()`, read every second while `tickstat N` is on, each
@@ -323,8 +238,8 @@ chat and command lines), and it survives a map change.
 
 | Ask | Get |
 | --- | --- |
-| `request=getlog` | The last 64 KB (`tail_bytes`), from the first line that starts in it |
-| `&since=<to>&file=<file_id>` | What was written since, at most 64 KB (`max_bytes`); `more: true` means ask again at once |
+| `request=getlog` | The last 64 KB, from the first line that starts in it |
+| `&since=<to>&file=<file_id>` | What was written since, at most 64 KB; `more: true` means ask again at once |
 | `&before=<off>&file=<file_id>` | The 64 KB before a line, for paging back; `at_start` at byte 0 |
 
 Each line is `{off, text}`: its byte offset, unique within a file, and its

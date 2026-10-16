@@ -12,25 +12,22 @@ import {
 /**
  * What perfmon logs, drawn.
  *
- * On the panel Lua: 10 s windows of the engine's own ServerPerformanceData, with the
- * tickrate counted per tick and the slowest tick, since the map loaded -- and
- * whatever this page has already read from earlier maps. On a stock server:
- * the vanilla getperfdata, three numbers a minute, as the server holds them.
+ * 10 s windows of the engine's own ServerPerformanceData, with the tickrate
+ * counted per tick and the slowest tick, since the map loaded -- and whatever
+ * this page has already read from earlier maps.
  */
 export function Performance({ state }: { state: ServerState }) {
-  const hasLua = state.luaVersion !== null;
-  const perf = usePerf(hasLua);
+  const perf = usePerf();
   const settings = useSettings();
   const theme = useResolvedTheme();
   const [zoom, setZoom] = useState<[number, number] | null>(null);
 
-  const windowS = perf.windowSeconds ?? (hasLua ? 10 : 60);
+  const windowS = perf.windowSeconds ?? 10;
   const rows = withGaps(perf.segments, windowS);
   const x = rows.map((r) => r.x);
   const pick = (f: (p: PerfPoint) => number | null) => rows.map((r) => r.p ? f(r.p) : null);
   const markers: ChartMarker[] = perf.segments
-    .filter((s) => s.loadedAt !== null)
-    .map((s) => ({ at: s.loadedAt! / 1000, label: s.map ?? "map load" }));
+    .map((s) => ({ at: s.loadedAt / 1000, label: s.map }));
   const current = perf.segments[perf.segments.length - 1];
   const latest = current?.points[current.points.length - 1] ?? null;
   const config = perf.config;
@@ -44,47 +41,26 @@ export function Performance({ state }: { state: ServerState }) {
     : Math.max(...ends) > Math.min(...ends) ? [Math.min(...ends), Math.max(...ends)]
     : [ends[0]! - 30, ends[0]! + 30]);
   const common = { x, markers, zoom: range, onZoom: setZoom, theme, clock: settings.clock };
-  const lua = perf.source === "lua";
 
   // One plot, one axis, numbers without a unit; each line names its own.
   // Fixed slots, whatever the server has: slowest tick dashed, players stepped.
   const hz = (v: number) => `${v.toFixed(1)} Hz`;
   const headline: ChartSeries[] = [
-    { label: lua ? "tickrate" : "tickrate (reading)", slot: 1, format: hz,
-      values: pick((p) => p.tickrate) },
-    ...(lua ? [
-      { label: "slowest tick", slot: 2 as const, dash: true, format: hz,
-        values: pick((p) => p.worstTickMs ? 1000 / p.worstTickMs : null) },
-      { label: "score", slot: 3 as const,
-        values: pick((p) => p.players > 0 ? p.score : null) },
-    ] : []),
+    { label: "tickrate", slot: 1, format: hz, values: pick((p) => p.tickrate) },
+    { label: "slowest tick", slot: 2, dash: true, format: hz,
+      values: pick((p) => p.worstTickMs ? 1000 / p.worstTickMs : null) },
+    { label: "score", slot: 3, values: pick((p) => p.players > 0 ? p.score : null) },
     { label: "players", slot: 4, stepped: true, values: pick((p) => p.players) },
   ];
   const engine = engineRecords(perf.segments);
-  const showEngine = lua && perf.engine !== null;
+  const showEngine = perf.engine !== null;
 
   return (
     <section class="wrap perf-tab">
-      {!hasLua && (
-        <div class="banner">
-          <h2>Stock server: one reading a minute</h2>
-          <p>
-            The game's own web interface keeps the last 30 readings, a minute
-            apart, of the tickrate, players and entities -- half an hour, lost
-            at every map change. With this panel's Lua the tab shows what
-            perfmon logs, every 10 seconds: the performance score, where each
-            tick's time goes, late updates to players, the slowest tick, the
-            configured rates and the Lua heap -- and, from the engine's own
-            log, tickstat's tick spacing, snapshot sizes and choke.
-          </p>
-        </div>
-      )}
 
       {showEngine && <BwlimitWarning events={engine.events} config={config} />}
-      {(lua || latest) && (
-        <Strip latest={latest} t={showEngine ? engine.latest : null} config={config}
-               lua={lua} events={engine.events} />
-      )}
+      <Strip latest={latest} t={showEngine ? engine.latest : null} config={config}
+             events={engine.events} />
       {(perf.error || zoom) && (
         <div class="toolbar">
           <span class="spacer" />
@@ -96,9 +72,7 @@ export function Performance({ state }: { state: ServerState }) {
       {perf.loading && rows.length === 0 && <p class="muted">Loading performance data...</p>}
       {!perf.loading && rows.length === 0 && !perf.error && (
         <p class="muted">
-          {lua
-            ? `No window yet: the first closes ${windowS} s after the map loads.`
-            : "No reading yet: the first is taken a minute after the map loads."}
+          No window yet: the first closes {windowS} s after the map loads.
         </p>
       )}
 
@@ -108,43 +82,36 @@ export function Performance({ state }: { state: ServerState }) {
               lines on one plot. Their values share a range of about 0 to 100,
               so the axis carries numbers only, and the legend the units. */}
           <PerfChart {...common} wide height={220}
-            title={lua ? "Tickrate, slowest tick, score and players" : "Tickrate and players"}
+            title="Tickrate, slowest tick, score and players"
             series={headline}
             format={(v) => v.toFixed(0)}
             axisFormat={(v) => v.toFixed(0)}
             yRange={(min, max) => [Math.min(0, min - 5),
-              Math.max((config?.tickrate ?? 0) * 1.15, config?.max_players ?? state.maxPlayers ?? 0,
+              Math.max((config?.tickrate ?? 0) * 1.15, config?.max_players ?? state.maxPlayers,
                        max * 1.1, 1)]}
             refLines={config ? [{ value: config.tickrate, label: `tickrate set ${config.tickrate}` }] : []} />
-          {lua && (
-            <PerfChart {...common} title="Frame time (% of each window)"
-              series={[
-                { label: "idle", slot: 1, values: pick((p) => p.idlePct) },
-                { label: "player moves", slot: 2, values: pick((p) => p.movesPct) },
-                { label: "entities", slot: 3, values: pick((p) => p.entitiesPct) },
-              ]}
-              format={(v) => `${v.toFixed(0)}%`}
-              yRange={() => [0, 100]} />
-          )}
-          {lua && (
-            <PerfChart {...common} title="Late updates to players (per window)"
-              series={[
-                { label: "warn", slot: 1, stepped: true, values: pick((p) => p.interpWarns) },
-                { label: "fail", slot: 2, stepped: true, values: pick((p) => p.interpFails) },
-              ]}
-              format={(v) => v.toFixed(0)}
-              yRange={(_min, max) => [0, Math.max(4, Math.ceil(max * 1.2))]} />
-          )}
+          <PerfChart {...common} title="Frame time (% of each window)"
+            series={[
+              { label: "idle", slot: 1, values: pick((p) => p.idlePct) },
+              { label: "player moves", slot: 2, values: pick((p) => p.movesPct) },
+              { label: "entities", slot: 3, values: pick((p) => p.entitiesPct) },
+            ]}
+            format={(v) => `${v.toFixed(0)}%`}
+            yRange={() => [0, 100]} />
+          <PerfChart {...common} title="Late updates to players (per window)"
+            series={[
+              { label: "warn", slot: 1, stepped: true, values: pick((p) => p.interpWarns) },
+              { label: "fail", slot: 2, stepped: true, values: pick((p) => p.interpFails) },
+            ]}
+            format={(v) => v.toFixed(0)}
+            yRange={(_min, max) => [0, Math.max(4, Math.ceil(max * 1.2))]} />
           <PerfChart {...common} title="Entities"
             series={[{ label: "entities", slot: 1, values: pick((p) => p.entities) }]}
             format={(v) => v.toFixed(0)} />
-          {lua && (
-            <PerfChart {...common} title="Lua heap (MB)"
-              series={[{ label: "heap", slot: 1,
-                values: pick((p) => p.luaKb === null ? null : p.luaKb / 1024) }]}
-              format={(v) => v.toFixed(v >= 10 ? 0 : 1)}
-              axisFormat={(v) => v.toFixed(0)} />
-          )}
+          <PerfChart {...common} title="Lua heap (MB)"
+            series={[{ label: "heap", slot: 1, values: pick((p) => p.luaKb / 1024) }]}
+            format={(v) => v.toFixed(v >= 10 ? 0 : 1)}
+            axisFormat={(v) => v.toFixed(0)} />
           {showEngine && engine.tickstats.length > 0 && (
             <TickstatCharts segments={perf.segments} config={config} markers={markers}
               range={range} onZoom={setZoom} theme={theme} clock={settings.clock}
@@ -169,15 +136,15 @@ function scoreLevel(score: number): { word: string; tone: string } {
  * The latest perfmon window and the latest tickstat line, as one summary:
  * only what the server has given, so a stat with no value is left out.
  */
-function Strip({ latest, t, config, lua, events }: {
+function Strip({ latest, t, config, events }: {
   latest: PerfPoint | null; t: Tickstat | null; config: PerfConfig | null;
-  lua: boolean; events: EngineEvent[];
+  events: EngineEvent[];
 }) {
-  const level = latest && latest.score !== null && latest.players > 0 ? scoreLevel(latest.score) : null;
+  const level = latest && latest.players > 0 ? scoreLevel(latest.score) : null;
   const fails = latest?.interpFails ?? 0;
   return (
     <div class="perf-strip" aria-label="Latest window and tickstat line">
-      {lua && <TickstatSwitch />}
+      <TickstatSwitch />
       {latest && (
         <div class="perf-stat">
           <span class="label">tickrate</span>
@@ -185,13 +152,13 @@ function Strip({ latest, t, config, lua, events }: {
           {config && <span class="muted"> / {config.tickrate}</span>}
         </div>
       )}
-      {lua && latest && latest.worstTickMs !== null && (
+      {latest && (
         <div class="perf-stat">
           <span class="label">slowest tick</span>
           <b>{latest.worstTickMs.toFixed(1)} ms</b>
         </div>
       )}
-      {lua && latest && latest.score !== null && (
+      {latest && (
         <div class="perf-stat" data-score={level?.word ?? "none"}>
           <span class="label">score</span>
           {level
@@ -199,16 +166,16 @@ function Strip({ latest, t, config, lua, events }: {
             : <b class="muted">no players</b>}
         </div>
       )}
-      {lua && latest && latest.idlePct !== null && (
+      {latest && (
         <div class="perf-stat">
           <span class="label">idle</span>
           <b>{latest.idlePct.toFixed(0)}%</b>
         </div>
       )}
-      {lua && latest && (latest.interpWarns !== null || latest.interpFails !== null) && (
+      {latest && (
         <div class="perf-stat" data-interp-fails={fails}>
           <span class="label">late updates</span>
-          <b>{latest.interpWarns ?? 0} warn, <span class={fails > 0 ? "tone-error" : ""}>
+          <b>{latest.interpWarns} warn, <span class={fails > 0 ? "tone-error" : ""}>
             {fails} fail</span></b>
           {fails > 0 && (
             <span class="tone-error" title={
@@ -239,13 +206,13 @@ function Strip({ latest, t, config, lua, events }: {
           <b>{latest.entities}</b>
         </div>
       )}
-      {lua && latest && latest.luaKb !== null && (
+      {latest && (
         <div class="perf-stat">
           <span class="label">Lua heap</span>
           <b>{(latest.luaKb / 1024).toFixed(0)} MB</b>
         </div>
       )}
-      {lua && config && (
+      {config && (
         <div class="perf-stat">
           <span class="label">rates</span>
           <b>move {config.moverate}, send {config.sendrate}, interp {config.interp_ms} ms</b>

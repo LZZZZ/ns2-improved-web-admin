@@ -3,7 +3,6 @@
   "more": false,
   "file_id": "09/28/2026 03:27:00 AM",
   "reset": "new_file",
-  "max_bytes": 262144,
   "lines": [
     {
       "text": "Date: 09/28/2026",
@@ -700,7 +699,5 @@
   ],
   "from": 0,
   "size": 10276,
-  "source": "file",
-  "tail_bytes": 65536,
   "at_start": true
 }

@@ -5,41 +5,34 @@
 // changes (the buffer is Lua state), and entries can fall out of the ring
 // before anyone reads them.
 //
-// With the panel Lua the server keeps 200 entries and answers `since`, so a poll
-// carries only what is new. A stock server keeps the last 20 and answers with
-// all of them every time; the merge by id makes that a no-op rather than a
-// duplicate, and what scrolled out of its 20 before we read it is simply
-// gone, which the tab says.
+// The server keeps 200 entries and answers `since`, so a poll carries only
+// what is new.
 
 import { useEffect, useState } from "preact/hooks";
 import { ApiError, getChat } from "../api/client";
 import type { ChatEntry } from "../api/types";
 
-/** Kept client-side. The panel Lua's ring is 200; holding more costs nothing. */
+/** Kept client-side. The server's ring is 200; holding more costs nothing. */
 const kMaxEntries = 1000;
 
 export interface ChatState {
   entries: ChatEntry[];
   cursor: number;
-  /** Entries the server dropped before we read them. Panel Lua only. */
+  /** Entries the server dropped before we read them. */
   dropped: number;
-  /** The server's ring size: 200 with the panel Lua, 20 on a stock server. */
+  /** The server's ring size. */
   bufferSize: number | null;
-  /** False when the server has no chat buffer at all (`{ }`). */
-  available: boolean;
   error: Error | null;
   loading: boolean;
 }
 
 let state: ChatState = {
-  entries: [], cursor: 0, dropped: 0, bufferSize: null, available: true,
-  error: null, loading: true,
+  entries: [], cursor: 0, dropped: 0, bufferSize: null, error: null, loading: true,
 };
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let inFlight = false;
 let intervalMs = 2000;
-let hasLua = false;
 
 function emit(next: Partial<ChatState>) {
   state = { ...state, ...next };
@@ -59,18 +52,14 @@ async function poll(): Promise<void> {
   if (inFlight) return;
   inFlight = true;
   try {
-    let page = await getChat(hasLua ? state.cursor : null);
-    if (!page.available) {
-      emit({ entries: [], available: false, error: null, loading: false });
-      return;
-    }
+    let page = await getChat(state.cursor);
     if (page.lastId < state.cursor) {
       // Ids went backwards: the Lua state was rebuilt, so the map changed.
       // That reply was cut at the old cursor, so read the new map's from 0.
-      if (hasLua) page = await getChat(0);
+      page = await getChat(0);
       emit({
         entries: page.entries, cursor: page.lastId,
-        dropped: page.dropped, bufferSize: page.bufferSize, available: true,
+        dropped: page.dropped, bufferSize: page.bufferSize,
         error: null, loading: false,
       });
       return;
@@ -80,7 +69,6 @@ async function poll(): Promise<void> {
       cursor: Math.max(state.cursor, page.lastId),
       dropped: page.dropped,
       bufferSize: page.bufferSize,
-      available: true,
       error: null,
       loading: false,
     });
@@ -115,17 +103,6 @@ export function refreshChat(): Promise<void> {
 export function setChatIntervalMs(ms: number) {
   intervalMs = ms;
   schedule();
-}
-
-/**
- * Whether to ask with a cursor. Set from the state blob before the first read;
- * a server that gains or loses the panel Lua starts over.
- */
-export function setChatLua(lua: boolean) {
-  if (lua === hasLua) return;
-  hasLua = lua;
-  emit({ entries: [], cursor: 0, dropped: 0, bufferSize: null });
-  if (listeners.size > 0) void poll();
 }
 
 export function useChat(): ChatState {

@@ -1,1 +1,25 @@
-[]
+{
+  "entries": [
+    {
+      "id": 1,
+      "player": "Admin",
+      "time": 1792111506,
+      "team": 0,
+      "steamId": 0,
+      "message": "Server restarting for a test",
+      "teamOnly": false
+    },
+    {
+      "id": 2,
+      "player": "Admin",
+      "time": 1792111506,
+      "team": 0,
+      "steamId": 0,
+      "message": "Second line",
+      "teamOnly": false
+    }
+  ],
+  "last_id": 2,
+  "dropped": 0,
+  "buffer_size": 200
+}

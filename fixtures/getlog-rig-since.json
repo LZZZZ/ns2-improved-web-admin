@@ -1,5 +1,4 @@
 {
-  "source": "file",
   "more": false,
   "file_id": "09/28/2026 03:26:13 AM",
   "from": 10277,
@@ -15,7 +14,5 @@
       "off": 10315
     }
   ],
-  "max_bytes": 262144,
-  "tail_bytes": 65536,
   "at_start": false
 }

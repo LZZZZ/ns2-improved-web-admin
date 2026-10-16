@@ -6,9 +6,6 @@ The 2012 panel showed installed mods with nothing to say which were loaded,
 and searched the workshop on every page load, from Steam, for a tab nobody
 had opened. So the checks are about what this one claims:
 
-  * stock      the tab says a stock server cannot tell what is loaded and
-               marks nothing loaded; a change is a POST with everything in its
-               body, reported as the server's copy, not the file
   * --mod      loaded mods first; the hex id selectable and the workshop id
                right; Load with every map appends and says it loads at the next
                map change, which then shows it loaded; Stop loading says it
@@ -22,9 +19,8 @@ had opened. So the checks are about what this one claims:
                option, the groups and the per-map mods surviving, and a cycle
                id the server has not installed shown in its place and removable
 
-and the whitelist (docs/CONSTRAINTS.md item 17) on each: stock uses the list the panel ships and
-says why; --mod shows the server's verdict on each mod and never asks for a
-list; the modded config's 43 whitelisted (2 of them hotfix mods) and 6
+and the whitelist (docs/CONSTRAINTS.md item 17): the server's verdict on each
+mod, never a list; the modded config's 43 whitelisted (2 of them hotfix mods) and 6
 others.
 
 and on all of them: no workshop search, no uncaught exceptions, nothing
@@ -33,7 +29,6 @@ fetched from a third party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8099 --web web --mod --shine=ban,reservedslots,mapvote --maps=modded
 """
@@ -41,7 +36,6 @@ import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_MAPS_URL", "http://127.0.0.1:8099")
 PORT = 9232
@@ -166,46 +160,12 @@ def posts(c, since):
             and e["params"]["request"].get("method") == "POST"]
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    reset(STOCK)
-    install(STOCK, CATALOGUE_ID)
-    await open_mods(c, STOCK)
-    b = await banners(c)
-    check("the stock banner says loaded mods cannot be told",
-          "Stock server Lua" in b and "does not say which mods are loaded" in b, b[:60])
-    t = await table(c)
-    check("the installed list renders", len(t) == 3, f"{len(t)} rows")
-    check("and nothing is marked loaded, or not loaded",
-          all(r[1] == "" and "loaded now" not in r[2] for r in t))
-    counts = str(await c.eval("document.querySelector('.mod-counts').textContent"))
-    check("the counts do not claim a loaded number", "loaded" not in counts, counts)
-    src = await wl_source(c)
-    check("no whitelist line: a stock server cannot say", src[0] == "", src[1][:60])
-    check("and no whitelist icon on any row",
-          (await wl_title(c, "d41d68cd"))[0] == "" and (await wl_title(c, CATALOGUE_ID))[0] == "")
-
-    mark = len(c.events)
-    await click_row(c, CATALOGUE_ID, "Load with every map")
-    sent = posts(c, mark)
-    body = urllib.parse.parse_qs(sent[0].get("postData", "")) if sent else {}
-    check("a change is one POST, everything in the body",
-          len(sent) == 1 and body.get("request") == ["setmapcycle"] and "data" in body
-          and "?" not in sent[0]["url"], f"{len(sent)} POSTs")
-    check("the id reached the cycle's mods", server_cycle(STOCK).get("mods") == [CATALOGUE_ID],
-          json.dumps(server_cycle(STOCK).get("mods")))
-    cmd, note = await last_activity(c)
-    check("reported as the server's copy, not the file",
-          cmd.startswith("setmapcycle (load ") and "cannot say whether MapCycle.json" in note,
-          note[:60])
-
-
 async def mod(c):
     print(f"\n== --mod ({MOD})")
     reset(MOD)
     install(MOD, CATALOGUE_ID)
     await open_mods(c, MOD)
-    check("no stock banner", await banners(c) == "")
+    check("no banner", await banners(c) == "")
     t = await table(c)
     check("loaded mods come first", [r[1] for r in t] == ["true", "true", "false"],
           str([r[1] for r in t]))
@@ -354,7 +314,6 @@ async def main():
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.removeItem('webadmin.settings'); } catch {}")
-            await stock(c)
             await mod_whitelist(c)
             await mod(c)
             await shine(c)
@@ -370,7 +329,7 @@ async def main():
                   not any("request=getmods" in u for u in urls))
             check("no server is asked for a whitelist",
                   not any("request=getwhitelist" in u for u in urls))
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE))})
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

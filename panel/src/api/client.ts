@@ -16,15 +16,15 @@
 //     poll across a nonce expiry never showed a 401 to the page
 
 import type {
-  Ban, BanList, CommandResult, ConsoleLine, InstalledMod, MapInfo,
-  MapCycleWrite, MapVote, Player, RawBan, RawBanList, RawCommandResult,
+  BanList, CommandResult, ConsoleLine, InstalledMod, MapInfo,
+  MapCycleWrite, MapVote, Player, RawBanList, RawCommandResult,
   RawConsoleLine, RawInstalledMod, RawMapCycle,
   RawMapCycleWrite, RawMapListEntry, RawMapVote, RawPlayer, RawRecentPlayers,
   RawReservedSlots, RawServerState, RecentPlayers, ReservedSlots, ServerState,
   InstallModResult, RawInstallModResult, RawWorkshopItem, RawWorkshopSearch,
   WorkshopItem, WorkshopSearch, PerfPoint, PerfReport, RawPerfReport,
   PerfEngine, RawPerfEngine,
-  RawPerfSample, RawPerfWindow, LogPage, RawLogPage, WireBool,
+  RawPerfWindow, LogPage, RawLogPage,
   ChatEntry, ChatPage, RawChatMessage, RawChatStream,
 } from "./types";
 
@@ -87,17 +87,11 @@ async function getJson<T>(
 
 // ------------------------------------------------------------- normalizing
 
-/** Read a boolean whichever way it was sent; never by truthiness. */
-function wireBool(v: WireBool): boolean {
-  return v === true || v === "true";
-}
-
 function normalizePlayer(raw: RawPlayer, index: number): Player {
-  const isBot = wireBool(raw.isbot);
   return {
     name: raw.name,
     steamId: raw.steamid,
-    isBot,
+    isBot: raw.isbot,
     team: raw.team,
     isCommander: raw.iscomm,
     score: raw.score,
@@ -108,12 +102,9 @@ function normalizePlayer(raw: RawPlayer, index: number): Player {
     ping: raw.ping,
     ip: raw.ipaddress,
     gagged: typeof raw.gagged === "boolean" ? raw.gagged : null,
-    familyShared: typeof raw.familyshared === "boolean" ? raw.familyshared : null,
+    familyShared: raw.familyshared,
     ownerSteamId: typeof raw.owner_steamid === "number" ? raw.owner_steamid : null,
-    movesRejected: typeof raw.moves_rejected_time === "number"
-      || typeof raw.moves_rejected_other === "number"
-      ? { time: raw.moves_rejected_time ?? 0, other: raw.moves_rejected_other ?? 0 }
-      : null,
+    movesRejected: { time: raw.moves_rejected_time, other: raw.moves_rejected_other },
     skill: typeof raw.skill === "number"
       ? { skill: raw.skill, offset: raw.skill_offset ?? 0,
           comm: raw.comm_skill ?? null, commOffset: raw.comm_skill_offset ?? 0,
@@ -130,8 +121,8 @@ export function normalizeServerState(raw: RawServerState): ServerState {
     serverName: raw.server_name,
     map: raw.map,
     uptimeSeconds: raw.uptime,
-    cheats: wireBool(raw.cheats),
-    devMode: wireBool(raw.devmode),
+    cheats: raw.cheats,
+    devMode: raw.devmode,
     playersOnline: raw.players_online,
     marines: raw.marines,
     aliens: raw.aliens,
@@ -141,49 +132,18 @@ export function normalizeServerState(raw: RawServerState): ServerState {
     gameStarted: raw.game_started,
     gameTimeSeconds: raw.game_time,
     players: (raw.player_list ?? []).map(normalizePlayer),
-    luaVersion: raw.lua_version ?? null,
-    maxPlayers: raw.max_players ?? null,
-    mapLoadedAt: typeof raw.map_loaded_at === "number" ? raw.map_loaded_at * 1000 : null,
-    rankingActive: typeof raw.ranking_active === "boolean" ? raw.ranking_active : null,
+    maxPlayers: raw.max_players,
+    mapLoadedAt: raw.map_loaded_at * 1000,
+    rankingActive: raw.ranking_active,
     shine: raw.shine
       ? {
           bans: raw.shine.ban,
           reservedSlots: raw.shine.reservedslots,
           mapVote: raw.shine.mapvote,
-          baseCommands: raw.shine.basecommands === true,
+          baseCommands: raw.shine.basecommands,
         }
       : null,
   };
-}
-
-// An expiry further out than this is Shine's way of writing "never" (6e+24
-// seen on a real server). The panel Lua's getbans applies the same line.
-const kPermanentAfter = 100 * 365 * 24 * 60 * 60;
-
-/**
- * The stock path: getbanlist, read the way the panel Lua's getbans would have
- * reported it. Expired bans are dropped -- a stock server keeps listing them
- * after it stops enforcing them -- and an absurd expiry reads as permanent.
- */
-export function normalizeBanList(raw: RawBan[], now = Date.now() / 1000): Ban[] {
-  const bans: Ban[] = [];
-  // Vanilla appends, so reversing puts the newest first.
-  [...raw].reverse().forEach((b) => {
-    const time = Number(b.time) || 0;
-    if (time !== 0 && time <= now) return;
-    const permanent = time === 0 || time - now > kPermanentAfter;
-    bans.push({
-      name: b.name,
-      steamId: Number(b.id),
-      reason: b.reason,
-      permanent,
-      expiresAt: permanent ? null : time,
-      issuedAt: null,
-      bannedBy: null,
-      order: bans.length,
-    });
-  });
-  return bans;
 }
 
 // --------------------------------------------------------------- requests
@@ -196,19 +156,8 @@ export async function getServerState(signal?: AbortSignal): Promise<ServerState>
     await getJson<RawServerState>({ request: "json" }, signal));
 }
 
-/**
- * The bans in force. With the panel Lua that is `getbans`, read from whichever table
- * decides them; on a stock server it is `getbanlist`, which cannot say whether
- * Shine owns the list.
- */
-export async function getBans(
-  hasLua: boolean,
-  signal?: AbortSignal,
-): Promise<BanList> {
-  if (!hasLua) {
-    const raw = await getJson<RawBan[]>({ request: "getbanlist" }, signal);
-    return { source: "stock", bans: normalizeBanList(raw), skewSeconds: 0 };
-  }
+/** The bans in force, read from whichever table decides them. */
+export async function getBans(signal?: AbortSignal): Promise<BanList> {
   const raw = await getJson<RawBanList>({ request: "getbans" }, signal);
   return {
     source: raw.source,
@@ -226,7 +175,7 @@ export async function getBans(
   };
 }
 
-/** Players seen in the last day, connected or not. Panel Lua only. */
+/** Players seen in the last day, connected or not. */
 export async function getRecentPlayers(signal?: AbortSignal): Promise<RecentPlayers> {
   const raw = await getJson<RawRecentPlayers>({ request: "getrecentplayers" }, signal);
   return {
@@ -258,33 +207,12 @@ export async function getReservedSlots(signal?: AbortSignal): Promise<ReservedSl
   };
 }
 
-/**
- * Run a console command the way a stock server allows: fire it and read the
- * state blob back.
- *
- * The reply says nothing about the command. It is built before the command's
- * effect lands, so a kick that worked and a kick that found nobody are
- * byte-comparable. Callers must say so rather than implying success -- the
- * 2012 panel's timed refresh is the behaviour being replaced.
- */
-export async function sendLegacyCommand(
-  command: string,
-  signal?: AbortSignal,
-): Promise<{ verified: false; state: ServerState }> {
-  const raw = await getJson<RawServerState>(
-    // Both parameters are required: `command` is only tested for truthiness
-    // and the text is read from `rcon`. Sending `rcon` alone does nothing.
-    { request: "json", command: "Send", rcon: command }, signal);
-  return { verified: false, state: normalizeServerState(raw) };
-}
-
 function normalizeConsoleLine(raw: RawConsoleLine): ConsoleLine {
   return { id: raw.id, at: raw.time * 1000, src: raw.src, text: raw.text };
 }
 
 /**
- * Run a console command on a server carrying the panel Lua, and get back what
- * it printed.
+ * Run a console command and get back what it printed.
  *
  * `dispatched` is the audit line the game emits before every command made with
  * CreateServerAdminCommand: true means it existed and ran. An empty `lines`
@@ -306,48 +234,22 @@ export async function runCommand(
 
 // ------------------------------------------------------------------- chat
 
-const kStockChatBufferSize = 20;   // Server.lua:74
-
-/**
- * The chat. With the panel Lua and a cursor, the panel Lua's ring of 200 from `since` on,
- * with times. Without (`since` null), the game's last 20, all of them every
- * time and with no times; or `{ }`, when the server has no chat buffer.
- */
-export async function getChat(
-  since: number | null,
-  signal?: AbortSignal,
-): Promise<ChatPage> {
-  if (since !== null) {
-    const raw = await getJson<RawChatStream>(
-      { request: "getchatlist", since: String(since) }, signal);
-    return {
-      // No time on a game whose chat ring keeps none.
-      entries: (raw.entries ?? []).map((e) => normalizeChat(e, typeof e.time === "number" ? e.time : null)),
-      lastId: raw.last_id ?? 0,
-      dropped: raw.dropped ?? 0,
-      bufferSize: raw.buffer_size ?? 200,
-      available: true,
-    };
-  }
-  const raw = await getJson<RawChatMessage[] | Record<string, never>>(
-    { request: "getchatlist" }, signal);
-  if (!Array.isArray(raw)) {
-    return { entries: [], lastId: 0, dropped: 0, bufferSize: 0, available: false };
-  }
-  const entries = raw.map((e) => normalizeChat(e, null));
+/** The chat ring from `since` on, with times. */
+export async function getChat(since: number, signal?: AbortSignal): Promise<ChatPage> {
+  const raw = await getJson<RawChatStream>(
+    { request: "getchatlist", since: String(since) }, signal);
   return {
-    entries,
-    lastId: entries.reduce((m, e) => Math.max(m, e.id), 0),
-    dropped: 0,
-    bufferSize: kStockChatBufferSize,
-    available: true,
+    entries: (raw.entries ?? []).map(normalizeChat),
+    lastId: raw.last_id ?? 0,
+    dropped: raw.dropped ?? 0,
+    bufferSize: raw.buffer_size ?? 200,
   };
 }
 
-function normalizeChat(raw: RawChatMessage, time: number | null): ChatEntry {
+function normalizeChat(raw: RawChatMessage & { time: number }): ChatEntry {
   return {
     id: raw.id,
-    at: time === null ? null : time * 1000,
+    at: raw.time * 1000,
     message: String(raw.message ?? ""),
     player: String(raw.player ?? ""),
     steamId: Number(raw.steamId) || 0,
@@ -359,10 +261,9 @@ function normalizeChat(raw: RawChatMessage, time: number | null): ChatEntry {
 // ------------------------------------------------------------ server log
 
 /**
- * The server's log through the panel Lua's getlog. No cursor: its last 64 KB.
- * `since` and `file`: what was written after `since` in that file. `before`:
- * the page ending there. A reply that is not a page -- a stock server
- * answering with the state blob -- is an error, not an empty log.
+ * The server's log. No cursor: its last 64 KB. `since` and `file`: what was
+ * written after `since` in that file. `before`: the page ending there. A reply
+ * that is not a page is an error, not an empty log.
  */
 export async function getLog(
   cursor: { since?: number; before?: number; file?: string },
@@ -373,7 +274,7 @@ export async function getLog(
   if (cursor.before !== undefined) params["before"] = String(cursor.before);
   if (cursor.file !== undefined) params["file"] = cursor.file;
   const raw = await getJson<RawLogPage>(params, signal);
-  if (raw?.source !== "file" || !Array.isArray(raw.lines)) {
+  if (!Array.isArray(raw?.lines)) {
     throw new ApiError("getlog did not return the log", 200, false);
   }
   return {
@@ -391,10 +292,9 @@ export async function getLog(
 // ------------------------------------------------------------ performance
 
 /**
- * The panel Lua's performance windows since `since` (0 for all it holds), one page
- * of them: `more` says the server holds more past `lastId`. A reply that is
- * not a report -- a stock server answering with the state blob -- is an
- * error, not an empty chart.
+ * The performance windows since `since` (0 for all it holds), one page of
+ * them: `more` says the server holds more past `lastId`. A reply that is not
+ * a report is an error, not an empty chart.
  */
 export async function getPerf(since: number, esince: number,
                               signal?: AbortSignal): Promise<PerfReport> {
@@ -412,8 +312,8 @@ export async function getPerf(since: number, esince: number,
     config: raw.config ?? null,
     points: raw.windows.map(normalizePerfWindow),
     lastId: raw.last_id,
-    more: raw.more === true,
-    engine: raw.engine ? normalizePerfEngine(raw.engine) : null,
+    more: raw.more,
+    engine: normalizePerfEngine(raw.engine),
   };
 }
 
@@ -442,47 +342,23 @@ function normalizePerfWindow(w: RawPerfWindow): PerfPoint {
   return {
     id: w.id,
     at: w.time * 1000,
-    durationMs: w.duration_ms,
     tickrate: w.tickrate,
     worstTickMs: w.worst_tick_ms,
     players: w.players,
     score: w.score,
-    quality: w.quality,
     idlePct: w.idle_pct,
     movesPct: w.moves_pct,
     entitiesPct: w.entities_pct,
-    movesPerSecond: w.moves_per_s,
-    moveMs: w.move_ms ?? null,
     entities: w.entities,
-    incomplete: w.incomplete,
     interpWarns: w.interp_warns,
     interpFails: w.interp_fails,
     luaKb: w.lua_kb,
   };
 }
 
-/**
- * Vanilla getperfdata: the whole window every time, up to 30 readings a minute
- * apart. The 2012 panel appended each reply to the last (CURRENT-UI defect 2);
- * this is the window as the server holds it, to replace the previous one.
- */
-export async function getPerfData(signal?: AbortSignal): Promise<PerfPoint[]> {
-  const raw = await getJson<RawPerfSample[]>({ request: "getperfdata" }, signal);
-  if (!Array.isArray(raw)) {
-    throw new ApiError("getperfdata did not return samples", 200, false);
-  }
-  return raw.map((p) => ({
-    id: null, at: p.time * 1000, durationMs: null, tickrate: p.tickrate,
-    worstTickMs: null, players: p.players, score: null, quality: null,
-    idlePct: null, movesPct: null, entitiesPct: null, movesPerSecond: null,
-    moveMs: null, entities: p.ent_count, incomplete: null, interpWarns: null,
-    interpFails: null, luaKb: null,
-  }));
-}
-
 // ------------------------------------------------------------------- maps
 
-/** MapCycle.json on the panel Lua; on a stock server, the copy loaded with the map. */
+/** MapCycle.json as the file holds it. */
 export async function getMapCycle(signal?: AbortSignal): Promise<RawMapCycle> {
   const raw = await getJson<RawMapCycle>({ request: "getmapcycle" }, signal);
   if (typeof raw !== "object" || raw === null || !Array.isArray(raw.maps)) {
@@ -492,20 +368,14 @@ export async function getMapCycle(signal?: AbortSignal): Promise<RawMapCycle> {
 }
 
 /**
- * Replace the whole cycle. Posted, since a cycle can outgrow a URL. The panel Lua
- * answers with the file read back or the reason it refused; a stock server
- * answers an empty 200 either way, which says nothing.
+ * Replace the whole cycle. Posted, since a cycle can outgrow a URL. The answer
+ * is the file read back or the reason it refused.
  */
 export async function setMapCycle(
   cycle: RawMapCycle,
-  hasLua: boolean,
   signal?: AbortSignal,
 ): Promise<MapCycleWrite> {
   const params = { request: "setmapcycle", data: JSON.stringify(cycle) };
-  if (!hasLua) {
-    await call(params, signal, "POST");
-    return { kind: "unverified" };
-  }
   const raw = await getJson<RawMapCycleWrite>(params, signal, "POST");
   if (raw.ok === true && raw.cycle && Array.isArray(raw.cycle.maps)) {
     return { kind: "written", cycle: raw.cycle };
@@ -527,12 +397,12 @@ export async function getInstalledMods(signal?: AbortSignal): Promise<InstalledM
   return raw.map((m) => ({
     id: m.id,
     name: m.name,
-    active: typeof m.active === "boolean" ? m.active : null,
-    whitelisted: typeof m.whitelisted === "boolean" ? m.whitelisted : null,
+    active: m.active,
+    whitelisted: m.whitelisted,
   }));
 }
 
-/** Shine's mapvote, as far as it concerns the cycle. Panel Lua only. */
+/** Shine's mapvote, as far as it concerns the cycle. */
 export async function getMapVote(signal?: AbortSignal): Promise<MapVote> {
   const raw = await getJson<RawMapVote>({ request: "getmapvote" }, signal);
   return {
@@ -546,9 +416,6 @@ export async function getMapVote(signal?: AbortSignal): Promise<MapVote> {
 
 // --------------------------------------------------------------- workshop
 
-/** The most Server.SearchWorshop hands over, whatever the page (measured). */
-export const kWorkshopLimit = 50;
-
 function normalizeWorkshopItem(m: RawWorkshopItem): WorkshopItem {
   return {
     id: String(m.id),
@@ -561,7 +428,7 @@ function normalizeWorkshopItem(m: RawWorkshopItem): WorkshopItem {
     childCount: Number(m.childcount) || 0,
     thumbnailUrl: String(m.thumbnailurl ?? ""),
     updatedAt: Number(m.version) > 0 ? Number(m.version) : null,
-    whitelisted: typeof m.whitelisted === "boolean" ? m.whitelisted : null,
+    whitelisted: m.whitelisted,
   };
 }
 
@@ -578,7 +445,7 @@ export async function searchWorkshop(
   signal?: AbortSignal,
 ): Promise<WorkshopSearch> {
   const raw = await getJson<RawWorkshopSearch>(
-    { request: "getmods", searchtext: text, p: "1" }, signal);
+    { request: "getmods", searchtext: text }, signal);
   if (typeof raw !== "object" || raw === null) {
     throw new ApiError("getmods did not return a search result", 200, false);
   }
@@ -588,8 +455,7 @@ export async function searchWorkshop(
   }
   if (typeof raw.error === "string") return { kind: "error", error: raw.error };
   const items = (Array.isArray(raw.items) ? raw.items : []).map(normalizeWorkshopItem);
-  return { kind: "results", items,
-           capped: typeof raw.capped === "boolean" ? raw.capped : items.length >= kWorkshopLimit };
+  return { kind: "results", items, capped: raw.capped === true };
 }
 
 /**
@@ -599,14 +465,9 @@ export async function searchWorkshop(
  */
 export async function installMod(
   id: string,
-  hasLua: boolean,
   signal?: AbortSignal,
 ): Promise<InstallModResult> {
   const params = { request: "installmod", modid: id };
-  if (!hasLua) {
-    await call(params, signal, "POST");
-    return { kind: "unverified" };
-  }
   const raw = await getJson<RawInstallModResult>(params, signal, "POST");
   if (raw.ok === true && typeof raw.id === "string") {
     return { kind: "sent", id: raw.id, alreadyInstalled: raw.already_installed === true };

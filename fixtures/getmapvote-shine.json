@@ -1,24 +1,24 @@
 {
-  "next_map": "ns2_jambi",
+  "next_map": "ns2_tanith",
   "enabled": true,
   "options": [
-    "ns2_veil",
-    "ns2_tram_nextstop",
-    "ns2_summit",
-    "ns2_jambi",
-    "ns2_biodome",
     "ns2_ayumi",
-    "ns2_descent",
+    "ns2_biodome",
+    "ns2_caged",
+    "ns2_eclipse",
     "ns2_derelict",
-    "ns2_unearthed",
+    "ns2_descent",
+    "ns2_docking",
     "ns2_metro",
-    "ns2_docking_mmpg",
-    "ns2_caged_mmpg",
-    "ns2_eclipse_mmpg",
-    "ns2_tanith_mmpg",
-    "ns2_nexus_fixes",
-    "ns2_mineral_nsl"
+    "ns2_mineshaft",
+    "ns2_origin",
+    "ns2_refinery",
+    "ns2_summit",
+    "ns2_tanith",
+    "ns2_tram",
+    "ns2_unearthed",
+    "ns2_veil"
   ],
   "maps_from_cycle": true,
-  "round_limit": 2
+  "round_limit": 0
 }

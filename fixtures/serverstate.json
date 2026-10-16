@@ -1,18 +1,25 @@
 {
-  "webport": "8080",
-  "marines": 0,
-  "cheats": "false",
-  "devmode": "false",
+  "map": "ns2_summit",
   "players_online": 0,
-  "uptime": 9,
+  "uptime": 33,
   "player_list": [],
   "marine_res": 60,
   "alien_res": 60,
   "server_name": "Example NS2 Server",
-  "frame_rate": 29.957765579224,
+  "frame_rate": 29.985054016113,
   "game_started": false,
   "game_time": 0,
+  "map_loaded_at": 1792111504,
   "aliens": 0,
-  "webdomain": "127.0.0.1",
-  "map": "ns2_summit"
+  "marines": 0,
+  "max_players": 16,
+  "shine": {
+    "ban": true,
+    "basecommands": true,
+    "mapvote": true,
+    "reservedslots": false
+  },
+  "cheats": false,
+  "ranking_active": false,
+  "devmode": false
 }

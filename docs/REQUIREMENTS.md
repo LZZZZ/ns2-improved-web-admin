@@ -94,7 +94,7 @@ Driven through the panel on the rig: Load with every map on `Mouse Wheel
 Jump` read "loads at the next map change"; after `sv_changemap` the log
 showed `Mounting mod 'Mouse Wheel Jump'` and the row read "loaded now";
 Stop loading reversed it at the next change. Fixture:
-`getinstalledmodslist-active.json` (49 installed, 24 active).
+`getinstalledmodslist.json` (49 installed, 24 active).
 
 ## 4. Mod browser: details before install
 

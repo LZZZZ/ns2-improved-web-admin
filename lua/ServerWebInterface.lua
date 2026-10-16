@@ -6,13 +6,9 @@
 --
 -- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
--- The server side of the web admin panel in web/. The stock request types
--- keep their reply shapes, for scripts that use them.
+-- The server side of the web admin panel in web/.
 
 Script.Load("lua/RingBuffer.lua")
-
--- Absent from the stock file's state, which is how the panel tells them apart.
-local kVersion = "0.2.0"
 
 -- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
@@ -91,8 +87,8 @@ end
 -- An expiry further out than this means permanent (Shine stores e.g. 6e+24).
 local kPermanentAfter = 100 * 365 * 24 * 60 * 60
 
--- The bans in force, newest first. Shine's table keeps issuer, issue time and
--- duration, which GetBannedPlayersList() drops.
+-- The bans in force, newest first. Shine's table keeps issuer and issue time,
+-- which GetBannedPlayersList() drops.
 local function GetBansInForce()
 
     local now = Shared.GetSystemTime()
@@ -121,7 +117,6 @@ local function GetBansInForce()
                 name = tostring(data.Name or ""),
                 reason = tostring(data.Reason or ""),
                 issued = tonumber(data.Issued),
-                duration = tonumber(data.Duration),
                 banned_by = data.BannedBy and tostring(data.BannedBy) or nil,
             }, data.UnbanTime)
         end
@@ -177,7 +172,6 @@ local recentSeq = 0
 local recentNextSlot = 1
 local recentDirty = false
 local recentUrgent = false
-local recentSavedAt
 local recentSaveError
 local lastRecentSweep = 0
 local lastRecentSave = 0
@@ -257,7 +251,6 @@ local function EnsureRecentLoaded()
         end
         recentSeq = best.seq
         recentNextSlot = bestSlot % #kRecentSlots + 1
-        recentSavedAt = tonumber(best.saved)
     end
 
     if present == 0 then
@@ -384,7 +377,7 @@ local function SaveRecent(now)
             error(openError or ("cannot open " .. path), 0)
         end
         file:write(Shared.JsonEncode({
-            version = kRecentFileVersion, seq = seq, saved = now, players = list,
+            version = kRecentFileVersion, seq = seq, players = list,
         }))
         file:close()
     end)
@@ -396,7 +389,6 @@ local function SaveRecent(now)
     if ok then
         recentSeq = seq
         recentNextSlot = recentNextSlot % #kRecentSlots + 1
-        recentSavedAt = now
         recentSaveError = nil
     else
         recentSaveError = tostring(err)
@@ -509,7 +501,6 @@ local function GetRecentPlayers()
         capacity = kRecentCapacity,
         storage = {
             loaded = recentLoadStatus,
-            saved_at = recentSavedAt,
             error = recentSaveError,
         },
         players = players,
@@ -552,12 +543,6 @@ local function EnsureShineAddBanWrapped()
 
 end
 
--- getperfdata: one sample a minute, the last 30.
-local kMaxPerfDatas = 30
-local kLogPerfDataRate = 60
-local perfDataBuffer = CreateRingBuffer(kMaxPerfDatas)
-local lastPerfDataTime = 0
-
 -- getperf: the engine's ServerPerformanceData samples (about one a second),
 -- accumulated into kPerfWindowSeconds windows. The ring and its ids restart
 -- with the map; `loaded_at` tells clients.
@@ -581,26 +566,19 @@ end
 -- One closed window: ServerPerformanceData.DetailText's figures.
 local function PerfWindowFromAcc(acc, ticks, elapsed, worstTick)
     local durationMs = acc:GetDurationMs()
-    local moves = acc:GetMovesProcessed()
     return {
         id = nextPerfWindowId,
         time = Shared.GetSystemTime(),
-        duration_ms = durationMs,
-        ticks = ticks,
         tickrate = PerfRound(elapsed > 0 and ticks / elapsed or 0, 2),
         worst_tick_ms = PerfRound(worstTick * 1000, 1),
         players = acc:GetNumPlayers(),
-        -- Both 0 with nobody on the server.
+        -- 0 with nobody on the server.
         score = acc:GetScore(),
-        quality = acc:GetQuality(),
         idle_pct = PerfRound(100 * acc:GetTimeSpentIdling() / durationMs),
         moves_pct = PerfRound(100 * acc:GetTimeSpentOnMoves() / durationMs),
         entities_pct = PerfRound(100 * acc:GetTimeSpentOnUpdate() / durationMs),
-        moves_per_s = PerfRound(moves / (durationMs / 1000)),
-        move_ms = moves > 0 and PerfRound(acc:GetTimeSpentOnMoves() / moves, 3) or nil,
         entities = acc:GetEntityCount(),
         -- Counts over the window; perfmon prints them per second.
-        incomplete = acc:GetIncompleteCount(),
         interp_warns = acc:GetNumInterpWarns(),
         interp_fails = acc:GetNumInterpFails(),
         lua_kb = math.floor(collectgarbage("count")),
@@ -779,7 +757,6 @@ local function GetLog(actions)
     end
 
     return {
-        source = "file",
         file_id = fileId,
         size = size,
         from = from,
@@ -788,8 +765,6 @@ local function GetLog(actions)
         more = more,
         at_start = from == 0,
         reset = reset,
-        tail_bytes = kLogTailBytes,
-        max_bytes = kLogMaxBytes,
     }
 
 end
@@ -1094,7 +1069,6 @@ local function GetServerState()
             {
                 name = player:GetName(),
                 steamid = client:GetUserId(),
-                -- Booleans here and below; the stock file sent strings.
                 isbot = client:GetIsVirtual() == true,
                 team = player:GetTeamNumber(),
                 iscomm = player:GetIsCommander(),
@@ -1145,8 +1119,6 @@ local function GetServerState()
 
     return
     {
-        webdomain = "[[webdomain]]",
-        webport = "[[webport]]",
         cheats  = Shared.GetCheatsEnabled() == true,
         devmode = Shared.GetDevMode() == true,
         map = tostring(Shared.GetMapName()),
@@ -1161,7 +1133,6 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        lua_version = kVersion,
         -- Upper bound for the reserved slot amount.
         max_players = Server.GetMaxPlayers(),
         -- The Lua VM is rebuilt at a map change.
@@ -1345,18 +1316,19 @@ local function GetMapVote()
 end
 
 -- Workshop search. Server.SearchWorshop returns at most 50 results and
--- ignores the page. Its callback gets an empty table both for no matches and
--- for a failed search, so an empty result is not reported as an error.
+-- ignores the page, so only the first is asked for. Its callback gets an
+-- empty table both for no matches and for a failed search, so an empty
+-- result is not reported as an error.
 local kWorkshopLimit = 50
 local kWorkshopTimeout = 30         -- seconds before a search is given up
 local kWorkshopCacheSeconds = 60
 
--- By search text and page: running ({ started, generation }) or done
+-- By search text: running ({ started, generation }) or done
 -- ({ cached_at, result }, the reply already encoded).
 local workshopSearches = { }
 local workshopGeneration = 0
 
-local function SearchWorkshop(searchtext, page)
+local function SearchWorkshop(searchtext)
 
     local now = Shared.GetTime()
     for key, entry in pairs(workshopSearches) do
@@ -1365,8 +1337,7 @@ local function SearchWorkshop(searchtext, page)
         end
     end
 
-    local key = searchtext .. "\0" .. page
-    local entry = workshopSearches[key]
+    local entry = workshopSearches[searchtext]
     if entry then
         if entry.cached_at then
             return entry.result
@@ -1375,9 +1346,9 @@ local function SearchWorkshop(searchtext, page)
             return Shared.JsonEncode({ loading = true, elapsed = now - entry.started })
         end
         -- Reported once; the next request starts a fresh search.
-        workshopSearches[key] = nil
+        workshopSearches[searchtext] = nil
         return Shared.JsonEncode({
-            done = true, page = page, items = { }, count = 0,
+            items = { },
             error = string.format("The workshop search had no answer after %d s.",
                                   kWorkshopTimeout),
         })
@@ -1385,12 +1356,12 @@ local function SearchWorkshop(searchtext, page)
 
     workshopGeneration = workshopGeneration + 1
     local generation = workshopGeneration
-    workshopSearches[key] = { started = now, generation = generation }
+    workshopSearches[searchtext] = { started = now, generation = generation }
 
-    Server.SearchWorshop(searchtext, page, function(results)
+    Server.SearchWorshop(searchtext, 1, function(results)
 
         -- Ignore a search that was given up on and restarted.
-        local current = workshopSearches[key]
+        local current = workshopSearches[searchtext]
         if not current or current.generation ~= generation then
             return
         end
@@ -1406,10 +1377,10 @@ local function SearchWorkshop(searchtext, page)
             end
         end
 
-        workshopSearches[key] = {
+        workshopSearches[searchtext] = {
             cached_at = Shared.GetTime(),
             result = Shared.JsonEncode({
-                done = true, page = page, items = items, count = #items,
+                items = items,
                 -- There may be more matches than the engine returns.
                 capped = #items >= kWorkshopLimit,
             }),
@@ -1458,7 +1429,6 @@ local kRootPage = [[<!doctype html>
 </head>
 <body>
 <p>The web admin panel is at <a href="/index.html">/index.html</a>.</p>
-<p>Server state, for a script, is at <a href="/?request=json">/?request=json</a>.</p>
 </body>
 </html>
 ]]
@@ -1469,7 +1439,6 @@ local kRequests = { }
 
 function kRequests.runcommand(actions)
     local command = tostring(actions.cmd or "")
-    local started = Shared.GetTime()
     local lines = CapturedLines(Shared.CaptureConsoleCommand(command))
     local dispatched = false
     for _, line in ipairs(lines) do
@@ -1480,7 +1449,6 @@ function kRequests.runcommand(actions)
         -- False for a plain console command and for no such command alike:
         -- the server cannot tell them apart.
         dispatched = dispatched,
-        elapsed = Shared.GetTime() - started,
         lines = lines,
     }
 end
@@ -1497,18 +1465,6 @@ kRequests.getinstalledmodslist = GetModList
 kRequests.getmaplist = GetMapList
 kRequests.getmapvote = GetMapVote
 
-function kRequests.getbanlist()
-    -- The game prunes expired bans only when it loads or saves the file.
-    local now = Shared.GetSystemTime()
-    local inForce = { }
-    for _, ban in ipairs(GetBannedPlayersList()) do
-        if ban.time == 0 or ban.time > now then
-            table.insert(inForce, ban)
-        end
-    end
-    return inForce
-end
-
 function kRequests.getreservedslots()
     -- Under Shine's reservedslots plugin, Shine's count is what is enforced.
     local data = GetReservedSlotData()
@@ -1517,10 +1473,6 @@ function kRequests.getreservedslots()
         data.shine = { slots = tonumber(plugin.Config.Slots) or 0 }
     end
     return data
-end
-
-function kRequests.getperfdata()
-    return perfDataBuffer:ToTable()
 end
 
 function kRequests.getperf(actions)
@@ -1540,8 +1492,7 @@ end
 
 function kRequests.getchatlist(actions)
     local all = Server.recentChatMessages:ToTable()
-    local since = tonumber(actions.since)
-    if not since then return all end
+    local since = tonumber(actions.since) or 0
     local entries = { }
     for _, entry in ipairs(all) do
         if entry.id > since then table.insert(entries, entry) end
@@ -1584,24 +1535,13 @@ function kRequests.setmapcycle(actions)
     return { ok = true, cycle = MapCycleForClient(written) }
 end
 
-function kRequests.setreservedslotamount(actions)
-    -- It takes (client, amount); the stock file passed only the amount.
-    SetReservedSlotAmount(nil, actions.amount)
-    return ""
-end
-
 function kRequests.installmod(actions)
     return InstallMod(actions.modid)
 end
 
--- Replies keep `loading` and `items`, the keys the 2012 panel read.
 function kRequests.getmods(actions)
     local searchtext = type(actions.searchtext) == "string" and actions.searchtext or ""
-    local page = math.floor(tonumber(actions.p) or 1)
-    if not (page >= 1 and page <= 1000) then   -- also NaN and inf
-        page = 1
-    end
-    return "application/json", SearchWorkshop(searchtext, page)
+    return "application/json", SearchWorkshop(searchtext)
 end
 
 -- The panel itself, so a browser at / stays at /.
@@ -1638,10 +1578,6 @@ local function OnWebRequest(actions, request)
         return result, body
     end
 
-    if actions.command then
-        Shared.ConsoleCommand(actions.rcon)
-    end
-
     return "application/json", Shared.JsonEncode(GetServerState())
 
 end
@@ -1657,17 +1593,6 @@ local function UpdateServerWebInterface()
     UpdatePerfWindows()
     UpdateTickstat()
     UpdateEngineLog()
-
-    if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then
-
-        local playerRecords = Shared.GetEntitiesWithClassname("Player")
-        local entCount = Shared.GetEntitiesWithClassname("Entity"):GetSize()
-        local newData = { players = playerRecords:GetSize(), tickrate = Server.GetFrameRate(), time = Shared.GetSystemTime(), ent_count = entCount }
-        perfDataBuffer:Insert(newData)
-
-        lastPerfDataTime = Shared.GetSystemTime()
-
-    end
 
 end
 

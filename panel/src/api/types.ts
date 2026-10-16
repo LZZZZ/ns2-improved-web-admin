@@ -1,22 +1,14 @@
 // The API's types, mirrored from docs/openapi.yaml, in two halves.
 //
-// `Raw*` is what the server actually sends, inconsistencies intact: `cheats`,
-// `devmode` and `isbot` are stringified booleans on a stock server (the panel Lua
-// sends real ones, like `iscomm` and `game_started`), mod ids are hex strings,
-// and the same Steam id is spelled `steamid`, `steamId` and `id` in three
-// different responses.
+// `Raw*` is what the server actually sends, inconsistencies intact: mod ids
+// are hex strings, and the same Steam id is spelled `steamid`, `steamId` and
+// `id` in three different responses.
 //
 // Everything below the client's normalize step uses the second half instead,
 // so no component ever has to remember which is which.
 
 /** A workshop id, lowercase hex, no 0x prefix. Never parse it as a number. */
 export type ModId = string;
-
-/** A boolean that crossed the wire as a string. `"false"` is truthy in JS. */
-export type StringBool = "true" | "false";
-
-/** A string on a stock server, a real boolean from the panel Lua. */
-export type WireBool = boolean | StringBool;
 
 /** 0 ready room, 1 marines, 2 aliens, 3 spectators. */
 export type TeamNumber = 0 | 1 | 2 | 3;
@@ -26,7 +18,7 @@ export type TeamNumber = 0 | 1 | 2 | 3;
 export interface RawPlayer {
   name: string;
   steamid: number;
-  isbot: WireBool;
+  isbot: boolean;
   team: TeamNumber;
   iscomm: boolean;
   score: number;
@@ -36,31 +28,30 @@ export interface RawPlayer {
   resources: number;
   ping: number;
   ipaddress: string;
-  /** Panel Lua only, and only under Shine's basecommands: Shine's gag. */
+  /** Only under Shine's basecommands: Shine's gag. */
   gagged?: boolean;
-  /** Panel Lua only: playing a Steam Family Shared copy. */
-  familyshared?: boolean;
+  /** Playing a Steam Family Shared copy. */
+  familyshared: boolean;
   /** With `familyshared`: the account that owns the game. */
   owner_steamid?: number;
-  /** Panel Lua only: moves rejected for time credit (usually a
-   * modified client) and for anything else (a poor connection can do it). */
-  moves_rejected_time?: number;
-  moves_rejected_other?: number;
-  /** Panel Lua only: Hive skill (ScoringMixin) and the per-team offsets. */
+  /** Moves rejected for time credit (usually a modified client) and for
+   * anything else (a poor connection can do it). */
+  moves_rejected_time: number;
+  moves_rejected_other: number;
+  /** Hive skill (ScoringMixin) and the per-team offsets; absent when the
+   * player has none. */
   skill?: number;
   skill_offset?: number;
   comm_skill?: number;
   comm_skill_offset?: number;
-  /** Panel Lua only: the tier the game draws the skill badge for
+  /** The tier the game draws the skill badge for
    * (ScoringMixin:GetSkillTier): -2 none, -1 bot, 0 rookie, 1-7. */
   skill_tier?: number;
 }
 
 export interface RawServerState {
-  webdomain: string;
-  webport: string;
-  cheats: WireBool;
-  devmode: WireBool;
+  cheats: boolean;
+  devmode: boolean;
   map: string;
   players_online: number;
   marines: number;
@@ -73,15 +64,13 @@ export interface RawServerState {
   frame_rate: number;
   game_started: boolean;
   game_time: number;
-  /** Added by the panel Lua. Absent means a stock server. */
-  lua_version?: string;
-  /** Panel Lua only. The reserved slot amount cannot exceed it. */
-  max_players?: number;
-  /** Panel Lua only. When the current map loaded, Unix seconds. */
-  map_loaded_at?: number;
-  /** Panel Lua only. Server.GetIsRankingActive(): the engine's verdict on ranking. */
-  ranking_active?: boolean;
-  /** Panel Lua only, and only when Shine is loaded. */
+  /** The reserved slot amount cannot exceed it. */
+  max_players: number;
+  /** When the current map loaded, Unix seconds. */
+  map_loaded_at: number;
+  /** Server.GetIsRankingActive(): the engine's verdict on ranking. */
+  ranking_active: boolean;
+  /** Only when Shine is loaded. */
   shine?: RawShineState;
 }
 
@@ -89,24 +78,10 @@ export interface RawShineState {
   ban: boolean;
   reservedslots: boolean;
   mapvote: boolean;
-  /** Absent from mods older than 2026-10-06. */
-  basecommands?: boolean;
+  basecommands: boolean;
 }
 
-/** `getbanlist`: GetBannedPlayersList() as it stands. The stock path. */
-export interface RawBan {
-  name: string;
-  /** A number from vanilla; a digit string when Shine's ban plugin owns the list. */
-  id: number | string;
-  reason: string;
-  /**
-   * Unix seconds; 0 is permanent. Expired bans are never pruned on a stock
-   * server, and under Shine a permanent ban can read 6e+24.
-   */
-  time: number;
-}
-
-/** `getbans` (panel Lua only): the bans in force, from the table that decides them. */
+/** `getbans`: the bans in force, from the table that decides them. */
 export interface RawBanEntry {
   id: number;
   name: string;
@@ -116,7 +91,6 @@ export interface RawBanEntry {
   expires?: number;
   /** Shine only. */
   issued?: number;
-  duration?: number;
   banned_by?: string;
 }
 
@@ -131,7 +105,7 @@ export interface RawReservedSlots {
   /** Both keys are absent when the server has no reserved-slot config. */
   amount?: number;
   ids?: { name: string; id: number }[];
-  /** Panel Lua only, while Shine's reservedslots plugin is on. */
+  /** While Shine's reservedslots plugin is on. */
   shine?: { slots: number };
 }
 
@@ -153,16 +127,13 @@ export interface Player {
   ip: string;
   /** Muted by Shine (sh_gag); null where nothing can say. */
   gagged: boolean | null;
-  /** A Family Shared copy; null on an engine that cannot tell. */
-  familyShared: boolean | null;
+  familyShared: boolean;
   /** Who owns a shared copy, when the engine says. */
   ownerSteamId: number | null;
-  /** Rejected moves; null on an engine that does not count them. */
-  movesRejected: { time: number; other: number } | null;
+  movesRejected: { time: number; other: number };
   /**
-   * Hive skill as the server holds it; null on a stock server. Marines play
+   * Hive skill as the server holds it; null when it has none. Marines play
    * at skill + offset, aliens at skill - offset; the commander's pair alike.
-   * `tier` is the server's skill tier, null from a mod that predates it.
    */
   skill: { skill: number; offset: number; comm: number | null; commOffset: number;
            tier: number | null } | null;
@@ -185,18 +156,12 @@ export interface ServerState {
   gameStarted: boolean;
   gameTimeSeconds: number;
   players: Player[];
-  /** The panel Lua version, or null on a stock server. */
-  luaVersion: string | null;
-  /** Null on a stock server, which does not report it. */
-  maxPlayers: number | null;
-  /** When the current map loaded, ms; null on a stock server. */
-  mapLoadedAt: number | null;
-  /** Whether the engine counts this server's rounds for ranking; null when not reported. */
-  rankingActive: boolean | null;
-  /**
-   * Which Shine plugins own what. Null when Shine is not loaded -- or when the
-   * server is stock, which cannot say either way.
-   */
+  maxPlayers: number;
+  /** When the current map loaded, ms. */
+  mapLoadedAt: number;
+  /** Whether the engine counts this server's rounds for ranking. */
+  rankingActive: boolean;
+  /** Which Shine plugins own what. Null when Shine is not loaded. */
   shine: ShineState | null;
 }
 
@@ -225,10 +190,9 @@ export interface Ban {
 }
 
 export interface BanList {
-  /** `stock` means getbanlist on a server without the panel Lua: owner unknown. */
-  source: "vanilla" | "shine" | "stock";
+  source: "vanilla" | "shine";
   bans: Ban[];
-  /** Server clock minus this browser's, in seconds. 0 when unknown. */
+  /** Server clock minus this browser's, in seconds. */
   skewSeconds: number;
 }
 
@@ -246,7 +210,7 @@ export interface ReservedSlots {
   shineSlots: number | null;
 }
 
-// ------------------------------------------------ recent players (panel Lua only)
+// ---------------------------------------------------------- recent players
 
 export type RecentLoad = "ok" | "fallback" | "empty" | "unreadable";
 
@@ -267,7 +231,7 @@ export interface RawRecentPlayers {
   /** Seconds. */
   window: number;
   capacity: number;
-  storage: { loaded: RecentLoad; saved_at?: number; error?: string };
+  storage: { loaded: RecentLoad; error?: string };
   players: RawRecentPlayer[];
 }
 
@@ -303,7 +267,7 @@ export const TEAM_NAMES: Record<TeamNumber, string> = {
   3: "Spectators",
 };
 
-// ------------------------------------------------- console (panel Lua only)
+// ----------------------------------------------------------------- console
 
 /** "audit": the line every admin command prints before it runs. */
 export type ConsoleSource = "audit" | "server";
@@ -318,11 +282,10 @@ export interface RawConsoleLine {
 export interface RawCommandResult {
   cmd: string;
   dispatched: boolean;
-  elapsed?: number;
   lines: RawConsoleLine[];
 }
 
-/** One entry of getchatlist, as stock and the panel Lua (without `since`) send it. */
+/** One entry of getchatlist. */
 export interface RawChatMessage {
   id: number;
   message: string;
@@ -332,7 +295,7 @@ export interface RawChatMessage {
   teamOnly: boolean;
 }
 
-/** The panel Lua's getchatlist&since=: its own ring of 200, with times. */
+/** getchatlist&since=: the ring of 200, with times. */
 export interface RawChatStream {
   entries: (RawChatMessage & { time: number })[];
   last_id: number;
@@ -342,8 +305,8 @@ export interface RawChatStream {
 
 export interface ChatEntry {
   id: number;
-  /** Milliseconds; null on a stock server, which records no time. */
-  at: number | null;
+  /** Milliseconds. */
+  at: number;
   message: string;
   player: string;
   steamId: number;
@@ -355,10 +318,7 @@ export interface ChatPage {
   entries: ChatEntry[];
   lastId: number;
   dropped: number;
-  /** 200 with the panel Lua, the game's 20 without. */
   bufferSize: number;
-  /** False when the server answered `{ }`: it has no chat buffer at all. */
-  available: boolean;
 }
 
 export interface ConsoleLine {
@@ -384,7 +344,7 @@ export interface CommandResult {
   lines: ConsoleLine[];
 }
 
-// ------------------------------------------------- the server log (panel Lua only)
+// ---------------------------------------------------------- the server log
 
 export interface RawLogLine {
   off: number;
@@ -392,7 +352,6 @@ export interface RawLogLine {
 }
 
 export interface RawLogPage {
-  source: "file";
   file_id: string;
   size: number;
   from: number;
@@ -401,8 +360,6 @@ export interface RawLogPage {
   more: boolean;
   at_start: boolean;
   reset?: "new_file" | "truncated";
-  tail_bytes: number;
-  max_bytes: number;
 }
 
 /** One line of log-Server.txt, verbatim. */
@@ -454,7 +411,7 @@ export interface RawMapCycle {
   [key: string]: unknown;
 }
 
-/** The panel Lua's answer to `setmapcycle`. A stock server answers an empty 200. */
+/** The answer to `setmapcycle`. */
 export type RawMapCycleWrite =
   | { ok: true; cycle: RawMapCycle }
   | { ok: false; error: string };
@@ -469,13 +426,13 @@ export interface RawInstalledMod {
   id: ModId;
   /** The workshop title, or the decimal workshop id when the server has none. */
   name: string;
-  /** Panel Lua only: mounted now. Changes only when the map changes. */
-  active?: boolean;
-  /** Panel Lua only: on the ranked-mod whitelist the engine read at boot. */
-  whitelisted?: boolean;
+  /** Mounted now. Changes only when the map changes. */
+  active: boolean;
+  /** On the ranked-mod whitelist the engine read at boot. */
+  whitelisted: boolean;
 }
 
-/** `getmapvote` (panel Lua only). */
+/** `getmapvote`. */
 export interface RawMapVote {
   enabled: boolean;
   maps_from_cycle?: boolean;
@@ -485,12 +442,10 @@ export interface RawMapVote {
 }
 
 export type MapCycleWrite =
-  /** Mod: MapCycle.json read back after the write. */
+  /** MapCycle.json read back after the write. */
   | { kind: "written"; cycle: RawMapCycle }
-  /** Mod: refused before anything was written. */
-  | { kind: "refused"; error: string }
-  /** Stock: an empty 200, whatever happened. */
-  | { kind: "unverified" };
+  /** Refused before anything was written. */
+  | { kind: "refused"; error: string };
 
 export interface MapInfo {
   name: string;
@@ -501,10 +456,10 @@ export interface MapInfo {
 export interface InstalledMod {
   id: ModId;
   name: string;
-  /** Mounted now; null on a stock server, which cannot say. */
-  active: boolean | null;
-  /** The engine's whitelist verdict; null on a stock server. */
-  whitelisted: boolean | null;
+  /** Mounted now. */
+  active: boolean;
+  /** The engine's whitelist verdict. */
+  whitelisted: boolean;
 }
 
 export interface MapVote {
@@ -539,22 +494,18 @@ export interface RawWorkshopItem {
   thumbnailurl: string;
   /** Unix seconds of the last update. */
   version: number;
-  /** Panel Lua only: on the ranked-mod whitelist the engine read at boot. */
-  whitelisted?: boolean;
+  /** On the ranked-mod whitelist the engine read at boot. */
+  whitelisted: boolean;
 }
 
 /**
- * `getmods`. Stock: `{loading}` or `{items}`. The panel Lua adds `elapsed` while
- * loading, and `done`, `page`, `count`, `capped` and, for a search that never
- * answered, `error` once settled.
+ * `getmods`: `{loading, elapsed}` while loading; once settled `items`,
+ * `capped` and, for a search that never answered, `error`.
  */
 export interface RawWorkshopSearch {
   loading?: boolean;
   elapsed?: number;
   items?: RawWorkshopItem[];
-  done?: boolean;
-  page?: number;
-  count?: number;
   capped?: boolean;
   error?: string;
 }
@@ -576,53 +527,37 @@ export interface WorkshopItem {
   thumbnailUrl: string;
   /** Unix seconds, or null when the item carries none. */
   updatedAt: number | null;
-  /** The engine's whitelist verdict; null on a stock server. */
-  whitelisted: boolean | null;
+  /** The engine's whitelist verdict. */
+  whitelisted: boolean;
 }
 
 export type WorkshopSearch =
   | { kind: "loading"; elapsedSeconds: number | null }
   /** At most 50 items; `capped` when there may be more than were returned. */
   | { kind: "results"; items: WorkshopItem[]; capped: boolean }
-  /** Panel Lua only: the search had no answer in time. */
+  /** The search had no answer in time. */
   | { kind: "error"; error: string };
 
 export type InstallModResult =
-  /** Mod: handed to the engine. Whether it downloads shows in the installed list. */
+  /** Handed to the engine. Whether it downloads shows in the installed list. */
   | { kind: "sent"; id: ModId; alreadyInstalled: boolean }
-  /** Mod: not a workshop id; nothing was sent to the engine. */
-  | { kind: "refused"; error: string }
-  /** Stock: an empty 200, whatever happened. */
-  | { kind: "unverified" };
+  /** Not a workshop id; nothing was sent to the engine. */
+  | { kind: "refused"; error: string };
 
 // ------------------------------------------------------------- performance
 
-/** getperfdata: vanilla, one reading a minute, the last 30. */
-export interface RawPerfSample {
-  players: number;
-  tickrate: number;
-  time: number;
-  ent_count: number;
-}
-
-/** getperf (panel Lua only): one 10 s window of what perfmon logs. */
+/** getperf: one 10 s window of what perfmon logs. */
 export interface RawPerfWindow {
   id: number;
   time: number;
-  duration_ms: number;
-  ticks: number;
   tickrate: number;
   worst_tick_ms: number;
   players: number;
   score: number;
-  quality: number;
   idle_pct: number;
   moves_pct: number;
   entities_pct: number;
-  moves_per_s: number;
-  move_ms?: number;
   entities: number;
-  incomplete: number;
   interp_warns: number;
   interp_fails: number;
   lua_kb: number;
@@ -740,10 +675,9 @@ export interface RawPerfReport {
   config?: PerfConfig;
   windows: RawPerfWindow[];
   last_id: number;
-  /** More windows are held past last_id: ask again from it. Absent before paging. */
-  more?: boolean;
-  /** Absent from a mod that predates it. */
-  engine?: RawPerfEngine;
+  /** More windows are held past last_id: ask again from it. */
+  more: boolean;
+  engine: RawPerfEngine;
 }
 
 /** An engine record with `at`, milliseconds, beside its raw `time`. */
@@ -767,31 +701,22 @@ export interface PerfEngine {
   events: EngineEvent[];
 }
 
-/**
- * A point on the Performance tab's charts, from either source. Times are
- * milliseconds. Fields only the panel Lua reports are null on a stock server.
- */
+/** A getperf window on the Performance tab's charts. Times are milliseconds. */
 export interface PerfPoint {
-  /** getperf's window id; null for a vanilla sample. */
-  id: number | null;
-  /** When the window closed, or the sample was taken. */
+  id: number;
+  /** When the window closed. */
   at: number;
-  durationMs: number | null;
   tickrate: number;
-  worstTickMs: number | null;
+  worstTickMs: number;
   players: number;
-  score: number | null;
-  quality: number | null;
-  idlePct: number | null;
-  movesPct: number | null;
-  entitiesPct: number | null;
-  movesPerSecond: number | null;
-  moveMs: number | null;
+  score: number;
+  idlePct: number;
+  movesPct: number;
+  entitiesPct: number;
   entities: number;
-  incomplete: number | null;
-  interpWarns: number | null;
-  interpFails: number | null;
-  luaKb: number | null;
+  interpWarns: number;
+  interpFails: number;
+  luaKb: number;
 }
 
 export interface PerfReport {
@@ -805,6 +730,5 @@ export interface PerfReport {
   lastId: number;
   /** The reply is one page: more windows are held past lastId. */
   more: boolean;
-  /** Null from a mod that predates it. */
-  engine: PerfEngine | null;
+  engine: PerfEngine;
 }

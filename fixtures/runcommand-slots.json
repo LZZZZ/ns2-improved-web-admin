@@ -1,19 +1,18 @@
 {
-  "elapsed": 0,
+  "dispatched": true,
   "lines": [
     {
-      "id": 1,
       "src": "audit",
-      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_reserved_slots",
-      "time": 1788643278
+      "id": 1,
+      "time": 1792111541,
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_reserved_slots"
     },
     {
-      "id": 2,
       "src": "server",
-      "text": "Reserved slot amount set to 3",
-      "time": 1788643278
+      "id": 2,
+      "time": 1792111541,
+      "text": "Reserved slot amount set to 3"
     }
   ],
-  "dispatched": true,
   "cmd": "sv_reserved_slots 3"
 }

@@ -7,7 +7,7 @@
 #
 #   tools/browser-checks/run-all.sh --stock-web <server>/ns2/web    every gate
 #   tools/browser-checks/run-all.sh spa-chat        only these
-#   tools/browser-checks/run-all.sh "spa-players@SPA_EXPECT_MOD=1 MOCK_URL=http://127.0.0.1:8094"
+#   tools/browser-checks/run-all.sh "spa-players@MOCK_URL=http://127.0.0.1:8102"
 #
 # --stock-web is the shipped 2012 panel, a server install's ns2/web, which the
 # mock-acceptance gate runs against the mock. Only that gate needs it.
@@ -22,14 +22,10 @@ mkdir -p "$LOG"
 # port|flags|stock-web (the 2012 panel instead of web/, for mock-acceptance)
 MOCKS=(
   "8090|--perf-rate 2|stock-web"
-  "8091|"
   "8094|--mod --perf-window 2"
-  "8095|"
   "8096|--mod --shine"
   "8097|--mod --shine=ban,reservedslots,mapvote"
-  "8098|--shine"
   "8099|--mod --shine=ban,reservedslots,mapvote --maps=modded"
-  "8101|--no-chat-buffer"
   "8102|--mod --ranked"
 )
 
@@ -63,9 +59,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 if [ ${#GATES[@]} -eq 0 ]; then
-  GATES=(mock-acceptance spa-players
-         "spa-players@SPA_EXPECT_MOD=1 MOCK_URL=http://127.0.0.1:8094"
-         spa-console spa-bans spa-slots spa-recent spa-maps spa-mods
+  GATES=(mock-acceptance spa-players spa-console spa-bans spa-slots spa-recent spa-maps spa-mods
          spa-workshop spa-perf spa-settings spa-log spa-chat)
 fi
 

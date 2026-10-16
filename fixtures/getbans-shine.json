@@ -7,7 +7,6 @@
       "name": "Fadeaway",
       "reason": "Mic spam after two warnings",
       "issued": 1790500000,
-      "duration": 86400,
       "banned_by": "Console",
       "permanent": false,
       "expires": 1790586400
@@ -17,7 +16,6 @@
       "name": "<unknown>",
       "reason": "Ban evasion (alt of 10000011)",
       "issued": 1790300000,
-      "duration": 0,
       "banned_by": "Adminator",
       "permanent": true
     },
@@ -26,7 +24,6 @@
       "name": "Onosaurus",
       "reason": "Griefing; see the Shine log for 2026-09-20",
       "issued": 1790200000,
-      "duration": 6e+24,
       "banned_by": "Adminator",
       "permanent": true
     },
@@ -35,7 +32,6 @@
       "name": "Lerkwarm",
       "reason": "No reason given.",
       "issued": 1780000000,
-      "duration": 0,
       "banned_by": "Commander Cee",
       "permanent": true
     }

@@ -1,19 +1,14 @@
 // The Performance tab's history.
 //
-// Two sources, one shape (PerfPoint):
+// getperf: 10 s windows with ids, read with a cursor. The server keeps an hour
+// of them since the map loaded; a map change rebuilds the Lua VM, so
+// `loadedAt` moves and the ids restart from 1. This store keeps what it has
+// already read across those restarts -- one segment per map load -- for as
+// long as the page is open, up to kHistoryMs. Windows the server dropped
+// before we read them (a map change mid-interval, or more than an hour away
+// from the tab) are a gap, never interpolated.
 //
-//   * the panel Lua's getperf: 10 s windows with ids, read with a cursor. The server
-//     keeps an hour of them since the map loaded; a map change rebuilds the Lua
-//     VM, so `loadedAt` moves and the ids restart from 1. This store keeps what
-//     it has already read across those restarts -- one segment per map load --
-//     for as long as the page is open, up to kHistoryMs. Windows the server
-//     dropped before we read them (a map change mid-interval, or more than an
-//     hour away from the tab) are a gap, never interpolated.
-//   * a stock server's getperfdata: the last 30 readings a minute apart, the
-//     whole window in every reply. It is replaced on each poll, never appended
-//     to -- appending is the 2012 panel's defect (CURRENT-UI defect 2).
-//
-// The panel Lua's reply also carries `engine`: tickstat windows, and what the engine
+// The reply also carries `engine`: tickstat windows, and what the engine
 // prints only to its log (rate steps, the perfmon: block), read with a cursor
 // of its own and kept in the same segments, so a map change restarts both.
 //
@@ -27,7 +22,7 @@
 // `more` asks again at once, page after page, each one its own request.
 
 import { useEffect, useState } from "preact/hooks";
-import { ApiError, getPerf, getPerfData, runCommand } from "../api/client";
+import { ApiError, getPerf, runCommand } from "../api/client";
 import type {
   EngineEvent, PerfConfig, PerfEngine, PerfmonBlock, PerfPoint, Tickstat,
 } from "../api/types";
@@ -35,12 +30,11 @@ import { record } from "../ui/activity";
 
 /** What the page keeps. The server keeps an hour, and only since map load. */
 export const kHistoryMs = 2 * 60 * 60 * 1000;
-export const kStockIntervalMs = 60_000;
 
 export interface PerfSegment {
-  /** Milliseconds; null for a stock server, which does not say. */
-  loadedAt: number | null;
-  map: string | null;
+  /** Milliseconds. */
+  loadedAt: number;
+  map: string;
   points: PerfPoint[];
   tickstats: Tickstat[];
   perfmon: PerfmonBlock[];
@@ -51,14 +45,13 @@ export interface PerfSegment {
 export type EngineStatus = Omit<PerfEngine, "tickstats" | "perfmon" | "events">;
 
 export interface PerfState {
-  source: "lua" | "stock" | null;
   segments: PerfSegment[];
   config: PerfConfig | null;
   windowSeconds: number | null;
   capacity: number | null;
   /** The oldest point this page still holds, in milliseconds. */
   keptSince: number | null;
-  /** Null on stock, or from a panel Lua that predates it. */
+  /** Null until the first reply. */
   engine: EngineStatus | null;
   error: Error | null;
   loading: boolean;
@@ -69,7 +62,7 @@ export interface PerfState {
 const kMaxPages = 20;
 
 const empty: PerfState = {
-  source: null, segments: [], config: null, windowSeconds: null, capacity: null,
+  segments: [], config: null, windowSeconds: null, capacity: null,
   keptSince: null, engine: null, error: null, loading: true, updatedAt: null,
 };
 
@@ -97,18 +90,18 @@ function trim(segments: PerfSegment[]): PerfSegment[] {
       + s.events.length > 0 || i === all.length - 1);
 }
 
-const newSegment = (loadedAt: number | null, map: string | null): PerfSegment =>
+const newSegment = (loadedAt: number, map: string): PerfSegment =>
   ({ loadedAt, map, points: [], tickstats: [], perfmon: [], events: [] });
 
 /** Records newer than the newest held, by id: a reply can never add one twice. */
-function fresh<T extends { id: number | null }>(held: T[], incoming: T[]): T[] {
-  const seen = held.length ? held[held.length - 1]!.id ?? 0 : 0;
-  const add = incoming.filter((r) => (r.id ?? 0) > seen);
+function fresh<T extends { id: number }>(held: T[], incoming: T[]): T[] {
+  const seen = held.length ? held[held.length - 1]!.id : 0;
+  const add = incoming.filter((r) => r.id > seen);
   return add.length ? [...held, ...add] : held;
 }
 
 /** One page. True when the server holds more past the cursors it moved. */
-async function pollMod(): Promise<boolean> {
+async function pollPage(): Promise<boolean> {
   let report = await getPerf(cursor, engineCursor);
   const current = state.segments[state.segments.length - 1];
   const restarted = current !== undefined && current.loadedAt !== report.loadedAt;
@@ -125,50 +118,30 @@ async function pollMod(): Promise<boolean> {
   const next: PerfSegment = {
     ...last,
     points: fresh(last.points, report.points),
-    tickstats: engine ? fresh(last.tickstats, engine.tickstats) : last.tickstats,
-    perfmon: engine ? fresh(last.perfmon, engine.perfmon) : last.perfmon,
-    events: engine ? fresh(last.events, engine.events) : last.events,
+    tickstats: fresh(last.tickstats, engine.tickstats),
+    perfmon: fresh(last.perfmon, engine.perfmon),
+    events: fresh(last.events, engine.events),
   };
   segments = [...segments.slice(0, -1), next];
   cursor = report.lastId;
-  engineCursor = engine?.lastId ?? 0;
+  engineCursor = engine.lastId;
   segments = trim(segments);
   const first = segments[0]?.points[0];
-  let status: EngineStatus | null = null;
-  if (engine) {
-    const { tickstats: _t, perfmon: _p, events: _e, ...rest } = engine;
-    status = rest;
-  }
+  const { tickstats: _t, perfmon: _p, events: _e, ...status } = engine;
   emit({
-    source: "lua", segments, config: report.config,
+    segments, config: report.config,
     windowSeconds: report.windowSeconds, capacity: report.capacity,
     keptSince: first?.at ?? null, engine: status,
   });
-  return report.more || (engine?.more ?? false);
+  return report.more || engine.more;
 }
-
-async function pollStock(): Promise<void> {
-  const points = await getPerfData();
-  emit({
-    source: "stock",
-    segments: [{ ...newSegment(null, null), points }],
-    config: null, windowSeconds: 60, capacity: 30,
-    keptSince: points[0]?.at ?? null,
-  });
-}
-
-let hasLua = false;
 
 function poll(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
-      if (hasLua) {
-        let page = 1;
-        while ((await pollMod()) && page < kMaxPages) page++;
-      } else {
-        await pollStock();
-      }
+      let page = 1;
+      while ((await pollPage()) && page < kMaxPages) page++;
       emit({ error: null, loading: false, updatedAt: Date.now() });
     } catch (e) {
       const busy = e instanceof ApiError && e.retryable;
@@ -181,7 +154,6 @@ function poll(): Promise<void> {
 }
 
 function intervalMs(): number {
-  if (!hasLua) return kStockIntervalMs;
   return (state.windowSeconds ?? 10) * 1000;
 }
 
@@ -200,15 +172,6 @@ function onVisibility() {
   void poll().then(schedule);
 }
 
-/** Switch source. A server that gained or lost the panel Lua starts a new history. */
-function setSource(lua: boolean) {
-  if (lua === hasLua && state.source !== null) return;
-  hasLua = lua;
-  cursor = 0;
-  engineCursor = 0;
-  state = { ...empty };
-}
-
 export function refreshPerf(): Promise<void> {
   return poll();
 }
@@ -224,7 +187,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Turn the engine's tickstat on at `seconds` (0 turns it off). The command
  * answers `tickstat: on|off`, which runcommand captures: that is the proof.
- * The panel Lua's scan of the log picks the same line up within `scan_s`, so the
+ * The Lua's scan of the log picks the same line up within `scan_s`, so the
  * switch reads one more report after that, for everyone's status to agree.
  */
 export async function setTickstat(seconds: number): Promise<TickstatOutcome> {
@@ -251,10 +214,9 @@ export async function setTickstat(seconds: number): Promise<TickstatOutcome> {
   return { kind: "unconfirmed", note };
 }
 
-export function usePerf(lua: boolean): PerfState {
+export function usePerf(): PerfState {
   const [, force] = useState(0);
   useEffect(() => {
-    setSource(lua);
     const listener = () => force((n) => n + 1);
     listeners.add(listener);
     if (listeners.size === 1) {
@@ -269,6 +231,6 @@ export function usePerf(lua: boolean): PerfState {
         timer = null;
       }
     };
-  }, [lua]);
+  }, []);
   return state;
 }

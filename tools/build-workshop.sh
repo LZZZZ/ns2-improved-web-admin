@@ -13,8 +13,8 @@
 # next upload creates another item. --visibility (0 public, 1 friends only,
 # 2 private, 3 unlisted) is required for a new item; on an update, leaving
 # it out keeps what the item has. The title is fixed here, the description
-# is workshop/description.bbcode with {version} replaced by kVersion from
-# lua/ServerWebInterface.lua. A line starting {if-id} is kept only once the
+# is workshop/description.bbcode with {version} replaced by workshop/version.
+# A line starting {if-id} is kept only once the
 # item id is known, one starting {if-no-id} only before; in them {id} is the
 # id and {hexid} the same in hex, as MapCycle.json's mods take it. The build
 # refuses to run with a placeholder left over.
@@ -43,8 +43,8 @@ if [ "$ALLOW_DIRTY" = 0 ] && [ -n "$(git status --porcelain -- web lua LICENSE w
   exit 1
 fi
 
-VERSION=$(sed -n 's/^local kVersion = "\(.*\)"$/\1/p' lua/ServerWebInterface.lua)
-[ -n "$VERSION" ] || { echo "kVersion not found in lua/ServerWebInterface.lua" >&2; exit 1; }
+VERSION=$(cat workshop/version)
+[ -n "$VERSION" ] || { echo "workshop/version is empty" >&2; exit 1; }
 [ -f web/index.html ] || { echo "no web/index.html; build the panel first" >&2; exit 1; }
 
 ID=""

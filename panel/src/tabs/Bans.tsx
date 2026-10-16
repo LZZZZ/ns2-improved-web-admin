@@ -12,12 +12,6 @@ import { dateTime, maskSteamId, parseSteamId, span } from "../ui/format";
 
 type SortKey = "order" | "name" | "expires" | "issued" | "bannedBy";
 
-// sv_unban on the stock Lua hands the console argument, a string, to a map
-// keyed by number, so it can never match (docs/CONSTRAINTS.md item 8). The
-// button would do nothing; it is disabled and says so.
-const STOCK_UNBAN_REASON =
-  "This server's Lua is too old to unban: it cannot match a ban.";
-
 function compare(a: Ban, b: Ban, key: SortKey): number {
   switch (key) {
     case "name":
@@ -42,15 +36,12 @@ function compare(a: Ban, b: Ban, key: SortKey): number {
 export function Bans({ state }: { state: ServerState }) {
   const settings = useSettings();
   const list = useResource(bansResource);
-  const hasLua = state.luaVersion !== null;
   const data = list.data;
   const shineOwns = data?.source === "shine";
 
   const [filter, setFilter] = useState("");
-  // A stock server may hand the list over in a different order on every poll
-  // (Shine's pairs() order), so its default is by name, which is stable.
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>(
-    { key: hasLua ? "order" : "name", dir: 1 });
+    { key: "order", dir: 1 });
 
   const [idInput, setIdInput] = useState("");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
@@ -87,7 +78,7 @@ export function Bans({ state }: { state: ServerState }) {
 
   const unban = (b: Ban) => {
     if (!confirm(`Unban ${b.name} (${b.steamId})?`)) return;
-    void sendCommand(unbanCommand(state, b.steamId), hasLua, [bansResource]);
+    void sendCommand(unbanCommand(state, b.steamId), [bansResource]);
   };
 
   const addBan = async (e: Event) => {
@@ -96,7 +87,7 @@ export function Bans({ state }: { state: ServerState }) {
     if (!confirm(`Ban ${parsedId} ${banSpan(minutes)}?`)) return;
     setBusy(true);
     const outcome = await sendCommand(
-      banCommand(state, parsedId, minutes, terms.reason), hasLua, [bansResource]);
+      banCommand(state, parsedId, minutes, terms.reason), [bansResource]);
     setBusy(false);
     if (outcome.tone !== "error") {
       setIdInput("");
@@ -108,18 +99,6 @@ export function Bans({ state }: { state: ServerState }) {
 
   return (
     <section class="wrap bans-tab">
-      {!hasLua && (
-        <div class="banner">
-          <h2>Stock server Lua</h2>
-          <p>
-            This list is the server's raw ban list. Expired bans are hidden
-            here, though the server still lists them. Unban cannot work on the
-            stock Lua. A ban is sent unverified, and if this server runs
-            Shine, a ban of someone who is not connected may not take effect:
-            only the panel Lua can tell which list is enforced.
-          </p>
-        </div>
-      )}
 
       <div class="toolbar">
         <input
@@ -133,7 +112,7 @@ export function Bans({ state }: { state: ServerState }) {
           {data
             ? `${rows.length} of ${data.bans.length} bans`
             : (list.loading ? "Loading bans..." : "")}
-          {data && hasLua && ` · ${shineOwns ? "Shine's ban list" : "the game's ban list"}`}
+          {data && ` · ${shineOwns ? "Shine's ban list" : "the game's ban list"}`}
         </span>
         <span class="spacer" />
         {list.error && <span class="tone-error">{list.error.message}</span>}
@@ -187,8 +166,7 @@ export function Bans({ state }: { state: ServerState }) {
                   </td>
                 )}
                 <td>
-                  <IconButton icon={ShieldOff} label="Unban" extraClass="unban" disabled={!hasLua}
-                              reason={hasLua ? undefined : STOCK_UNBAN_REASON}
+                  <IconButton icon={ShieldOff} label="Unban" extraClass="unban"
                               onClick={() => unban(b)} />
                 </td>
               </tr>

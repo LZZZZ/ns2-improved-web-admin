@@ -5,8 +5,6 @@ The 2012 panel's Reserved Slots tab never worked -- its one request is broken
 in the stock Lua (docs/CONSTRAINTS.md item 7) and answered 200 anyway. So the
 checks are about what this one claims:
 
-  * stock      the amount is set through sv_reserved_slots, which works there,
-               and reported as unverified; the removal bug is disclosed
   * --mod      the server password is set and removed with sv_password, and
                one that would not survive as one console argument cannot
                be sent; the amount is capped at max players (the server ignores more
@@ -23,7 +21,6 @@ nothing fetched from a third party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8097 --web web --mod --shine=ban,reservedslots,mapvote
 """
@@ -31,7 +28,6 @@ import asyncio, json, os, sys, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE_SLOTS = os.environ.get("SHINE_SLOTS_URL", "http://127.0.0.1:8097")
 PORT = 9229
@@ -103,27 +99,11 @@ async def banners(c):
                             ".map(h=>h.textContent).join('|')"))
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    reset(STOCK)
-    await open_slots(c, STOCK)
-    b = str(await c.eval("[...document.querySelectorAll('.slots-tab .banner p')]"
-                         ".map(p=>p.textContent).join('|')"))
-    check("the stock removal bug is disclosed", "restart" in b, b[:60])
-    await set_amount(c, "3")
-    cmd, note = await last_activity(c)
-    check("the amount is sent as sv_reserved_slots", cmd == "sv_reserved_slots 3", cmd)
-    check("and reported as unverified, not as success",
-          "unverified" in note.lower() and "success" not in note.lower(), note[:60])
-    check("and it took: the command works on a stock server", await count(c) == "3",
-          await count(c))
-
-
 async def mod(c):
     print(f"\n== --mod ({MOD})")
     reset(MOD)
     await open_slots(c, MOD)
-    check("no stock or Shine banner", await banners(c) == "", await banners(c) or "(none)")
+    check("no banner", await banners(c) == "", await banners(c) or "(none)")
 
     pw = "document.querySelector('input[name=password]')"
     await type_into(c, "input[name=password]", "two words")
@@ -228,7 +208,6 @@ async def main():
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.setItem('webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
-            await stock(c)
             await mod(c)
             await shine(c)
 
@@ -237,7 +216,7 @@ async def main():
             check("no uncaught exceptions", not exceptions, str(len(exceptions)))
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE_SLOTS))})
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE_SLOTS))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

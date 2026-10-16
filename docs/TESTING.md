@@ -87,8 +87,7 @@ environment; keep them in that file. Drive the rig with `curl --digest -u
 
 ```bash
 tools/capture-fixtures.sh --env webadmin.env              # read-only
-tools/capture-fixtures.sh --env webadmin.env --mutating   # also the writes
-tools/capture-fixtures.sh --env webadmin.env --mod        # also the mod's request types (lua/ mounted)
+tools/capture-fixtures.sh --env webadmin.env --mutating   # also setmapcycle
 tools/redact-fixtures.py --path <rig>=/srv/ns2            # fixtures/live/ -> fixtures/
 ```
 
@@ -100,10 +99,8 @@ and mod names survive. Log lines name the server's directories, so pass a
 `--path` for each directory outside the rig's tree (a `-consolefifo`, for
 example); any home directory left becomes `/home/user`.
 
-`redact-fixtures.py` rewrites all of `fixtures/live/`, so a capture with
-the mod mounted overwrites the stock fixtures (`serverstate.json` gains
-`lua_version`). Capture the two sets separately, or use `--src`, and `git
-checkout` what you did not mean to replace.
+Captures of the 2012 Lua live in `fixtures/legacy/`: the mock's stock mode
+reads some, and `check-openapi.py` does not check them.
 
 A populated `player_list`, real chat, a successful kick or a ban need a
 human in the server; bots report `"steamid": 0`.

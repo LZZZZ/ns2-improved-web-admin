@@ -1,19 +1,18 @@
 {
-  "elapsed": 0,
+  "dispatched": true,
   "lines": [
     {
-      "id": 1,
       "src": "audit",
-      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_kick",
-      "time": 1788643278
+      "id": 1,
+      "time": 1792111541,
+      "text": "sv - Admin - 0: : STEAM_0:0:0: sv_kick"
     },
     {
-      "id": 2,
       "src": "server",
-      "text": "No matching player",
-      "time": 1788643278
+      "id": 2,
+      "time": 1792111541,
+      "text": "No matching player"
     }
   ],
-  "dispatched": true,
   "cmd": "sv_kick NoSuchPlayer"
 }

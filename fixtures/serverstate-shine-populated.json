@@ -8,9 +8,6 @@
     "ban": true,
     "basecommands": true
   },
-  "webdomain": "127.0.0.1",
-  "lua_version": "0.1.0",
-  "webport": "8080",
   "aliens": 2,
   "devmode": false,
   "players_online": 4,

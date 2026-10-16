@@ -143,22 +143,20 @@ local vm = NewVM()
 do
     write("")
     local r = vm.log({ })
-    check(r.source == "file" and r.size == 0 and #r.lines == 0 and r.at_start == true,
-          "an empty file: source file, no lines")
+    check(r.size == 0 and #r.lines == 0 and r.at_start == true, "an empty file: no lines")
 end
 
 -- 2. A small file: all of it, the header parsed into the file id.
 do
     write(header("02:50:11 AM") .. "[  0.000] Main : Filesystem initialized\n\nLinux\n")
     local r, body, ctype = vm.log({ })
-    check(ctype == "application/json" and r.source == "file", "a file: source file")
+    check(ctype == "application/json" and r.file_id ~= nil, "a file: JSON")
     check(r.file_id == "09/28/2026 02:50:11 AM", "file id from the Date and Time lines")
     check(r.from == 0 and r.at_start == true and r.to == r.size and r.more == false,
           "small file: from 0, at the start, to the end")
     local ok, why = sameLines(r.lines, fileLines())
     check(ok, "small file: every line, with its offset" .. (why and (": " .. why) or ""))
     check(r.lines[6].text == "" and r.lines[7].text == "Linux", "an empty line is kept")
-    check(r.tail_bytes == 65536 and r.max_bytes == 65536, "tail and cap stated, 64 KB each")
     check(r.reset == nil, "no reset without a cursor")
 end
 

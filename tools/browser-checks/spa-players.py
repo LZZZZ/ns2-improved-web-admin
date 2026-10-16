@@ -7,19 +7,17 @@ looks like a failure rather than like a design choice:
 
   * identifiers masked until asked for, with Mask on (defect 6)
   * a bot's per-player buttons are disabled rather than inert (defect 7)
-  * a command is reported as sent and unverified, never as succeeded
+  * a command reports what the server printed, never "succeeded"
   * sort order and a half-typed filter survive a poll
   * nothing is fetched from anywhere but the game server (defect 13)
-  * with the mod, a browser at a bare / gets a page leading to the panel, not
-    the state blob with every player's IP (defect 12), while a script there
-    still gets the blob, and any other path a not-found page; on stock /
-    is the blob for everyone
+  * a browser at a bare / gets a page leading to the panel, not the state
+    blob with every player's IP (defect 12), while a script there still gets
+    the blob, and any other path the panel
   * the 2012 panel's round buttons, with commands that exist (its Reset
     Round sent sv_resetround: defect 17); Force even teams is disabled
     mid-round and says why
-  * Family Sharing and rejected moves show only when the server reports
-    them (the mod always does): a Shared column with the owner's id masked, and a
-    Rejected column; the mod's Hive skill column (P1); and every human row
+  * a Shared column with the owner's id masked, a Rejected column when
+    someone has rejected moves, the Hive skill column (P1); and every human row
     links to ns2panel.com (P3) and to the player's Steam profile
   * one table per team, in the scoreboard's order, under the game's logo
     for the two playing teams; one sort for all four
@@ -32,7 +30,9 @@ looks like a failure rather than like a design choice:
 Build the panel and start the mock on it first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8091 --web web --perf-rate 2
+    node mock/server.js --port 8094 --web web --mod --perf-window 2
+    node mock/server.js --port 8096 --web web --mod --shine
+    node mock/server.js --port 8102 --web web --mod --ranked
 
 Exit status is 0 only if every check passes.
 """
@@ -40,18 +40,12 @@ import asyncio, json, os, re, sys, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-MOCK = os.environ.get("MOCK_URL", "http://127.0.0.1:8091")
-# Shine with basecommands, for Mute, and a mod server with the per-player
-# fields. Both driven in the stock run only.
+MOCK = os.environ.get("MOCK_URL", "http://127.0.0.1:8094")
+# Shine with basecommands, for Mute, and a ranked server with a shared copy.
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
 BETA = os.environ.get("BETA_URL", "http://127.0.0.1:8102")
 BASE = MOCK + "/index.html"
 PORT = 9226
-
-# Set when the mock is running with --mod, i.e. it answers with a lua_version.
-# The panel must then drop the stock-server banner -- the same detection,
-# asserted from the other side.
-EXPECT_MOD = os.environ.get("SPA_EXPECT_MOD") == "1"
 
 results = []
 
@@ -104,14 +98,10 @@ async def main():
                   "uptime" in str(await c.eval(
                       "document.querySelector('.stats').textContent")))
 
-            print("\n== stock-server honesty")
+            print("\n== no banner")
             banner = str(await c.eval(
                 "document.querySelector('.banner h2')?.textContent||''"))
-            if EXPECT_MOD:
-                check("no stock banner when the server runs our Lua",
-                      "Stock server Lua" not in banner, banner or "(no banner)")
-            else:
-                check("stock Lua banner is shown", "Stock server Lua" in banner)
+            check("no banner", banner == "", banner)
 
             print("\n== Players")
             rows = await c.eval(f"{ROWS}.length")
@@ -223,7 +213,7 @@ async def main():
             check("Slay sends sv_slay with the Steam id", cmd == "sv_slay 10000000", cmd)
             # A slay that works prints nothing, like a kick.
             check("and says what is known",
-                  ("printed nothing" in note) if EXPECT_MOD else ("unverified" in note),
+                  "printed nothing" in note,
                   note[:50])
             await c.eval(f"(()=>{{const s={row}.querySelector('.actions select');"
                          "s.value='1';s.dispatchEvent(new Event('change',{bubbles:true}));})()")
@@ -253,18 +243,12 @@ async def main():
             cmd = await c.eval(
                 "document.querySelector('.cmd-confirm .cmd')?.textContent||''")
             check("the command is logged verbatim", cmd.startswith("sv_kick "), cmd)
-            if EXPECT_MOD:
-                # With the mod's Lua the result is known, so "unverified" would
-                # be a lie in the other direction. A kick that works prints
-                # nothing -- only its failure branch does -- so that is what
-                # the panel must say.
-                check("reported as ran-and-printed-nothing, not as success",
-                      "printed nothing" in note and "success" not in note.lower(),
-                      note[:70])
-            else:
-                check("and is reported as unverified, not as success",
-                      "unverified" in note.lower() and "success" not in note.lower(),
-                      note[:70])
+            # A kick that works prints
+            # nothing -- only its failure branch does -- so that is what
+            # the panel must say.
+            check("reported as ran-and-printed-nothing, not as success",
+                  "printed nothing" in note and "success" not in note.lower(),
+                  note[:70])
             after = await c.eval(f"{ROWS}.length")
             check("the kicked player is gone from the table", after == before - 1,
                   f"{before} -> {after}")
@@ -288,11 +272,8 @@ async def main():
             await asyncio.sleep(2.5)
             note = str(await c.eval(
                 "document.querySelector('.cmd-confirm .note')?.textContent||''"))
-            if EXPECT_MOD:
-                check("Reset round reports what the server printed",
-                      "Reset AI TeamBrain" in note, note[:60])
-            else:
-                check("Reset round is reported as unverified", "unverified" in note, note[:60])
+            check("Reset round reports what the server printed",
+                  "Reset AI TeamBrain" in note, note[:60])
             check("the round is reset", state()["game_started"] is False)
             check("and Force even teams is offered once it is",
                   not await c.eval(f"{even}.disabled"))
@@ -337,31 +318,30 @@ async def main():
                   await c.eval(f"{mute}?.disabled") is True)
             check("and says the game has no mute",
                   "no mute command" in str(await c.eval(f"{mute}?.title")))
-            if not EXPECT_MOD:
-                with urllib.request.urlopen(f"{SHINE}/__mock/reset", timeout=5) as r:
-                    r.read()
-                await c.send("Page.navigate", url=SHINE + "/index.html")
-                await asyncio.sleep(3.5)
-                check("under Shine's basecommands Mute is offered",
-                      await c.eval(f"{mute}?.disabled") is False)
-                await c.eval(f"{mute}.click()")
-                await asyncio.sleep(2.5)
-                note = str(await c.eval(
-                    "document.querySelector('.cmd-confirm .note')?.textContent||''"))
-                cmd = str(await c.eval(
-                    "document.querySelector('.cmd-confirm .cmd')?.textContent||''"))
-                check("it sends sh_gag", cmd.startswith("sh_gag "), cmd)
-                check("and reports Shine's line", "gagged" in note, note[:60])
-                check("the row shows the gag",
-                      "MUTED" in str(await c.eval(f"{human}.textContent")))
-                check("and offers Unmute", await c.eval(f"{mute}.textContent") == "Unmute")
-                await c.eval(f"{mute}.click()")
-                await asyncio.sleep(2.5)
-                cmd = str(await c.eval(
-                    "document.querySelector('.cmd-confirm .cmd')?.textContent||''"))
-                check("Unmute sends sh_ungag", cmd.startswith("sh_ungag "), cmd)
-                check("and the gag is gone",
-                      "MUTED" not in str(await c.eval(f"{human}.textContent")))
+            with urllib.request.urlopen(f"{SHINE}/__mock/reset", timeout=5) as r:
+                r.read()
+            await c.send("Page.navigate", url=SHINE + "/index.html")
+            await asyncio.sleep(3.5)
+            check("under Shine's basecommands Mute is offered",
+                  await c.eval(f"{mute}?.disabled") is False)
+            await c.eval(f"{mute}.click()")
+            await asyncio.sleep(2.5)
+            note = str(await c.eval(
+                "document.querySelector('.cmd-confirm .note')?.textContent||''"))
+            cmd = str(await c.eval(
+                "document.querySelector('.cmd-confirm .cmd')?.textContent||''"))
+            check("it sends sh_gag", cmd.startswith("sh_gag "), cmd)
+            check("and reports Shine's line", "gagged" in note, note[:60])
+            check("the row shows the gag",
+                  "MUTED" in str(await c.eval(f"{human}.textContent")))
+            check("and offers Unmute", await c.eval(f"{mute}.textContent") == "Unmute")
+            await c.eval(f"{mute}.click()")
+            await asyncio.sleep(2.5)
+            cmd = str(await c.eval(
+                "document.querySelector('.cmd-confirm .cmd')?.textContent||''"))
+            check("Unmute sends sh_ungag", cmd.startswith("sh_ungag "), cmd)
+            check("and the gag is gone",
+                  "MUTED" not in str(await c.eval(f"{human}.textContent")))
 
             print("\n== the per-player Family Sharing and rejected-move fields")
             await c.send("Page.navigate", url=BASE)
@@ -371,46 +351,40 @@ async def main():
             has_shared = await c.eval("[...document.querySelectorAll('thead th')]"
                                       ".some(t=>t.textContent==='Shared')")
             check("no Rejected column", not has_rejected)
-            if EXPECT_MOD:
-                check("a Shared column", has_shared)
-            else:
-                check("no Shared column", not has_shared)
+            check("a Shared column", has_shared)
             has_skill = await c.eval("[...document.querySelectorAll('thead th')]"
                                      ".some(t=>t.textContent.startsWith('Skill'))")
-            if EXPECT_MOD:
-                with urllib.request.urlopen(f"{MOCK}/?request=json", timeout=5) as r:
-                    me = next(p for p in json.loads(r.read())["player_list"]
-                              if p["steamid"] == 10000000)
-                cell = json.loads(await c.eval(
-                    f"JSON.stringify((t=>[t.querySelector('.skill-value').textContent,t.title,"
-                    f"t.querySelector('.skill-badge')?.textContent,"
-                    f"getComputedStyle(t.querySelector('.skill-badge')).backgroundPosition])"
-                    f"({human}.querySelector('.skill-cell')))"))
-                marines = round(me["skill"] + me["skill_offset"])
-                check("the mod's Skill column shows the server's skill (P1)",
-                      has_skill and cell[0] == str(round(me["skill"])), str(cell[0]))
-                check("and on hover the marine, alien and commander figures",
-                      f"Marines {marines}" in cell[1] and "Commander" in cell[1], cell[1][:60])
-                names = {0: "Rookie", 1: "Recruit", 2: "Frontiersman", 3: "Squad Leader",
-                         4: "Veteran", 5: "Commandant", 6: "Special Ops", 7: "Sanji Survivor"}
-                tier = me["skill_tier"]
-                check("the game's badge for the server's tier, named", cell[2] == names[tier],
-                      f"{tier} {cell[2]}")
-                check("from the sheet's row tier + 2, 20 px a row",
-                      cell[3] == f"0px {-(tier + 2) * 20}px", cell[3])
-                check("and the tier first on hover", cell[1].startswith(names[tier]), cell[1][:30])
-                check("a bot shows no skill, and the bot badge", await c.eval(
-                    f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
-                    ".every(r=>r.querySelector('.skill-value').textContent==='--'"
-                    "&&r.querySelector('.skill-badge')?.textContent==='Bot')"))
-                loaded = await c.eval(
-                    "(async()=>{const u=getComputedStyle(document.querySelector('.skill-badge'))"
-                    ".backgroundImage.slice(5,-2);const i=new Image();i.src=u;"
-                    "try{await i.decode();return i.naturalWidth+'x'+i.naturalHeight}"
-                    "catch(e){return 'failed '+u}})()", await_promise=True)
-                check("the sheet loads from the web root, 100x320", loaded == "100x320", loaded)
-            else:
-                check("no Skill column from a stock server", not has_skill)
+            with urllib.request.urlopen(f"{MOCK}/?request=json", timeout=5) as r:
+                me = next(p for p in json.loads(r.read())["player_list"]
+                          if p["steamid"] == 10000000)
+            cell = json.loads(await c.eval(
+                f"JSON.stringify((t=>[t.querySelector('.skill-value').textContent,t.title,"
+                f"t.querySelector('.skill-badge')?.textContent,"
+                f"getComputedStyle(t.querySelector('.skill-badge')).backgroundPosition])"
+                f"({human}.querySelector('.skill-cell')))"))
+            marines = round(me["skill"] + me["skill_offset"])
+            check("the mod's Skill column shows the server's skill (P1)",
+                  has_skill and cell[0] == str(round(me["skill"])), str(cell[0]))
+            check("and on hover the marine, alien and commander figures",
+                  f"Marines {marines}" in cell[1] and "Commander" in cell[1], cell[1][:60])
+            names = {0: "Rookie", 1: "Recruit", 2: "Frontiersman", 3: "Squad Leader",
+                     4: "Veteran", 5: "Commandant", 6: "Special Ops", 7: "Sanji Survivor"}
+            tier = me["skill_tier"]
+            check("the game's badge for the server's tier, named", cell[2] == names[tier],
+                  f"{tier} {cell[2]}")
+            check("from the sheet's row tier + 2, 20 px a row",
+                  cell[3] == f"0px {-(tier + 2) * 20}px", cell[3])
+            check("and the tier first on hover", cell[1].startswith(names[tier]), cell[1][:30])
+            check("a bot shows no skill, and the bot badge", await c.eval(
+                f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
+                ".every(r=>r.querySelector('.skill-value').textContent==='--'"
+                "&&r.querySelector('.skill-badge')?.textContent==='Bot')"))
+            loaded = await c.eval(
+                "(async()=>{const u=getComputedStyle(document.querySelector('.skill-badge'))"
+                ".backgroundImage.slice(5,-2);const i=new Image();i.src=u;"
+                "try{await i.decode();return i.naturalWidth+'x'+i.naturalHeight}"
+                "catch(e){return 'failed '+u}})()", await_promise=True)
+            check("the sheet loads from the web root, 100x320", loaded == "100x320", loaded)
             link = json.loads(await c.eval(
                 f"JSON.stringify((a=>a&&[a.href,a.rel,a.target])"
                 f"({human}.querySelector('a.ns2panel-link')))"))
@@ -446,29 +420,28 @@ async def main():
             check("hovering the map name shows its minimap", "ns2_summit" in src, src[-40:])
             await c.eval(f"{name}.dispatchEvent(new MouseEvent('mouseleave'))")
 
-            if not EXPECT_MOD:
-                await c.send("Page.navigate", url=BETA + "/index.html")
-                await asyncio.sleep(3.5)
-                check("a server that reports Family Sharing gets the Shared column",
-                      await c.eval("[...document.querySelectorAll('thead th')]"
-                                   ".some(t=>t.textContent==='Shared')"))
-                check("and a shared copy says so there",
-                      "shared copy" in str(await c.eval(
-                          f"{human}.querySelector('.shared-cell').textContent")))
-                owner = f"{human}.querySelector('.owner-id')"
-                check("the owner's id is masked",
-                      "10000042" not in str(await c.eval(f"{owner}?.textContent||''")))
-                await c.eval(f"{owner}.querySelector('button').click()")
-                await asyncio.sleep(0.3)
-                check("and reveals on click",
-                      "10000042" in str(await c.eval(f"{owner}.textContent")))
-                bots = await c.eval(f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
-                                    ".every(r=>!r.querySelector('.shared-cell')"
-                                    ".textContent.includes('shared copy'))")
-                check("bots read as not shared", bots is True)
-                check("a ranked server shows the marine logo by its name",
-                      await c.eval("document.querySelector('.header .ranked')?.title")
-                      == "Server is ranked")
+            await c.send("Page.navigate", url=BETA + "/index.html")
+            await asyncio.sleep(3.5)
+            check("a server that reports Family Sharing gets the Shared column",
+                  await c.eval("[...document.querySelectorAll('thead th')]"
+                               ".some(t=>t.textContent==='Shared')"))
+            check("and a shared copy says so there",
+                  "shared copy" in str(await c.eval(
+                      f"{human}.querySelector('.shared-cell').textContent")))
+            owner = f"{human}.querySelector('.owner-id')"
+            check("the owner's id is masked",
+                  "10000042" not in str(await c.eval(f"{owner}?.textContent||''")))
+            await c.eval(f"{owner}.querySelector('button').click()")
+            await asyncio.sleep(0.3)
+            check("and reveals on click",
+                  "10000042" in str(await c.eval(f"{owner}.textContent")))
+            bots = await c.eval(f"[...{ROWS}].filter(r=>r.textContent.includes('BOT'))"
+                                ".every(r=>!r.querySelector('.shared-cell')"
+                                ".textContent.includes('shared copy'))")
+            check("bots read as not shared", bots is True)
+            check("a ranked server shows the marine logo by its name",
+                  await c.eval("document.querySelector('.header .ranked')?.title")
+                  == "Server is ranked")
 
             print("\n== a bare / (CURRENT-UI defect 12)")
             with urllib.request.urlopen(f"{MOCK}/", timeout=5) as r:
@@ -477,28 +450,23 @@ async def main():
                 state_body = r.read().decode()
             check("?request=json is still the server state",
                   '"player_list"' in state_body, f"{len(state_body)} B")
-            if EXPECT_MOD:
-                check("/ for a script is the state blob, as vanilla served it",
-                      ctype.startswith("application/json") and '"player_list"' in body, ctype)
-                req = urllib.request.Request(f"{MOCK}/", headers={"Accept": "text/html"})
-                with urllib.request.urlopen(req, timeout=5) as r:
-                    ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
-                check("/ for a browser is a page, not the state blob",
-                      ctype.startswith("text/html") and "player_list" not in body
-                      and "ipaddress" not in body, ctype)
-                with urllib.request.urlopen(f"{MOCK}/nothing-here", timeout=5) as r:
-                    ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
-                check("any other path gets the panel too",
-                      ctype.startswith("text/html") and 'id="app"' in body, ctype)
-                await c.send("Page.navigate", url=MOCK + "/")
-                await asyncio.sleep(3)
-                landed = str(await c.eval("location.pathname"))
-                check("and a browser there gets the panel, staying at /",
-                      landed == "/" and await c.eval("!!document.querySelector('.tab')"), landed)
-            else:
-                check("on stock, / is the state blob, as on a real server",
-                      '"player_list"' in body, ctype)
-
+            check("/ for a script is the state blob, as vanilla served it",
+                  ctype.startswith("application/json") and '"player_list"' in body, ctype)
+            req = urllib.request.Request(f"{MOCK}/", headers={"Accept": "text/html"})
+            with urllib.request.urlopen(req, timeout=5) as r:
+                ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
+            check("/ for a browser is a page, not the state blob",
+                  ctype.startswith("text/html") and "player_list" not in body
+                  and "ipaddress" not in body, ctype)
+            with urllib.request.urlopen(f"{MOCK}/nothing-here", timeout=5) as r:
+                ctype, body = r.headers.get("Content-Type", ""), r.read().decode()
+            check("any other path gets the panel too",
+                  ctype.startswith("text/html") and 'id="app"' in body, ctype)
+            await c.send("Page.navigate", url=MOCK + "/")
+            await asyncio.sleep(3)
+            landed = str(await c.eval("location.pathname"))
+            check("and a browser there gets the panel, staying at /",
+                  landed == "/" and await c.eval("!!document.querySelector('.tab')"), landed)
             print("\n== nothing is fetched from a third party (defect 13)")
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]

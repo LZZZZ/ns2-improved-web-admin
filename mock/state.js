@@ -64,7 +64,7 @@ export function createState(fixturesDir, opts = {}) {
   // and installed mods. The default is a stock install's.
   const modded = opts.maps === "modded";
 
-  const base = fx("serverstate-populated");
+  const base = fx("legacy/serverstate-populated");
   const bootedAt = Date.now();
 
   const s = {
@@ -81,13 +81,13 @@ export function createState(fixturesDir, opts = {}) {
     gameStartedAt: base.game_started ? bootedAt : null,
     players: clone(base.player_list),
 
-    bans: clone(fx("getbanlist-populated")),
+    bans: clone(fx("legacy/getbanlist-populated")),
     reserved: clone(fx("getreservedslots")),
     // Fixture entries carry no time; give them the boot's.
-    chat: clone(fx("getchatlist-player")).map((e) => ({ ...e, time: Math.floor(bootedAt / 1000) })),
+    chat: clone(fx("legacy/getchatlist-player")).map((e) => ({ ...e, time: Math.floor(bootedAt / 1000) })),
     chatDropped: 0,
-    perf: rebasePerf(clone(fx("getperfdata-populated"))),
-    installedMods: clone(fx(modded ? "getinstalledmodslist-modded" : "getinstalledmodslist")),
+    perf: rebasePerf(clone(fx("legacy/getperfdata-populated"))),
+    installedMods: clone(fx(modded ? "legacy/getinstalledmodslist-modded" : "legacy/getinstalledmodslist")),
     mapList: clone(fx(modded ? "getmaplist-modded" : "getmaplist")),
     // MapCycle.json, with mod ids as numbers the way the file holds them. The
     // game also keeps the copy it loaded with the map, `mapCycleMemory`: a
@@ -97,7 +97,7 @@ export function createState(fixturesDir, opts = {}) {
 
     // What the workshop search finds: a real page of results, plus a few made
     // up to have a small result, a map mod and a description with markup.
-    catalogue: [...clone(fx("getmods-settled").items || []), ...syntheticWorkshopItems()],
+    catalogue: [...clone(fx("legacy/getmods-settled").items || []), ...syntheticWorkshopItems()],
   };
 
   s.mapCycleMemory = clone(s.mapCycle);
@@ -127,7 +127,6 @@ export function createState(fixturesDir, opts = {}) {
   const kWorkshopLimit = 50;
   let workshopTimeoutS = 30;
   const workshopNext = { search: null, searches: 0, install: null };
-  const kVersion = "0.2.0";
 
   // ------------------------------------------------------------- whitelist
 
@@ -169,7 +168,7 @@ export function createState(fixturesDir, opts = {}) {
       });
     }
   }
-  let recentStorage = { loaded: "ok", saved_at: Math.floor(bootedAt / 1000) };
+  let recentStorage = { loaded: "ok" };
 
   const isHuman = (p) => p.isbot !== "true" && p.steamid !== 0;
 
@@ -321,26 +320,19 @@ export function createState(fixturesDir, opts = {}) {
     const w = {
       id,
       time: at,
-      duration_ms: perfWindowS * 1000 + Math.floor(Math.random() * 30),
-      ticks: 0,
       tickrate: Math.round((59.7 + Math.random() * 0.4 - (hitch ? 1.5 : 0)) * 100) / 100,
       worst_tick_ms: Math.round((hitch ? 40 + Math.random() * 40 : 17 + Math.random() * 6) * 10) / 10,
       players,
       score: players ? Math.round(45 - 25 * busy + Math.random() * 6) : 0,
-      quality: players ? Math.round(80 + Math.random() * 15) : 0,
       idle_pct: Math.round((80 - 35 * busy + Math.random() * 4) * 10) / 10,
       moves_pct: Math.round((25 * busy + Math.random() * 2) * 10) / 10,
       entities_pct: Math.round((3 + 12 * busy + Math.random() * 2) * 10) / 10,
-      moves_per_s: Math.round(players * 60 * (0.95 + Math.random() * 0.05)),
       entities: Math.round(160 + 700 * busy + Math.random() * 40),
-      incomplete: 0,
       interp_warns: 0,
       interp_fails: 0,
       lua_kb: Math.round(20000 + 30000 * busy + Math.random() * 4000),
     };
-    if (players) w.move_ms = Math.round((0.15 + Math.random() * 0.05) * 1000) / 1000;
     if (perfForced) { Object.assign(w, perfForced); perfForced = null; }
-    w.ticks = Math.round(w.tickrate * w.duration_ms / 1000);
     return w;
   };
   const pushPerfWindow = () => {
@@ -405,8 +397,8 @@ export function createState(fixturesDir, opts = {}) {
     const marines = s.players.filter((p) => p.team === 1).length;
     const aliens = s.players.filter((p) => p.team === 2).length;
     return {
-      webdomain: s.webdomain,
-      webport: s.webport,
+      // The 2012 file's; the panel's Lua dropped them.
+      ...(opts.mod ? {} : { webdomain: s.webdomain, webport: s.webport }),
       server_name: s.server_name,
       map: s.map,
       uptime: uptimeMinutes(),
@@ -435,10 +427,8 @@ export function createState(fixturesDir, opts = {}) {
         ...(opts.mod ? betaPlayer(p) : {}),
         ...(opts.mod ? skillOf(p) : {}),
       })),
-      // Absent on a stock server, which is how the panel knows which it is
-      // talking to and what it can honestly offer.
       ...(opts.mod ? {
-        lua_version: kVersion, max_players: maxPlayers, map_loaded_at: perfWin.loadedAt,
+        max_players: maxPlayers, map_loaded_at: perfWin.loadedAt,
         // Unranked, as any server with this mod mounted is until it is
         // whitelisted (CONSTRAINTS item 18); --ranked for the game's own copy.
         ranking_active: opts.ranked === true,
@@ -610,9 +600,8 @@ export function createState(fixturesDir, opts = {}) {
       [lines, to] = logLinesOf(text, from);
     }
     return {
-      source: "file", file_id: fileId, size, from, to, lines,
+      file_id: fileId, size, from, to, lines,
       more, at_start: from === 0, ...(reset ? { reset } : {}),
-      tail_bytes: kLogTailBytes, max_bytes: kLogMaxBytes,
     };
   }
 
@@ -940,7 +929,6 @@ export function createState(fixturesDir, opts = {}) {
     return {
       cmd: line,
       dispatched,
-      elapsed: 0,
       lines: lines.map((l, i) => ({ id: i + 1, time, src: l.src, text: l.text })),
     };
   }
@@ -1094,7 +1082,7 @@ export function createState(fixturesDir, opts = {}) {
       for (const b of shineBans.values()) {
         add({
           id: Number(b.ID), name: b.Name, reason: b.Reason,
-          issued: b.Issued, duration: b.Duration, banned_by: b.BannedBy,
+          issued: b.Issued, banned_by: b.BannedBy,
         }, b.UnbanTime);
       }
       bans.sort((a, b) => (b.issued - a.issued) || (a.id - b.id));
@@ -1312,7 +1300,7 @@ export function createState(fixturesDir, opts = {}) {
       if (request.path !== "/" || String(request.headers?.accept ?? "").includes("text/html")) {
         let page;
         try { page = readFileSync(join(opts.web, "index.html"), "utf8"); }
-        catch { page = readFileSync(join(fixturesDir, "root-mod.html"), "utf8"); }
+        catch { page = readFileSync(join(fixturesDir, "root-fallback.html"), "utf8"); }
         return ["text/html", page];
       }
       return json(serverState());
@@ -1320,6 +1308,7 @@ export function createState(fixturesDir, opts = {}) {
 
     switch (actions.request) {
       case "getbanlist": {
+        if (opts.mod) break;   // the 2012 file's; the panel's Lua dropped it
         const now = Math.floor(Date.now() / 1000);
         // Under Shine's ban plugin this is Shine's list, not vanilla's.
         const all = shineHas("ban") ? shineBanList() : s.bans;
@@ -1339,6 +1328,7 @@ export function createState(fixturesDir, opts = {}) {
           : s.reserved);
 
       case "setreservedslotamount":
+        if (opts.mod) break;
         if (bugs.setreservedslotamount) {
           // The amount arrives as `client`, `amount` is nil, the guard rejects
           // it, and the request still answers 200 with an empty body.
@@ -1354,10 +1344,10 @@ export function createState(fixturesDir, opts = {}) {
         // `Server.recentChatMessages and json.encode(...) or "{ }"` -- when the
         // buffer does not exist the reply is an object, not an array.
         if (opts.noChatBuffer) return ["application/json", "{ }"];
-        // The mod's cursor (CONSTRAINTS item 3). Without one, or on stock, the
+        // The mod's cursor (CONSTRAINTS item 3), 0 when absent. Stock: the
         // game's 20 in the game's shape -- no time, which only the mod records.
-        if (opts.mod && actions.since !== undefined && Number.isFinite(Number(actions.since))) {
-          const since = Number(actions.since);
+        if (opts.mod) {
+          const since = Number.isFinite(Number(actions.since)) ? Number(actions.since) : 0;
           return json({
             entries: s.chat.filter((e) => e.id > since),
             last_id: s.chat.at(-1)?.id ?? 0,
@@ -1368,6 +1358,7 @@ export function createState(fixturesDir, opts = {}) {
         return json(s.chat.slice(-kMaxChat).map(({ time, ...e }) => e));
 
       case "getperfdata":
+        if (opts.mod) break;
         return json(s.perf.slice(-kMaxPerfDatas));
 
       case "getinstalledmodslist":
@@ -1452,18 +1443,15 @@ export function createState(fixturesDir, opts = {}) {
         // Stock: no searchtext never starts a search, and a `p` that is not a
         // number is a Lua error, an empty 200. The mod reads them as "" and 1.
         const hasText = typeof actions.searchtext === "string";
-        let page;
-        if (opts.mod) {
-          page = Math.floor(Number(actions.p ?? 1));
-          if (!(page >= 1 && page <= 1000)) page = 1;
-        } else {
+        let page = 1;
+        if (!opts.mod) {
           page = actions.p === undefined ? 1 : Number(actions.p);
           if (Number.isNaN(page)) return null;
         }
         const searchtext = hasText ? actions.searchtext : "";
-        // Vanilla's key runs text and page together; the mod's does not
-        // (without searchtext, vanilla's key is the page number itself).
-        const key = opts.mod ? `${searchtext}\0${page}`
+        // Vanilla's key runs text and page together; the mod asks for page 1
+        // only (without searchtext, vanilla's key is the page number itself).
+        const key = opts.mod ? searchtext
           : hasText ? `${searchtext}${page}` : `#${page}`;
 
         for (const [k, e] of modSearches) {
@@ -1479,7 +1467,7 @@ export function createState(fixturesDir, opts = {}) {
         if (entry && opts.mod) {
           // Given up once; the next request starts afresh.
           modSearches.delete(key);
-          return json({ done: true, page, items: [], count: 0,
+          return json({ items: [],
             error: `The workshop search had no answer after ${workshopTimeoutS} s.` });
         }
 
@@ -1501,8 +1489,8 @@ export function createState(fixturesDir, opts = {}) {
                 || m.description.toLowerCase().includes(needle))
               .slice(0, kWorkshopLimit);
             started.result = JSON.stringify(opts.mod
-              ? { done: true, page, items: hits.map((m) => ({ ...m, whitelisted: isWhitelisted(m.id) })),
-                  count: hits.length, capped: hits.length >= kWorkshopLimit }
+              ? { items: hits.map((m) => ({ ...m, whitelisted: isWhitelisted(m.id) })),
+                  capped: hits.length >= kWorkshopLimit }
               : { items: hits });
             started.cachedAt = Date.now();
           }, fate === "offline" ? 0 : (opts.modSearchMs ?? 1200));
@@ -1572,13 +1560,10 @@ export function createState(fixturesDir, opts = {}) {
     // bare `/`, an unknown request type and runcommand. The
     // shipped panel sends request=json, which is one of those unmatched
     // values. See API.md, "There is no directory index either".
-    if (actions.command) {
-      // The legacy path the 2012 panel uses. It still runs the command and
-      // still returns nothing about it, with or without --mod: the mod adds a
-      // way to see output, it does not change this one.
-      const out = opts.mod
-        ? runCommandCapturing(actions.rcon ?? "").lines.map((l) => l.text).join(" | ")
-        : execute(actions.rcon ?? "").mockLog;
+    if (actions.command && !opts.mod) {
+      // The 2012 file's command path, which returns nothing about the
+      // command. The panel's Lua dropped it.
+      const out = execute(actions.rcon ?? "").mockLog;
       log(`console: ${actions.rcon} -> ${out || "(no output)"}`);
     }
     return json(serverState());
@@ -1629,8 +1614,7 @@ export function createState(fixturesDir, opts = {}) {
     },
     /** What the next getrecentplayers reports about the file's load and save. */
     setRecentStorage(loaded, error) {
-      recentStorage = { loaded, saved_at: recentStorage.saved_at,
-                        ...(error ? { error } : {}) };
+      recentStorage = { loaded, ...(error ? { error } : {}) };
     },
     /**
      * Values the next perf window carries (score, interp_fails, worst_tick_ms,

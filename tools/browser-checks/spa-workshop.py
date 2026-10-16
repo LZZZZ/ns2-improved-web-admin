@@ -8,15 +8,6 @@ similar-looking results with no details, and "subscribed" with a toggle that
 downloaded and said nothing more. So the checks are about what this one
 claims:
 
-  * stock      no search before the tab is opened, one when it is, and no
-               polling once it settles; the first-50 cap stated, with the
-               Steam Workshop offered for the rest (no referrer); an empty
-               result said to be no matches or no Steam; install asks first
-               (download only, no delete, ranking), is one POST with the id
-               in its body, reported as unverified, shown downloading and
-               then installed once the installed list has it, and Open in
-               Mods filters that tab to it; a search that never answers given
-               up at 35 s with the stock caveat
   * --mod      a mod's details: its description as text, markup and BBCode
                included and nothing run; its ids, author, size, requirements
                and Steam's problem flag; a search the server gave up on shown
@@ -38,7 +29,6 @@ Not covered: the 3-minute "not installed" state, which would need a
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8099 --web web --mod --shine=ban,reservedslots,mapvote --maps=modded
 """
@@ -46,7 +36,6 @@ import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_MAPS_URL", "http://127.0.0.1:8099")
 PORT = 9233
@@ -167,128 +156,6 @@ async def last_activity(c):
     return str(cmd), str(note)
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    reset(STOCK)
-    mark = len(c.events)
-    await load(c, STOCK)
-    await asyncio.sleep(1.0)
-    check("no workshop search before the tab is opened", searches(c, mark) == [])
-
-    await open_tab(c, "Workshop")
-    await settled(c)
-    s = searches(c, mark)
-    check("opening the tab searches, for everything",
-          len(s) >= 1 and all(q.get("searchtext", [""]) == [""] for q in s), f"{len(s)} polls")
-    t = await table(c)
-    st = await status(c)
-    check("the first 50 are shown, with no results line under the search",
-          len(t) == 50 and st == "", f"{len(t)} rows")
-    links = json.loads(await c.eval(
-        "JSON.stringify([...document.querySelectorAll('.workshop-tab a')]"
-        ".filter(a=>a.textContent==='Steam Workshop').map(a=>[a.href,a.rel,a.target]))"))
-    check("which links to the workshop, out of the panel and without a referrer",
-          len(links) == 1 and all(l[0] == "https://steamcommunity.com/app/4920/workshop/"
-                                  and "noreferrer" in l[1] and l[2] == "_blank" for l in links),
-          f"{len(links)} links")
-
-    await asyncio.sleep(0.2)
-    mark = len(c.events)
-    await asyncio.sleep(2.0)
-    check("no polling once settled", searches(c, mark) == [], f"{len(searches(c, mark))} polls")
-
-    await search(c, "halcyon")
-    t = await table(c)
-    st = await status(c)
-    check("a narrow search: three results, no cap note",
-          [r[0] for r in t] == ["5ea0001", "5ea0002", "5ea0003"]
-          and st == "", st[:40])
-    nav = await c.eval("[...document.querySelectorAll('.workshop-tab button')]"
-                       ".some(b=>/next|previous|page/i.test(b.textContent))")
-    check("no paging offered: the engine has none", nav is False)
-    maxlen = await c.eval("document.querySelector('input[name=\"workshop-query\"]').maxLength")
-    check("the search text is capped", maxlen == 200, str(maxlen))
-
-    await search(c, "zzqqxx")
-    st = await status(c)
-    check("an empty result says no matches or no Steam",
-          "Nothing found" in st and "could not reach Steam" in st, st[:50])
-
-    await search(c, "halcyon")
-    r = await row(c, SMALL)
-    check("an uninstalled result offers Install", "not installed" in r[2] and "Install" in r[3])
-    check("a stock server cannot say whether it is whitelisted: no icon",
-          "whitelisted" not in r[2], r[2][:40])
-    check("and no whitelist line",
-          not await c.eval("!!document.querySelector('.workshop-tab .whitelist-source')"))
-    await c.eval("window.__confirms = []")
-    mark = len(c.events)
-    await click_row(c, SMALL, "Install")
-    asked = json.loads(await c.eval("JSON.stringify(window.__confirms)"))
-    check("Install asks first, with what it does and costs",
-          len(asked) == 1 and "only downloads it" in asked[0]
-          and "can delete" in asked[0]
-          and "Loading a mod that is not whitelisted turns ranking off." in asked[0],
-          (asked or [""])[0][:40])
-    posted = [r for r in requests(c, mark) if r.get("method") == "POST"]
-    body = urllib.parse.parse_qs(posted[0].get("postData", "")) if posted else {}
-    check("one POST, the id in the body",
-          len(posted) == 1 and body == {"request": ["installmod"], "modid": [SMALL]}
-          and "?" not in posted[0]["url"], f"{len(posted)} POSTs")
-    cmd, note = await last_activity(c)
-    check("reported as unverified", cmd == f"installmod {SMALL}"
-          and "does not answer" in note, note[:50])
-    r = await row(c, SMALL)
-    check("shown downloading, not installed", "Downloading" in r[2] and "installed" not in r[2],
-          r[2][:40])
-    ok = await wait_for(c, f"document.querySelector('tr[data-mod=\"{SMALL}\"] .status-cell')"
-                           "?.textContent.includes('installed')", timeout=8)
-    r = await row(c, SMALL)
-    check("installed once the server lists it", ok and SMALL in installed_ids(STOCK)
-          and "Open in Mods" in r[3] and "loaded now" not in r[2], r[2][:30])
-    cmd, note = await last_activity(c)
-    check("and the arrival is reported", "is installed: the server lists it now" in note, note[:50])
-
-    await click_row(c, SMALL, "Open in Mods")
-    await wait_for(c, "document.querySelectorAll('.mods-table tbody tr[data-mod]').length > 0")
-    mods = json.loads(await c.eval(
-        "JSON.stringify([document.querySelector('.tab[aria-selected=true]').textContent,"
-        "document.querySelector('.mods-tab input[type=search]').value,"
-        "[...document.querySelectorAll('.mods-table tbody tr[data-mod]')].map(r=>r.dataset.mod)])"))
-    check("Open in Mods opens that tab filtered to it",
-          mods[0] == "Mods" and mods[1] == SMALL and mods[2] == [SMALL], json.dumps(mods))
-    await open_tab(c, "Workshop")
-    await settled(c)
-    await open_tab(c, "Mods")
-    fil = await c.eval("document.querySelector('.mods-tab input[type=search]').value")
-    check("and the filter does not stick to a plain tab click", fil == "", repr(fil))
-
-    await open_tab(c, "Workshop")
-    await settled(c)
-    await search(c, "badges")
-    r = await row(c, WHITELISTED)
-    check("and no whitelist verdict on a stock server, either way",
-          r and "whitelisted" not in r[2], (r or ["", "", ""])[2][:40])
-    await search(c, "halcyon")
-    back = [r[0] for r in await table(c)]
-    check("coming back shows the last search again", len(back) == 3, json.dumps(back))
-    # Two: the stock Lua restarts it at 30 s, and Steam is still not answering.
-    workshop(STOCK, search="hang", n=2)
-    await search(c, "never answers")
-    st = await status(c)
-    check("a search that never answers keeps loading", st.startswith("Searching"), st[:30])
-    ok = await settled(c, timeout=40)
-    st = await status(c)
-    check("is given up at 35 s, with the stock caveat",
-          ok and "No answer" in st and "35 s" in st
-          and "cannot tell a failed search from a slow one" in st, st[:60])
-    await c.eval("[...document.querySelectorAll('.search-status button')]"
-                 ".find(b=>b.textContent==='Retry').click()")
-    await asyncio.sleep(0.3)
-    st = await status(c)
-    check("and Retry searches again", st.startswith("Searching"), st[:30])
-
-
 async def mod(c):
     print(f"\n== --mod ({MOD})")
     reset(MOD)
@@ -340,7 +207,7 @@ async def mod(c):
     st = await status(c)
     check("a search the server gave up on shows its error, with Retry",
           ok and "failed: The workshop search had no answer after 2 s." in st
-          and "Retry" in st and "stock" not in st, st[:70])
+          and "Retry" in st, st[:70])
     await c.eval("[...document.querySelectorAll('.search-status button')]"
                  ".find(b=>b.textContent==='Retry').click()")
     await settled(c)
@@ -421,7 +288,6 @@ async def main():
                          source="window.confirm = (m) => { (window.__confirms ||= []).push(m);"
                                 " return true; };"
                                 "try { localStorage.removeItem('webadmin.settings'); } catch {}")
-            await stock(c)
             await mod(c)
             await shine(c)
 
@@ -431,7 +297,7 @@ async def main():
                   str(len(exceptions)) + (f": {exceptions[0]['params']['exceptionDetails'].get('text')}"
                                           if exceptions else ""))
             urls = [r["url"] for r in requests(c)]
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, SHINE))
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE))
                               and "steamusercontent.com" not in u})
             check("nothing else went anywhere but the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))

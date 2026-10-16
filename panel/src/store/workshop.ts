@@ -3,10 +3,9 @@
 // Both are asynchronous on the server and neither says when it is done, so
 // both are polled here, measured on the 09-26 rig (REQUIREMENTS item 4):
 //
-//   * a search answers `loading` until it settles, 0.3-0.9 s. On a stock
-//     server one that never answers restarts every 30 s and answers `loading`
-//     forever, so the panel gives up on its own after 35 s. The panel Lua settles it
-//     with an error at 30 s.
+//   * a search answers `loading` until it settles, 0.3-0.9 s. One that never
+//     answers settles with an error at 30 s; the panel stops at 35 s anyway,
+//     in case the server is too busy to say.
 //   * an install is proved only by the id appearing in getinstalledmodslist,
 //     which happens once the mod is downloaded and unpacked, under its real
 //     title, and never before: 1.7 s for 710 bytes, 3.8 s for 26 MB. An id
@@ -30,10 +29,8 @@ export type SearchState =
   | { status: "idle" }
   | { status: "loading"; query: string; startedAt: number }
   | { status: "results"; query: string; items: WorkshopItem[]; capped: boolean }
-  /** The panel Lua's timeout, or a request that failed. */
-  | { status: "error"; query: string; error: string }
-  /** Stock: no answer in time, and the server cannot say why. */
-  | { status: "gave-up"; query: string };
+  /** The server's timeout, or a request that failed. */
+  | { status: "error"; query: string; error: string };
 
 export interface Install {
   id: string;
@@ -88,7 +85,9 @@ export async function runSearch(query: string): Promise<void> {
         return settle({ status: "error", query, error: (e as Error).message });
       }
     }
-    if (Date.now() - startedAt >= kGiveUpMs) return settle({ status: "gave-up", query });
+    if (Date.now() - startedAt >= kGiveUpMs) {
+      return settle({ status: "error", query, error: "no answer from the server in 35 s" });
+    }
     await sleep(kPollMs);
   }
 }
@@ -138,7 +137,7 @@ async function watch(): Promise<void> {
 }
 
 /** Ask the server to download a mod, and watch the installed list for it. */
-export async function requestInstall(item: WorkshopItem, hasLua: boolean): Promise<void> {
+export async function requestInstall(item: WorkshopItem): Promise<void> {
   const id = item.id.toLowerCase();
   const command = `installmod ${id}`;
   installs = new Map(installs).set(id, {
@@ -147,17 +146,15 @@ export async function requestInstall(item: WorkshopItem, hasLua: boolean): Promi
   emit();
 
   try {
-    const result = await installMod(id, hasLua);
+    const result = await installMod(id);
     if (result.kind === "refused") {
       setInstall(id, { state: "refused", note: result.error });
       record(command, `refused, nothing sent: ${result.error}`, "error");
       return;
     }
-    record(command, result.kind === "unverified"
-      ? "sent. This server does not answer; the installed list will show whether it downloads."
-      : result.alreadyInstalled
-        ? "already installed. The server checks it for an update."
-        : "download asked for. Waiting for the server to list it.");
+    record(command, result.alreadyInstalled
+      ? "already installed. The server checks it for an update."
+      : "download asked for. Waiting for the server to list it.");
   } catch (e) {
     setInstall(id, { state: "failed", note: (e as Error).message });
     record(command, `could not be sent: ${(e as Error).message}`, "error");

@@ -20,7 +20,7 @@ import { WhitelistIcon } from "../ui/whitelist";
 //   * installed is not loaded. `installmod` downloads a mod; nothing mounts it
 //     until the cycle names it and the map changes.
 //   * a cycle edit is not a load either. It takes effect at the next map
-//     change, and `active` (from the panel Lua) is what is mounted now.
+//     change, and `active` is what is mounted now.
 //   * the cycle is not all that is mounted. The engine mounts two hotfix mods
 //     with no cycle entry, and a map's own mods only with that map.
 //
@@ -83,7 +83,6 @@ function rank(r: Row): number {
 export function Mods(
   { state, initialFilter = "" }: { state: ServerState; initialFilter?: string },
 ) {
-  const hasLua = state.luaVersion !== null;
   const store = useMapCycle();
   const mods = useResource(installedMods);
   const maps = useResource(mapList);
@@ -98,20 +97,9 @@ export function Mods(
 
   return (
     <section class="wrap mods-tab">
-      {!hasLua && (
-        <div class="banner">
-          <h2>Stock server Lua</h2>
-          <p>
-            A stock server does not say which mods are loaded, so this list is
-            what is installed, nothing more. A cycle change is reported as the
-            server's copy; the panel Lua reads MapCycle.json back.
-          </p>
-        </div>
-      )}
       <CycleBanners cycle={store} />
       <ModsView
         state={state}
-        hasLua={hasLua}
         cycle={store.shown}
         store={store}
         mods={mods.data}
@@ -125,7 +113,6 @@ export function Mods(
 
 interface ViewProps {
   state: ServerState;
-  hasLua: boolean;
   cycle: RawMapCycle | null;
   store: ReturnType<typeof useMapCycle>;
   mods: InstalledMod[] | null;
@@ -135,7 +122,7 @@ interface ViewProps {
 }
 
 function ModsView(p: ViewProps) {
-  const { state, hasLua, cycle, store } = p;
+  const { state, cycle, store } = p;
   const locked = !cycle || store.conflict !== null;
   const [filter, setFilter] = useState(p.initialFilter);
 
@@ -174,7 +161,7 @@ function ModsView(p: ViewProps) {
       if (r) { place(r); byId.delete(id); continue; }
       // Listed twice, or engine-mounted anyway: already placed.
       if (ordered.some((o) => o.id === id)) continue;
-      place(make({ id, name: id, active: null, whitelisted: null }, true));
+      place(make({ id, name: id, active: false, whitelisted: false }, true));
     }
     const rest = [...byId.values()].sort((a, b) => rank(a) - rank(b)
       || a.mod.name.localeCompare(b.mod.name, undefined, { sensitivity: "base" }));
@@ -192,7 +179,7 @@ function ModsView(p: ViewProps) {
   const loaded = rows.filter((r) => r.mod.active).length;
 
   const commit = (label: string, edit: (mods: string[]) => string[]) =>
-    commitMapCycle((c) => ({ ...c, mods: edit(c.mods ?? []) }), label, hasLua);
+    commitMapCycle((c) => ({ ...c, mods: edit(c.mods ?? []) }), label);
 
   // Appends: the order is the mount order, and the rest of it stays as it is.
   const addGlobal = (r: Row) =>
@@ -217,13 +204,13 @@ function ModsView(p: ViewProps) {
             {p.mods ? (
               <>
                 <b>{installedCount}</b> installed
-                {hasLua && <>, <b>{loaded}</b> loaded now</>}
+                {<>, <b>{loaded}</b> loaded now</>}
                 , <b>{globalIds.length}</b> with every map
               </>
             ) : p.modsError ? <span class="tone-error">{p.modsError}</span> : "Loading..."}
           </span>
           <span class="spacer" />
-          <UndoReload cycle={store} hasLua={hasLua} />
+          <UndoReload cycle={store} />
         </div>
         {/* How a write went stays by Undo; the standing notes are below the table. */}
         {(store.saving || store.last) && <CycleNote cycle={store} idle="" />}
@@ -250,7 +237,7 @@ function ModsView(p: ViewProps) {
           </thead>
           <tbody>
             {shown.map((r) => (
-              <ModRow key={r.id} r={r} hasLua={hasLua} locked={locked}
+              <ModRow key={r.id} r={r} locked={locked}
                       onAdd={() => addGlobal(r)}
                       onRemove={() => removeGlobal(r.id, r.mod.name, r.dependents)} />
             ))}
@@ -274,13 +261,12 @@ function ModsView(p: ViewProps) {
 
 interface RowProps {
   r: Row;
-  hasLua: boolean;
   locked: boolean;
   onAdd: () => void;
   onRemove: () => void;
 }
 
-function ModRow({ r, hasLua, locked, onAdd, onRemove }: RowProps) {
+function ModRow({ r, locked, onAdd, onRemove }: RowProps) {
   const ws = workshopId(r.id);
   if (r.missing) return <MissingRow r={r} ws={ws} locked={locked} onRemove={onRemove} />;
   const engine = ENGINE_MOUNTED.has(r.id);
@@ -288,18 +274,16 @@ function ModRow({ r, hasLua, locked, onAdd, onRemove }: RowProps) {
 
   // What differs between now and after the next map change.
   let pending: { icon: LucideIcon; label: string; tone: "warn" | "dim" } | null = null;
-  if (hasLua && active !== null) {
-    if (engine && active) {
-      pending = { icon: Server, label: "Mounted by the server itself, not by the cycle.",
-                  tone: "dim" };
-    } else if (r.global && !active) {
-      pending = { icon: ClockArrowUp, label: "Not loaded yet: loads at the next map change.",
-                  tone: "warn" };
-    } else if (active && !r.global && !r.withThisMap) {
-      pending = { icon: ClockArrowDown,
-                  label: "The cycle no longer names it: unloads at the next map change.",
-                  tone: "warn" };
-    }
+  if (engine && active) {
+    pending = { icon: Server, label: "Mounted by the server itself, not by the cycle.",
+                tone: "dim" };
+  } else if (r.global && !active) {
+    pending = { icon: ClockArrowUp, label: "Not loaded yet: loads at the next map change.",
+                tone: "warn" };
+  } else if (active && !r.global && !r.withThisMap) {
+    pending = { icon: ClockArrowDown,
+                label: "The cycle no longer names it: unloads at the next map change.",
+                tone: "warn" };
   }
 
   const uses: { text: string; title?: string | undefined }[] = [];

@@ -17,7 +17,6 @@ const SHINE_REASON =
 export function Slots({ state }: { state: ServerState }) {
   const settings = useSettings();
   const res = useResource(reservedSlots);
-  const hasLua = state.luaVersion !== null;
   const shineOwns = state.shine?.reservedSlots === true;
   const data = res.data;
   const refresh = [reservedSlots];
@@ -35,7 +34,7 @@ export function Slots({ state }: { state: ServerState }) {
   const amountValue = Number(amount);
   const amountValid = amount.trim() !== "" && Number.isInteger(amountValue)
     && amountValue >= 0
-    && (state.maxPlayers === null || shineOwns || amountValue <= state.maxPlayers);
+    && (shineOwns || amountValue <= state.maxPlayers);
   const parsedId = parseSteamId(idInput);
   const cleanName = slotName(name);
   const existing = data?.slots.find((s) => s.name === cleanName && cleanName !== "");
@@ -49,7 +48,7 @@ export function Slots({ state }: { state: ServerState }) {
 
   const run = async (command: string) => {
     setBusy(true);
-    const outcome = await sendCommand(command, hasLua, refresh);
+    const outcome = await sendCommand(command, refresh);
     setBusy(false);
     return outcome;
   };
@@ -129,16 +128,6 @@ export function Slots({ state }: { state: ServerState }) {
           </p>
         </div>
       )}
-      {!hasLua && (
-        <div class="banner">
-          <h2>Stock server Lua</h2>
-          <p>
-            Changes are sent unverified. On the stock Lua a removed slot is
-            not saved to disk until something else saves the slot config, so
-            a restart before then brings it back. The panel Lua fixes that.
-          </p>
-        </div>
-      )}
       {data && !data.configured && !shineOwns && (
         <div class="banner">
           <h2>No reserved-slot config</h2>
@@ -156,9 +145,7 @@ export function Slots({ state }: { state: ServerState }) {
             Reserved
             <span class="read-field-value slot-count">
               {current === null ? "--" : current}
-              {state.maxPlayers !== null && (
-                <span class="muted">of {state.maxPlayers} player slots</span>
-              )}
+              <span class="muted">of {state.maxPlayers} player slots</span>
             </span>
           </div>
           <label>
@@ -175,7 +162,7 @@ export function Slots({ state }: { state: ServerState }) {
         </div>
         {amount.trim() !== "" && !amountValid && (
           <p class="muted form-hint">
-            {state.maxPlayers !== null && amountValue > state.maxPlayers
+            {amountValue > state.maxPlayers
               ? `At most ${state.maxPlayers}: the server ignores anything above its player limit, without a word.`
               : "A whole number, 0 or more."}
           </p>

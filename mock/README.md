@@ -42,15 +42,18 @@ the 2012 panel and the faithfulness test need.
 
 ### `--mod`: a server running this repo's Lua
 
-On a stock server the mod's request types fall through to the state blob,
-which is what a panel pointed at the wrong server sees. `--mod` adds them:
+What the panel needs. Without `--mod` the mock is the 2012 file, kept for
+`mock-acceptance.py` and seeded from `fixtures/legacy/`. With it, the 2012
+file's `getbanlist`, `getperfdata`, `setreservedslotamount` and
+`command=Send` fall through to the state blob, as in the Lua, and these are
+added:
 
 | | |
 | --- | --- |
-| `lua_version`, `max_players` (16), `map_loaded_at` | In the state blob. `map_loaded_at` is `getperf`'s `loaded_at`. |
-| `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the panel's `index.html` from `--web` (or `fixtures/root-mod.html` without one) and anything else the state blob; any other path, the panel too. |
+| `max_players` (16), `map_loaded_at`, `ranking_active` | In the state blob, which drops `webdomain` and `webport`. `map_loaded_at` is `getperf`'s `loaded_at`. |
+| `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the panel's `index.html` from `--web` (or `fixtures/root-fallback.html` without one) and anything else the state blob; any other path, the panel too. |
 | `runcommand` | What a command printed, as `Shared.CaptureConsoleCommand` returns it, tagged `audit` or `server`; `dispatched` is the audit line. The lines reach the log too. |
-| `getchatlist` | With `since`, a ring of 200 with times (the game's, after the ns2-game PR); without, the stock 20. Both empty at `sv_changemap`, ids from 1. |
+| `getchatlist` | A ring of 200 with times, from `since` (0 when absent). Empty at `sv_changemap`, ids from 1. |
 | `getbans` | The bans in force, from Shine's table under `--shine`, vanilla's otherwise. |
 | `getrecentplayers` | The synthetic `fixtures/getrecentplayers.json` moved to now, plus the humans connected. A kick, ban or map change leaves a player listed, not connected. With `--shine`, an `sh_banid` of an absent listed player is stored under their name. |
 | `getmapcycle` | Reads the file. Stock answers from the copy loaded with the map, so a hand edit (`/__mock/cycle-file`) shows only with `--mod` (CONSTRAINTS item 13). |

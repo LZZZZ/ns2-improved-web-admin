@@ -28,35 +28,6 @@ export function Log({ state, onOpenSettings }: {
   state: ServerState;
   onOpenSettings: () => void;
 }) {
-  if (state.luaVersion === null) {
-    return (
-      <section class="wrap">
-        <div class="banner">
-          <h2>This server cannot serve its log or command output</h2>
-          <p>
-            The stock web interface has no way to read <code>log-Server.txt</code>,
-            and runs a command only to answer with the ordinary server state, so
-            a kick that worked and one that matched nobody look the same. There
-            is nothing for this tab to show, and no command line it could
-            honour. Commands can still be sent from the Players tab, reported
-            as unverified because that is all that is true.
-          </p>
-          <p>
-            Run this panel's <code>ServerWebInterface.lua</code> on the server
-            and this tab shows the log as the engine writes it, and runs
-            commands with their output.
-          </p>
-        </div>
-      </section>
-    );
-  }
-  return <LogView state={state} onOpenSettings={onOpenSettings} />;
-}
-
-function LogView({ state, onOpenSettings }: {
-  state: ServerState;
-  onOpenSettings: () => void;
-}) {
   const settings = useSettings();
   const log = useLog();
   const hidden = useMemo(() => new Set(settings.logHiddenKinds), [settings.logHiddenKinds]);
@@ -165,11 +136,9 @@ function LogView({ state, onOpenSettings }: {
             <Download size={14} aria-hidden="true" /> Save
           </button>
         )}
-        {state.mapLoadedAt !== null && (
-          <span class="muted console-map" title="When the current map loaded, as the server says">
-            Last map change: <b>{dateTime(state.mapLoadedAt / 1000)}</b>
-          </span>
-        )}
+        <span class="muted console-map" title="When the current map loaded, as the server says">
+          Last map change: <b>{dateTime(state.mapLoadedAt / 1000)}</b>
+        </span>
       </div>
 
       {paused && (

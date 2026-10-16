@@ -6,8 +6,6 @@ expired, offered an Unban that could never match, and on a Shine server it
 had no idea whose list it was showing. So the checks are about what the tab
 claims, per kind of server:
 
-  * stock      expired bans hidden, Unban disabled with its reason, a ban
-               reported as unverified
   * --mod      a ban reports what the server printed, an unban that removed
                something says it printed nothing, an unban of a ban that is
                already gone says so, Steam ids parse from any common form
@@ -15,8 +13,6 @@ claims, per kind of server:
                permanent, bans and unbans sent as sh_banid / sh_unban (a
                vanilla sv_ban of an absent id is a phantom ban there), and the
                Players tab's Ban 24h going the same way
-  * stock + Shine   the list arrives in a new order on every poll; the rows
-               must not move
 
 and on all of them: Steam ids masked until asked, `;` never reaching the
 command line, no uncaught exceptions, nothing fetched from a third party.
@@ -24,19 +20,15 @@ command line, no uncaught exceptions, nothing fetched from a third party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
     node mock/server.js --port 8096 --web web --mod --shine
-    node mock/server.js --port 8098 --web web --shine
 """
 import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
-STOCK_SHINE = os.environ.get("STOCK_SHINE_URL", "http://127.0.0.1:8098")
 PORT = 9228
 
 ROWS = "document.querySelectorAll('.bans-table tbody tr[data-steamid]')"
@@ -117,41 +109,13 @@ async def common(c, base):
           not any(i and i in str(masked) for i in ids), str(masked)[:40])
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    reset(STOCK)
-    await open_tab(c, STOCK, "Bans")
-    raw = http(STOCK, {"request": "getbanlist"})
-    check("the stock server still lists an expired ban", len(raw) == 1, f"{len(raw)} listed")
-    check("the tab hides it", await c.eval(f"{ROWS}.length") == 0,
-          str(await c.eval("document.querySelector('.bans-count').textContent")))
-    banner = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
-                              ".map(h=>h.textContent).join('|')"))
-    check("stock banner is shown", "Stock server Lua" in banner, banner)
-
-    await ban_via_form(c, "99999991", reason="evil; sv_cheats 1")
-    cmd, note = await last_activity(c)
-    check("a ban is sent as sv_ban", cmd.startswith("sv_ban 99999991 1440 "), cmd)
-    check("`;` never reaches the command line", ";" not in cmd, cmd)
-    check("and is reported as unverified, not as success",
-          "unverified" in note.lower() and "success" not in note.lower(), note[:60])
-    await asyncio.sleep(1)
-    button = await c.eval("document.querySelector('.bans-table tr[data-steamid=\"99999991\"] .unban')"
-                          "?.disabled")
-    check("the new ban is listed, with Unban disabled", button is True)
-    reason = await c.eval("document.querySelector('.bans-table tr[data-steamid=\"99999991\"] .unban')"
-                          "?.title||''")
-    check("and the button says why", "too old to unban" in str(reason), str(reason)[:50])
-    await common(c, STOCK)
-
-
 async def mod(c):
     print(f"\n== --mod ({MOD})")
     reset(MOD)
     await open_tab(c, MOD, "Bans")
     banner = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
                               ".map(h=>h.textContent).join('|')"))
-    check("no stock banner", "Stock server Lua" not in banner, banner or "(none)")
+    check("no banner", banner == "", banner)
     check("says whose list it is", "the game's ban list" in str(
         await c.eval("document.querySelector('.bans-count').textContent")))
 
@@ -238,24 +202,6 @@ async def shine(c):
           cmd.startswith("sh_banid ") and " 1440 WebUI" in cmd, cmd)
 
 
-async def stock_shine(c):
-    print(f"\n== stock server running Shine ({STOCK_SHINE})")
-    reset(STOCK_SHINE)
-    orders = {",".join(b["id"] for b in http(STOCK_SHINE, {"request": "getbanlist"}))
-              for _ in range(6)}
-    check("the server's own order changes between calls", len(orders) > 1,
-          f"{len(orders)} orders in 6 calls")
-    await open_tab(c, STOCK_SHINE, "Bans")
-    first = await row_ids(c)
-    await asyncio.sleep(11)      # past one 10 s poll
-    await c.eval("document.querySelector('.statusbar .btn').click()")
-    await asyncio.sleep(1)
-    check("the rows do not move across polls", await row_ids(c) == first, str(first))
-    six = await c.eval("document.querySelector('.bans-table tr[data-steamid=\"10000011\"]')"
-                       "?.querySelector('.expires-cell').textContent||''")
-    check("6e+24 reads Permanent on the stock path too", six == "Permanent", str(six))
-
-
 async def main():
     proc, _ = launch_chrome(port=PORT)
     try:
@@ -268,17 +214,15 @@ async def main():
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.setItem('webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
-            await stock(c)
             await mod(c)
             await shine(c)
-            await stock_shine(c)
 
             print("\n== every server")
             exceptions = [e for e in c.events if e["method"] == "Runtime.exceptionThrown"]
             check("no uncaught exceptions", not exceptions, str(len(exceptions)))
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]
-            ours = (STOCK, MOD, SHINE, STOCK_SHINE)
+            ours = (MOD, SHINE)
             foreign = sorted({u for u in urls if not u.startswith(ours)})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))

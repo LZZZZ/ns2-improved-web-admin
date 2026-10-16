@@ -115,19 +115,16 @@ export function Players({ state }: { state: ServerState }) {
 
   const act = (command: string, confirmText?: string) => {
     if (confirmText && !confirm(confirmText)) return;
-    // With the panel Lua the result comes back with the command; without it,
-    // nothing does. sendCommand says which, rather than assuming.
-    void sendCommand(command, state.luaVersion !== null);
+    void sendCommand(command);
   };
 
   const canMute = state.shine?.baseCommands === true;
-  const showShared = state.players.some((p) => p.familyShared !== null);
-  // The panel Lua sends skill; a stock server does not, and gets no column.
+  // No column when nobody has a skill, as on a server without Hive.
   const showSkill = state.players.some((p) => p.skill !== null);
   const columns = COLUMNS.filter((c) => c.key !== "skill" || showSkill);
   const tableWidth = NAME_MIN_WIDTH
     + columns.reduce((sum, c) => sum + (c.width ?? 0), 0)
-    + (showShared ? WIDTH.shared : 0)
+    + WIDTH.shared
     + WIDTH.steamId + WIDTH.ip + WIDTH.actions;
 
   return (
@@ -198,7 +195,7 @@ export function Players({ state }: { state: ServerState }) {
                     {columns.map((c) => (
                       <col key={c.key} style={c.width ? `width: ${c.width}px` : undefined} />
                     ))}
-                    {showShared && <col style={`width: ${WIDTH.shared}px`} />}
+                    <col style={`width: ${WIDTH.shared}px`} />
                     <col style={`width: ${WIDTH.steamId}px`} />
                     <col style={`width: ${WIDTH.ip}px`} />
                     <col style={`width: ${WIDTH.actions}px`} />
@@ -219,7 +216,7 @@ export function Players({ state }: { state: ServerState }) {
                           {sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
                         </th>
                       ))}
-                      {showShared && <th class="static" title={SHARED_TITLE}>Shared</th>}
+                      <th class="static" title={SHARED_TITLE}>Shared</th>
                       <th class="static">Steam id</th>
                       <th class="static">IP</th>
                       <th class="static">Actions</th>
@@ -241,26 +238,24 @@ export function Players({ state }: { state: ServerState }) {
                         <td class="num">{p.deaths}</td>
                         <td class="num">{Math.round(p.resources)}</td>
                         <td class="num">{p.ping}</td>
-                        {showShared && (
-                          <td class="shared-cell">
-                            {p.familyShared ? (
-                              <span class="icon-row">
-                                <StatusIcon icon={Users} label="shared copy" tone="warn"
-                                            title="playing a Family Shared copy" />
-                                {p.ownerSteamId !== null && (
-                                  <span class="owner-id">
-                                    owner{" "}
-                                    <Masked
-                                      value={String(p.ownerSteamId)}
-                                      masked={maskSteamId(p.ownerSteamId)}
-                                      label="owner's Steam id"
-                                    />
-                                  </span>
-                                )}
-                              </span>
-                            ) : <span class="muted">--</span>}
-                          </td>
-                        )}
+                        <td class="shared-cell">
+                          {p.familyShared ? (
+                            <span class="icon-row">
+                              <StatusIcon icon={Users} label="shared copy" tone="warn"
+                                          title="playing a Family Shared copy" />
+                              {p.ownerSteamId !== null && (
+                                <span class="owner-id">
+                                  owner{" "}
+                                  <Masked
+                                    value={String(p.ownerSteamId)}
+                                    masked={maskSteamId(p.ownerSteamId)}
+                                    label="owner's Steam id"
+                                  />
+                                </span>
+                              )}
+                            </span>
+                          ) : <span class="muted">--</span>}
+                        </td>
                         <td>
                           {p.isBot
                             ? <span class="muted mono">--</span>

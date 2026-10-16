@@ -1,13 +1,9 @@
-import { runCommand, sendLegacyCommand } from "../api/client";
+import { runCommand } from "../api/client";
 import type { ServerState } from "../api/types";
 import { record } from "../ui/activity";
 import { consoleArg, slotName } from "../ui/format";
 import type { Resource } from "./poll";
 import { serverState } from "./resources";
-
-/** What the panel can truthfully say after sending a command to a stock server. */
-const UNVERIFIED =
-  "sent. This server returns no command output, so the result is unverified.";
 
 // Shine ends every command it runs with this receipt. Like the vanilla audit
 // line it proves the command ran, and it repeats the command line, so it is
@@ -15,14 +11,9 @@ const UNVERIFIED =
 const kShineReceipt = /^Console\[N\/A\] ran command \S+ with arguments:/;
 
 /**
- * Send a console command and report exactly what is known about it.
+ * Send a console command and report what it printed.
  *
- * On a server carrying the panel Lua that is a real answer: the command's own
- * output comes back with it. On a stock server it is not, and the difference
- * is stated rather than smoothed over.
- *
- * Note what an empty result means on the panel Lua: the command ran and printed
- * nothing. That is the normal case for a kick that worked -- only the failure
+ * Note what an empty result means: the command ran and printed nothing. That is the normal case for a kick that worked -- only the failure
  * branch prints -- so it is reported as "no output", never as success.
  */
 export interface CommandOutcome {
@@ -35,7 +26,6 @@ export interface CommandOutcome {
 
 export async function sendCommand(
   command: string,
-  hasLua: boolean,
   /** Lists the command may have changed, re-read once it has run. */
   refresh: Resource<unknown>[] = [],
 ): Promise<CommandOutcome> {
@@ -47,28 +37,22 @@ export async function sendCommand(
 
   try {
     let outcome: CommandOutcome;
+    const result = await runCommand(command);
 
-    if (hasLua) {
-      const result = await runCommand(command);
-
-      const receipt = result.lines.some((l) => kShineReceipt.test(l.text));
-      const output = result.lines.filter((l) =>
-        l.src !== "audit" && !kShineReceipt.test(l.text));
-      if (output.length > 0) {
-        outcome = finish(output.map((l) => l.text).join(" | "), "sent",
-          output.map((l) => l.text));
-      } else if (result.dispatched || receipt) {
-        // The ordinary case for a command that worked: only failure branches
-        // print. Said plainly, and not dressed up as success.
-        outcome = finish("ran, and printed nothing.", "sent");
-      } else {
-        outcome = finish(
-          "is not an admin command. Either a plain console command, or no "
-          + "such command -- the server does not distinguish the two.", "error");
-      }
+    const receipt = result.lines.some((l) => kShineReceipt.test(l.text));
+    const output = result.lines.filter((l) =>
+      l.src !== "audit" && !kShineReceipt.test(l.text));
+    if (output.length > 0) {
+      outcome = finish(output.map((l) => l.text).join(" | "), "sent",
+        output.map((l) => l.text));
+    } else if (result.dispatched || receipt) {
+      // The ordinary case for a command that worked: only failure branches
+      // print. Said plainly, and not dressed up as success.
+      outcome = finish("ran, and printed nothing.", "sent");
     } else {
-      await sendLegacyCommand(command);
-      outcome = finish(UNVERIFIED, "sent");
+      outcome = finish(
+        "is not an admin command. Either a plain console command, or no "
+        + "such command -- the server does not distinguish the two.", "error");
     }
 
     // Re-read the state so the tables reflect whatever did happen. This is a
@@ -86,8 +70,7 @@ export async function sendCommand(
 // vanilla sv_ban of an id that is not connected prints "has been banned" and
 // lands only in the vanilla list, which nothing enforces -- a phantom ban
 // (docs/CONSTRAINTS.md, "Shine"). So Shine's own commands are used whenever
-// the server says Shine owns the job. A stock server cannot say, and gets the
-// vanilla commands.
+// the server says Shine owns the job.
 
 /** Ban an id for `minutes` (0 is permanent). Kicks the player if connected. */
 export function banCommand(state: ServerState, steamId: number, minutes: number,
@@ -103,8 +86,7 @@ export function unbanCommand(state: ServerState, steamId: number): string {
 
 /**
  * Set the reserved slot count. sv_reserved_slots, not the
- * setreservedslotamount request: the command works on a stock server too, and
- * it says what it did.
+ * setreservedslotamount request: the command says what it did.
  */
 export function slotAmountCommand(state: ServerState, amount: number): string {
   const n = Math.max(0, Math.round(amount));

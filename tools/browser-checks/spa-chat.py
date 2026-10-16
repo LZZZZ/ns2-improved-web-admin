@@ -13,10 +13,6 @@ the server cannot keep:
                the chat itself; nothing is shown twice; a flood larger than the ring
                is reported as dropped; a map change restarts the numbering
                and the tab says so
-  * stock      reads the whole 20-entry list, without a cursor, and says that
-               it is all a stock server keeps and that it has no times;
-               a message sent is confirmed by reading the chat back, the
-               one receipt a stock server gives
   * --shine    sv_say becomes Shine's sh_say, which prints only Shine's
                receipt: the tab still confirms it from the chat; a gagged
                player's chat never arrives
@@ -28,18 +24,14 @@ party.
 Start the mocks first:
 
     (cd panel && npx vite build)
-    node mock/server.js --port 8095 --web web
     node mock/server.js --port 8094 --web web --mod
-    node mock/server.js --port 8101 --web web --no-chat-buffer
     node mock/server.js --port 8096 --web web --mod --shine
 """
 import asyncio, json, os, sys, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
-NOCHAT = os.environ.get("NOCHAT_URL", "http://127.0.0.1:8101")
 SHINE = os.environ.get("SHINE_URL", "http://127.0.0.1:8096")
 PORT = 9235
 TAB = "Chat"
@@ -145,7 +137,6 @@ async def mod(c):
     check("the tab is reachable", await c.eval("!!document.querySelector('.chat')"))
     status = str(await c.eval("document.querySelector('.chat-tab .toolbar').textContent"))
     check("the ring size is not shown", "keeps the last" not in status, status[:60])
-    check("no stock-server note", not await c.eval("!!document.querySelector('.chat-stock')"))
     got = await texts(c)
     check("what the server holds is shown", "Test message as a player" in got,
           f"{len(got)} messages")
@@ -201,33 +192,6 @@ async def mod(c):
     check("and the new map's chat is shown", "new map" in await texts(c))
 
 
-async def stock(c):
-    print(f"\n== stock server ({STOCK})")
-    control(STOCK, "reset")
-    mark = len(c.events)
-    await open_tab(c, STOCK)
-
-    note = str(await c.eval("document.querySelector('.chat-stock')?.textContent||''"))
-    check("says a stock server keeps only 20, without times",
-          "last 20 messages" in note and "no" in note and "times" in note, note[:70])
-    got = await texts(c)
-    check("the server's messages are shown", "Test message as a player" in got,
-          f"{len(got)} messages")
-    first = await line_with(c, "Test message as a player")
-    check("with no time it does not have", first and not first["time"], first)
-    urls = chat_requests(c, mark)
-    check("and read without a cursor", urls and not any("since=" in u for u in urls),
-          f"{len(urls)} reads")
-    m = len(c.events)
-    note = await send(c, "2", "aliens only")
-    check("a message sent goes out, and once read back no note is left",
-          "sv_tsay 2 aliens only" in sent(c, m) and note == "", note[-60:])
-    await asyncio.sleep(2.5)
-    seen = await ids(c)
-    check("re-reading the whole list shows nothing twice",
-          len(seen) == len(set(seen)), f"{len(seen)} lines")
-
-
 async def shine(c):
     print(f"\n== Shine with basecommands ({SHINE})")
     control(SHINE, "reset")
@@ -244,16 +208,6 @@ async def shine(c):
           "you cannot hear me" not in got and "but me you can" in got)
 
 
-async def nochat(c):
-    print(f"\n== a server with no chat buffer ({NOCHAT})")
-    await open_tab(c, NOCHAT)
-    banner = str(await c.eval("[...document.querySelectorAll('.banner h2')]"
-                              ".map(h=>h.textContent).join('|')"))
-    check("the tab explains itself", "keeps no chat" in banner, banner[:60])
-    check("and offers nothing it cannot read",
-          not await c.eval("!!document.querySelector('.chat')"))
-
-
 async def main():
     proc, _ = launch_chrome(port=PORT)
     try:
@@ -266,16 +220,14 @@ async def main():
                                 # reopened: start every page load from the defaults.
                                 "try { localStorage.setItem('webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await mod(c)
-            await stock(c)
             await shine(c)
-            await nochat(c)
 
             print("\n== every server")
             exceptions = [e for e in c.events if e["method"] == "Runtime.exceptionThrown"]
             check("no uncaught exceptions", not exceptions, str(len(exceptions)))
             urls = [e["params"]["request"]["url"] for e in c.events
                     if e["method"] == "Network.requestWillBeSent"]
-            foreign = sorted({u for u in urls if not u.startswith((STOCK, MOD, NOCHAT, SHINE))})
+            foreign = sorted({u for u in urls if not u.startswith((MOD, SHINE))})
             check("every request went to the game server", not foreign,
                   f"{len(urls)} requests" + (f", foreign: {foreign}" if foreign else ""))
     finally:

@@ -79,25 +79,25 @@ end
 -- 1. A search starts, loads, settles, and is cached.
 do
     local vm = NewVM()
-    local _, r = vm.request({ request = "getmods", searchtext = "combat", p = "1" })
+    local _, r = vm.request({ request = "getmods", searchtext = "combat" })
     check(r.loading == true and r.elapsed == 0, "first call answers loading")
     check(#vm.searches == 1 and vm.searches[1].text == "combat" and vm.searches[1].page == 1,
           "and starts one search")
     vm.now = 2
-    _, r = vm.request({ request = "getmods", searchtext = "combat", p = "1" })
+    _, r = vm.request({ request = "getmods", searchtext = "combat" })
     check(r.loading == true and r.elapsed == 2 and #vm.searches == 1,
           "a poll while running reports elapsed and starts nothing")
     vm.searches[1].callback(hits(50))
-    _, r = vm.request({ request = "getmods", searchtext = "combat", p = "1" })
-    check(r.done == true and r.count == 50 and #r.items == 50 and r.capped == true
-          and r.page == 1, "a settled search: done, 50 items, capped")
+    _, r = vm.request({ request = "getmods", searchtext = "combat" })
+    check(#r.items == 50 and r.capped == true and r.loading == nil,
+          "a settled search: 50 items, capped")
     check(r.items[1].id == "ca84f209", "ids hex-encoded, above 2^31 too")
     check(r.loading == nil, "no loading key once settled (the 2012 panel stops)")
     vm.now = 61.9   -- settled at 2
-    _, r = vm.request({ request = "getmods", searchtext = "combat", p = "1" })
-    check(r.done == true and #vm.searches == 1, "cached for 60 s from the answer")
+    _, r = vm.request({ request = "getmods", searchtext = "combat" })
+    check(r.items and #vm.searches == 1, "cached for 60 s from the answer")
     vm.now = 62
-    _, r = vm.request({ request = "getmods", searchtext = "combat", p = "1" })
+    _, r = vm.request({ request = "getmods", searchtext = "combat" })
     check(r.loading == true and #vm.searches == 2, "then searches again")
 end
 
@@ -107,17 +107,16 @@ do
     vm.request({ request = "getmods", searchtext = "nomatch" })
     vm.searches[1].callback({ })
     local _, r, body = vm.request({ request = "getmods", searchtext = "nomatch" })
-    check(r.done == true and r.count == 0 and r.error == nil and r.capped == false,
-          "empty: done, count 0, no error")
+    check(#r.items == 0 and r.error == nil and r.capped == false, "empty: no items, no error")
     check(body:find('"items":%[%]') ~= nil, "empty items encodes as []")
     vm.request({ request = "getmods", searchtext = "few" })
     vm.searches[2].callback(hits(6))
     _, r = vm.request({ request = "getmods", searchtext = "few" })
-    check(r.count == 6 and r.capped == false, "six hits: not capped")
+    check(#r.items == 6 and r.capped == false, "six hits: not capped")
     vm.request({ request = "getmods", searchtext = "nil" })
     vm.searches[3].callback(nil)
     _, r = vm.request({ request = "getmods", searchtext = "nil" })
-    check(r.done == true and r.count == 0, "a nil answer reads as empty")
+    check(r.items and #r.items == 0, "a nil answer reads as empty")
 end
 
 -- 3. A search with no answer times out once, then starts afresh.
@@ -129,8 +128,8 @@ do
     check(r.loading == true, "still loading at 29.9 s")
     vm.now = 30
     _, r = vm.request({ request = "getmods", searchtext = "slow" })
-    check(r.done == true and type(r.error) == "string" and r.error:find("30 s")
-          and #r.items == 0 and r.loading == nil, "at 30 s: done, with the error")
+    check(type(r.error) == "string" and r.error:find("30 s")
+          and #r.items == 0 and r.loading == nil, "at 30 s: settled, with the error")
     check(#vm.searches == 1, "and the timeout itself starts nothing")
     _, r = vm.request({ request = "getmods", searchtext = "slow" })
     check(r.loading == true and #vm.searches == 2, "the next request starts a fresh search")
@@ -140,27 +139,17 @@ do
     check(r.loading == true, "a late answer to the abandoned search is ignored")
     vm.searches[2].callback(hits(5))
     _, r = vm.request({ request = "getmods", searchtext = "slow" })
-    check(r.count == 5, "the fresh search's answer is the one used")
+    check(r.items and #r.items == 5, "the fresh search's answer is the one used")
 end
 
--- 4. Parameters vanilla mishandled.
+-- 4. Parameters.
 do
     local vm = NewVM()
     local _, r = vm.request({ request = "getmods" })
     check(r.loading == true and #vm.searches == 1 and vm.searches[1].text == "",
           "no searchtext searches for everything instead of never starting")
-    _, r = vm.request({ request = "getmods", searchtext = "combat", p = "abc" })
-    check(r and r.loading == true and vm.searches[2].page == 1, "p=abc reads as page 1")
-    for _, p in ipairs({ "0", "-3", "inf", "nan", "1e300" }) do
-        vm.request({ request = "getmods", searchtext = "p" .. p, p = p })
-        check(vm.searches[#vm.searches].page == 1, "p=" .. p .. " reads as page 1")
-    end
-    vm.request({ request = "getmods", searchtext = "combat", p = "2.7" })
-    check(vm.searches[#vm.searches].page == 2, "p=2.7 reads as page 2")
-    vm.request({ request = "getmods", searchtext = "a", p = "11" })
-    local n = #vm.searches
-    vm.request({ request = "getmods", searchtext = "a1", p = "1" })
-    check(#vm.searches == n + 1, "\"a\" page 11 and \"a1\" page 1 are separate searches")
+    vm.request({ request = "getmods", searchtext = "combat", p = "2" })
+    check(vm.searches[#vm.searches].page == 1, "always page 1: the engine ignores it")
 end
 
 -- 5. installmod refuses what the engine would drop or misread.

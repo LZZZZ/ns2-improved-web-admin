@@ -1,10 +1,8 @@
 // What the panel has done, and what it can honestly say about the result.
 //
-// Every command sent from the panel lands here. On a stock server the entry
-// says the result is unverified, because it is: the reply to a command is the
-// ordinary state blob, built before the command's effect lands. The 2012
-// panel's timed refresh, which implied success it never checked, is the thing
-// this exists to not repeat.
+// Every command sent from the panel lands here, with what the server said it
+// did. The 2012 panel's timed refresh, which implied success it never
+// checked, is the thing this exists to not repeat.
 //
 // The full list is the Activity tab's. The tab a command was sent from shows
 // its own latest one in a single line, so an entry remembers the tab that was

@@ -5,7 +5,7 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
 (CURRENT-UI defect 2). So the checks are about the data as much as the chart:
 
   * nothing is polled before the tab opens, or after it closes
-  * on the mod, getperf is read with a cursor and the page holds exactly the
+  * getperf is read with a cursor and the page holds exactly the
     windows the server served -- none twice; a history longer than a reply's
     60 is fetched page after page at once, not one page a poll
   * the y axis follows the configured tickrate (the mock runs 60, not 30)
@@ -15,8 +15,6 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
   * drag-to-zoom zooms every chart, and hovering one shows the same moment in
     the others
   * a theme switch rebuilds the charts cleanly
-  * on a stock server only getperfdata is asked, and a refresh replaces the
-    window instead of appending to it
   * nothing is fetched from anywhere but the server
   * tickrate, the slowest tick, score and players are four lines on one
     chart with one unitless axis (F1, as settled on the rig), the units in
@@ -29,13 +27,11 @@ The 2012 tab drew, and drew wrong: every poll re-appended the whole window
     bwlimit that fixes it; the engine's bwlimit warning is shown; a map
     change keeps the earlier lines; turning it off is confirmed the same way
   * no table view and no history line (Performance review, 2026-10-08)
-  * a stock server shows no tickstat switch
 
 Start the mocks first:
 
     (cd panel && npx vite build)
     node mock/server.js --port 8094 --web web --mod --perf-window 2
-    node mock/server.js --port 8095 --web web
 """
 import asyncio, json, os, sys, urllib.request
 from urllib.parse import parse_qs, urlparse
@@ -43,7 +39,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cdp import CDP, launch_chrome, page_target
 
 MOD = os.environ.get("MOD_URL", "http://127.0.0.1:8094")
-STOCK = os.environ.get("STOCK_URL", "http://127.0.0.1:8095")
 PORT = 9231
 
 results = []
@@ -294,8 +289,7 @@ async def tickstat_checks(c):
 
 
 async def main():
-    for base in (MOD, STOCK):
-        get(f"{base}/__mock/reset")
+    get(f"{MOD}/__mock/reset")
 
     proc, _ = launch_chrome(port=PORT)
     try:
@@ -453,50 +447,18 @@ async def main():
             await tickstat_checks(c)
 
             exceptions = c.take_events("Runtime.exceptionThrown")
-            stock_mark = len(c.events)
-            check("no uncaught exceptions on the mod", not exceptions,
+            check("no uncaught exceptions", not exceptions,
                   [e["params"]["exceptionDetails"].get("text", "") for e in exceptions][:2])
 
-            print("\n== against a stock server")
-            await c.send("Page.navigate", url=STOCK + "/index.html")
-            await asyncio.sleep(3.5)
-            mark = len(c.events)
-            await open_tab(c, STOCK, "Performance")
-            await asyncio.sleep(1)
-            banners = str(await c.eval(
-                "[...document.querySelectorAll('.banner h2')].map(e=>e.textContent).join(' | ')"))
-            check("the tab explains the one-a-minute readings", "one reading a minute" in banners,
-                  banners[-40:])
-            check("two charts on stock",
-                  await c.eval("document.querySelectorAll('.perf-chart').length") == 2)
-            check("no engine section on stock",
-                  await c.eval("document.querySelector('.perf-engine')") is None)
-            check("no tickstat switch on stock",
-                  not await c.eval("!!document.querySelector('input[name=tickstat]')"))
-            for _ in range(3):
-                # Coming back to the tab reads again (stock polls once a minute).
-                await open_tab(c, STOCK, "Settings")
-                await open_tab(c, STOCK, "Performance")
-                await asyncio.sleep(0.6)
-            served = len(json.loads(get(f"{STOCK}/?request=getperfdata")))
-            rows = await window_points(c)
-            check("four reads later the window is replaced, not appended",
-                  rows == served, f"{rows} points, {served} served")
-            check("only getperfdata was asked", len(requests_of(c, "getperf", mark)) == 0
-                  and len(requests_of(c, "getperfdata", mark)) >= 4)
 
             third = []
             for e in c.events:
                 if e["method"] == "Network.requestWillBeSent":
                     url = e["params"]["request"]["url"]
-                    if not (url.startswith(MOD) or url.startswith(STOCK)
+                    if not (url.startswith(MOD)
                             or url.startswith("data:") or url == "about:blank"):
                         third.append(url)
             check("nothing fetched from a third party", not third, third[:2])
-            exceptions = [e for e in c.events[stock_mark:]
-                          if e["method"] == "Runtime.exceptionThrown"]
-            check("no uncaught exceptions on stock", not exceptions,
-                  [e["params"]["exceptionDetails"].get("text", "") for e in exceptions][:2])
     finally:
         proc.terminate()
 

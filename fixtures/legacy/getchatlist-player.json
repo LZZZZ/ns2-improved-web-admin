@@ -1,0 +1,50 @@
+[
+  {
+    "message": "webadmin-spa capture test",
+    "teamOnly": false,
+    "player": "Onosaurus",
+    "id": 1,
+    "team": 0,
+    "steamId": 0
+  },
+  {
+    "message": "Test message as a player",
+    "teamOnly": false,
+    "player": "Skulkovich",
+    "id": 2,
+    "team": 1,
+    "steamId": 10000000
+  },
+  {
+    "message": "Typing something in chat: 1/4",
+    "teamOnly": false,
+    "player": "Skulkovich",
+    "id": 3,
+    "team": 1,
+    "steamId": 10000000
+  },
+  {
+    "message": "Typing something in chat: 2/4",
+    "teamOnly": false,
+    "player": "Skulkovich",
+    "id": 4,
+    "team": 1,
+    "steamId": 10000000
+  },
+  {
+    "message": "Typing something in chat: 3/4",
+    "teamOnly": false,
+    "player": "Skulkovich",
+    "id": 5,
+    "team": 1,
+    "steamId": 10000000
+  },
+  {
+    "message": "Typing something in chat: 4/4",
+    "teamOnly": false,
+    "player": "Skulkovich",
+    "id": 6,
+    "team": 1,
+    "steamId": 10000000
+  }
+]
