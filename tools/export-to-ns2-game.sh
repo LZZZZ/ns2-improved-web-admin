@@ -38,8 +38,7 @@ API: openapi.yaml.
 MIT (LICENSE). Bundled libraries: ns2/web/THIRD-PARTY-LICENSES.txt.
 EOF
 
-# The API spec, without what points into this repo: fixture examples and
-# links to docs, fixtures and the mock.
+# The API spec, without its links to this repo's fixtures.
 python3 - "$here/docs/openapi.yaml" "$src/openapi.yaml" <<'PY'
 import re, sys, yaml
 src, out = sys.argv[1], sys.argv[2]
@@ -73,18 +72,6 @@ while i < len(lines):
     kept.append(line)
     i += 1
 s = "\n".join(kept)
-
-for pattern, repl in [
-    (r"Machine-readable companion to \[API\.md\]\(API\.md\)\. (Read from.*?needs\)\.).*?check-openapi\.py`\.", r"\1"),
-    (r", CONSTRAINTS item \d+", ""),
-    (r"\s*\((?:CONSTRAINTS|REQUIREMENTS|SERVER-COST)[^)]*\)", ""),
-    (r"; see REQUIREMENTS\.md item \d+\.", "."),
-    (r"\s*(?:See\s+)?(?:CONSTRAINTS|REQUIREMENTS)\.md[^.]*\.", ""),
-    (r"\s*--\s*develop against `mock/server\.js`", ""),
-    (r"\s*Live captures must never be committed.*?`0\.0\.0\.0`\.", ""),
-    (r"\s*Redacted in the fixtures\.", ""),
-]:
-    s = re.sub(pattern, repl, s, flags=re.S)
 
 left = re.findall(r".*(?:\.md\b|CONSTRAINTS|REQUIREMENTS|fixtures|mock/|externalValue|x-fixtures).*", s)
 assert not left, "openapi.yaml still points into this repo:\n" + "\n".join(left)

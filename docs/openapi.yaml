@@ -5,45 +5,33 @@ info:
   version: "344+26-10-15"
   summary: The HTTP surface of the server web admin, as `ServerWebInterface.lua` implements it.
   description: |
-    Machine-readable companion to [API.md](API.md). Read from
-    `lua/ServerWebInterface.lua` and measured against a server on the beta
-    engine (10-12 or later, which the Lua needs). Every schema here is checked
-    against the committed captures in `fixtures/` by `tools/check-openapi.py`.
+    Implemented by `ServerWebInterface.lua`. Needs the 10-12 beta engine or
+    later.
 
-    ## One endpoint, not a REST API
+    ## One endpoint
 
-    There are no REST paths, verbs or status codes. Every call is a `GET` or
-    `POST` to `/`, and the action is chosen by the `request` parameter. The
-    Lua handler is `OnWebRequest(actions, request)`: `actions` is the query
-    string of a `GET`, or the form body of a `POST` (whose query string is
-    dropped; measured on 09-26), and `request` the path, method and headers.
+    Every call is a `GET` or `POST` to `/`, and the `request` parameter picks
+    the action. A `GET` takes its parameters from the query string, a `POST`
+    from its form body; a `POST`'s query string is ignored.
 
-    OpenAPI keys operations by path, which this API does not vary, so each
-    action below is keyed by a URL fragment naming its `request` value:
+    OpenAPI keys operations by path, so each action here is keyed by a URL
+    fragment naming its `request` value:
 
         /#request=getbans   ->   GET /?request=getbans
 
-    The fragment is documentation, not part of the wire format. The real path
-    is always `/`, and each operation pins its action with a `const` on the
-    `request` parameter. `x-request` on each operation carries the same value
-    for tooling.
+    The fragment is not part of the wire format. `x-request` on each
+    operation carries the same value.
 
-    ## Consequences worth knowing before writing a client
+    ## For clients
 
-    - **There is no 404.** A path that is not a file under the web root gets
-      the panel (`/#no-parameters`), and an unknown `request` value gets the
-      server-state blob, both with `200`. Never use the status code to detect
-      a missing asset or a typo.
-    - **Method is not enforced.** Every write also works as a `GET` with query
-      parameters. Only `GET` and `POST` reach Lua at all; `PUT` and `DELETE`
-      are refused `405` by the engine's web server.
-    - **Reads and writes answer JSON**, a write saying what it did or why it
-      refused. `runcommand` returns what a console command printed.
-    - **Steam ids are numbers, mod ids hex strings.** `steamid` is a number in
-      server state and in the ban list, but mod ids are hex **strings**
-      everywhere. Do not parse mod ids as numbers.
-    - **Player rows carry full IP addresses** over plain HTTP. Mask by
-      default. Never commit a live capture.
+    - **No 404.** A path that is not a file under the web root gets the
+      panel (`getRoot`), and an unknown `request` value gets the server
+      state, both with `200`.
+    - **Method is not enforced.** Every write also works as a `GET`. `PUT`,
+      `DELETE`, `HEAD` and `OPTIONS` get `405` from the engine.
+    - **Replies are JSON.** A write says what it did or why it refused.
+    - **Steam ids are numbers, mod ids hex strings.**
+    - **Player rows carry full IP addresses**, over plain HTTP.
 
 servers:
   - url: http://{host}:{port}
@@ -63,13 +51,13 @@ tags:
   - name: server
     description: Server state and console commands.
   - name: players
-    description: Bans and reserved slots.
+    description: Bans, reserved slots and recent players.
   - name: chat
-    description: The in-game chat ring buffer.
+    description: The in-game chat history.
   - name: performance
     description: Performance windows and the engine's own reports.
   - name: maps
-    description: Map list and map cycle.
+    description: Map list, map cycle and Shine's mapvote.
   - name: mods
     description: Installed mods and workshop search.
   - name: static
@@ -83,27 +71,20 @@ paths:
     get:
       tags: [server]
       operationId: getRoot
-      summary: A request with no parameters at all
+      summary: A request with no parameters
       description: |
-        `/`, a path that is not a file (`/index.htm`, `/missing.png`), `/?`,
-        `/?foo` (a key with no `=` does not reach Lua) and a `POST` with an
-        empty body: the Lua sees an empty parameter table for all of them.
-        Since the 10-12 engine its hook also gets the request's `path`,
-        `method` and `headers` (names in lower case, never `authorization`
-        or `cookie`; measured 2026-10-12).
+        `/`, any path that is not a file, `/?`, `/?foo` (a key without `=`)
+        or a `POST` with an empty body.
 
-        At `/`, a browser (`Accept` naming `text/html`) gets the panel
-        itself, the Lua reading `web/index.html` (or, if it cannot, a page
-        whose meta refresh leads to `/index.html`); anything else gets the
-        state blob, which auto-shutdown scripts read. Any other path gets the
-        panel too (CONSTRAINTS item 6). A parameter with any value, even
-        empty (`?foo=`), is not this case. Lua returns only a type and
-        a body, so this cannot be an HTTP redirect or a `404`.
+        At `/`, a request whose `Accept` names `text/html` gets the panel,
+        anything else the server state. Any other path gets the panel. If
+        `web/index.html` cannot be read, the panel is a page that refreshes
+        to `/index.html`.
       responses:
         "200":
           description: >
-            The panel for a browser at `/` and for any other path, the state
-            blob for a script at `/`.
+            The panel for a browser at `/` and for any other path, the server
+            state for a script at `/`.
           content:
             text/html:
               schema: { type: string }
@@ -122,20 +103,15 @@ paths:
       tags: [server]
       operationId: getServerState
       x-request: json
-      summary: Full server state (the default response)
+      summary: Server state (the default response)
       description: |
-        `GetServerState()`. This is the **fallthrough**: any `request` value
-        that is not one of the fourteen below lands here, as does a request
-        with parameters but no `request`. The panel sends `request=json`,
-        which is one of the unmatched values. A request with no parameters at
-        all is the one exception: see `getRoot`.
+        `GetServerState()`. Also the answer to any `request` value not listed
+        here, and to parameters without `request`.
       parameters:
         - $ref: "#/components/parameters/RequestJson"
       responses:
         "200":
-          description: |
-            Server state. Rendered from live entities, so `uptime`,
-            `frame_rate` and `game_time` drift between any two samples.
+          description: Server state.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ServerState" }
@@ -162,8 +138,8 @@ paths:
       x-request: getreservedslots
       summary: Reserved slot count and the ids that hold them
       description: |
-        `GetReservedSlotData()`, `ServerAdminCommands.lua:595`. Returns `{}`
-        with neither key when the server has no reserved-slot config.
+        `GetReservedSlotData()`. `{}` when the server has no reserved-slot
+        config.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -190,22 +166,19 @@ paths:
       x-request: getchatlist
       summary: The chat, since a cursor
       description: |
-        The chat ring, `Server.recentChatMessages`: **200** entries
-        (`Server.lua`), each with its time. It holds every call to
-        `Server.AddChatToHistory` -- player chat, `sv_say`, `sv_tsay` and
-        Shine's `sh_say`.
+        `Server.recentChatMessages`: the last 200 entries, each with its
+        time. Holds player chat, `sv_say`, `sv_tsay` and Shine's `sh_say`.
 
         Poll with the previous reply's `last_id`. Ids restart from 1 at every
-        map change (the ring is Lua state), so a `last_id` below the cursor
-        means the map changed.
+        map change.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: since
           in: query
           required: false
           description: |
-            Return entries with an id greater than this. Omitted, or not a
-            number, reads as `0`: everything the ring still holds.
+            Return entries with an id greater than this. Missing or not a
+            number reads as `0`.
           schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200":
@@ -234,8 +207,8 @@ paths:
       x-request: getmaplist
       summary: Maps installed on the server
       description: |
-        `GetMapList()`. Every map the server can load, with the workshop mod
-        that provides it -- `"0"` for a stock map.
+        `GetMapList()`: every map the server can load, with the mod that
+        provides it (`"0"` for a stock map).
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -265,10 +238,8 @@ paths:
       x-request: getmapcycle
       summary: The current map cycle
       description: |
-        `config://MapCycle.json`, the file rotation reads, with mod ids
-        hex-encoded. The copy the game loaded with the map is used only when
-        the file is missing or does not parse, and is never mutated
-        (CONSTRAINTS items 12 and 13).
+        `config://MapCycle.json`, mod ids hex-encoded. If the file is missing
+        or does not parse, the cycle the map loaded with.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -301,21 +272,13 @@ paths:
       x-request: setmapcycle
       summary: Replace the map cycle
       description: |
-        The cycle arrives as a **JSON string in the `data` parameter** --
-        not as a JSON request body. Whole-document write: there is no way to
-        add or remove a single map. Read the cycle, modify it, send it back.
+        Replaces the whole cycle; there is no partial update. The cycle is a
+        JSON string in the `data` form field, not a JSON body.
 
-        It is checked first -- `maps` a non-empty list of names or `{map}`
-        objects, `time` a number >= 0, `mode` `order` or `random`, every mod
-        id hex or carrying `:` -- and refused with a reason and nothing
-        written. An accepted cycle has `ModIdsFromHex` applied to it and to
-        every map entry, is written by `MapCycle_SetMapCycle`, and the file is
-        read back and returned. Keys the check does not know (Shine's per-map
-        `min`, `max`, `chance`, top-level `groups`) pass through.
-
-        A 17-map cycle serialises to **263 bytes**, 249x under the 64 KB
-        request-body cap; the cap is not a practical constraint. Verified to
-        round-trip losslessly.
+        Refused, with nothing written, unless `maps` is a non-empty list of
+        names or `{map}` objects, `time` a number >= 0, `mode` `order` or
+        `random`, and every mod id hex or containing `:`. Other keys pass
+        through. The reply holds the file as read back after the write.
       requestBody:
         required: true
         content:
@@ -327,9 +290,7 @@ paths:
                 request: { const: setmapcycle }
                 data:
                   type: string
-                  description: |
-                    A `MapCycle` serialised with `JSON.stringify`. Mod ids must
-                    be hex strings, as `getmapcycle` returns them.
+                  description: A `MapCycle` as JSON, mod ids as hex strings.
                   contentMediaType: application/json
                   contentSchema: { $ref: "#/components/schemas/MapCycle" }
             example:
@@ -356,6 +317,38 @@ paths:
         "413": { $ref: "#/components/responses/BodyTooLarge" }
         "503": { $ref: "#/components/responses/Busy" }
 
+  "/#request=getmapvote":
+    get:
+      tags: [maps]
+      operationId: getMapVote
+      x-request: getmapvote
+      summary: What Shine's mapvote will do with the map cycle
+      description: |
+        `{"enabled": false}` when Shine's mapvote plugin is off. Otherwise:
+
+        - `maps_from_cycle`: the vote's options come from the map cycle, else
+          from the plugin's own list.
+        - `options`: the maps the vote offers now. Read from the cycle at map
+          load, so a `setmapcycle` shows here from the next map.
+        - `round_limit`: rounds before the map ends, `0` for none. When set,
+          it ends the map instead of the cycle's `time`.
+        - `next_map`: the vote's winner, else the option after the current
+          map. Absent when the plugin cannot say.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The mapvote plugin's view of the cycle.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MapVote" }
+          x-fixtures:
+            - getmapvote-off.json
+            - getmapvote-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
   # ------------------------------------------------------------------ mods
 
   "/#request=getinstalledmodslist":
@@ -363,18 +356,11 @@ paths:
       tags: [mods]
       operationId: getInstalledModsList
       x-request: getinstalledmodslist
-      summary: Mods downloaded to the server (not necessarily loaded)
+      summary: Mods downloaded to the server, mounted or not
       description: |
-        `GetModList()`. **Installed is not loaded.** A mod appears here within seconds of `installmod`, but it is
-        only mounted when it is in the map cycle's `mods` array *and* the map
-        changes -- verified: setting `mods: ["1e62a2ce"]` and running
-        `sv_changemap` produced `Mounting mod 'Combat Fix'[509780686]`.
-
-        **There is no uninstall.** Nothing in the API removes a downloaded
-        mod, so this list only ever grows.
-
-        Each row says whether it is mounted now (`active`) and the engine's
-        whitelist verdict (`whitelisted`). See the schema.
+        `GetModList()`: every mod downloaded to the server. A mod is mounted
+        only when the map cycle names it and the map changes (`active`).
+        Nothing removes a downloaded mod.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -401,32 +387,19 @@ paths:
       x-request: installmod
       summary: Download a workshop mod
       description: |
-        `Server.InstallMod`. Asynchronous. The engine call returns nothing,
-        and drops an id it cannot parse without a word (`-5` became mod
-        18446744073709551611 -- measured on 09-26), so a malformed id is
-        refused before the call, and an accepted one says whether it was
-        installed already.
+        `Server.InstallMod`. Asynchronous: the mod appears in
+        `getinstalledmodslist` once downloaded, and an id Steam does not have
+        never does. A malformed id is refused. Installing a mod that is there
+        already checks it for an update.
 
-        The only proof of a download is `getinstalledmodslist`: a
-        mod is listed once it is downloaded and unpacked, under its real
-        title, and never before (1.7 s for a 710-byte mod, 3.8 s for 26 MB on
-        the rig). An id Steam does not have never arrives. Re-installing an
-        installed mod checks it and downloads nothing when it is current.
-
-        **Loading a non-whitelisted mod silently unranks the server** -- the
-        log says `Ranking disabled: server has non-whitelisted mods mounted`
-        and `Requesting server ranking be enabled, request success: false`.
-        Removing the mod restores ranking. `whitelisted` on each search hit
-        and installed mod says so beforehand, `ranking_active` afterwards.
+        Mounting a mod that is not whitelisted unranks the server; see
+        `whitelisted` and `ranking_active`.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: modid
           in: query
           required: true
-          description: |
-            Workshop id as a **hex string**, as `getmods` and
-            `getinstalledmodslist` report it. `1e62a2ce` is workshop item
-            `509780686`.
+          description: Workshop id as a hex string.
           schema: { $ref: "#/components/schemas/ModId" }
           example: 1e62a2ce
       responses:
@@ -451,7 +424,7 @@ paths:
       operationId: installModPost
       x-request: installmod
       summary: Download a workshop mod (form body)
-      description: Identical to the `GET` form. See `installMod`. The panel posts.
+      description: As the `GET` form.
       requestBody:
         required: true
         content:
@@ -483,35 +456,19 @@ paths:
       tags: [mods]
       operationId: getMods
       x-request: getmods
-      summary: Search the Steam workshop (asynchronous, poll until settled)
+      summary: Search the Steam workshop (poll until settled)
       description: |
-        The Lua handler cannot block, so the first call **starts**
-        `Server.SearchWorshop` (the spelling is UWE's) and returns `loading`
-        immediately. Poll the same URL until the reply is something else.
-
-        What the engine does, measured on 09-26 (REQUIREMENTS item 4):
-
-        - **At most 50 hits, and no paging.** Pages 1, 2, 3 and 500 of one
-          search were the same 50 items, so only page 1 is asked for. The
-          engine logs the total (`numMatching = 2874`) but does not hand it
-          to Lua.
-        - Relevance order: `combat fix` puts Combat Fix first.
-        - The callback gets one table. An empty one means no matches **or a
-          search Steam failed** (`Failed Steam error NoConnection` with the
-          rig offline, answered at once); nothing tells the two apart.
-        - A search answers in 0.3-0.9 s.
-
-        A settled result is cached for **60 s** by its text. A search with no
-        answer after **30 s** is reported once, with `error`; the next request
-        starts a fresh one (CONSTRAINTS item 2).
+        Starts `Server.SearchWorshop` and answers `loading` until it settles;
+        poll the same URL. At most 50 hits, in relevance order, no paging. No
+        matches and a failed search both settle with no items. A search with
+        no answer after 30 s settles once with `error`, and the next request
+        starts a new one. Settled results are cached for 60 s by search text.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: searchtext
           in: query
           required: false
-          description: |
-            Free-text workshop query; missing reads as `""`, everything. Keep
-            it short: a 3000-character query failed Digest authentication.
+          description: Free-text query. Missing reads as `""`, everything.
           schema: { type: string, default: "" }
           example: combat
       responses:
@@ -528,7 +485,7 @@ paths:
                   summary: Six hits
                   externalValue: ../fixtures/getmods-settled.json
                 empty:
-                  summary: No matches, or a search Steam failed -- no error either way
+                  summary: No matches, or a failed search
                   externalValue: ../fixtures/getmods-empty.json
                 timedOut:
                   summary: A search with no answer after 30 s
@@ -551,31 +508,20 @@ paths:
       x-request: runcommand
       summary: Run a console command and return what it printed
       description: |
-        Runs it with `Shared.CaptureConsoleCommand` (10-12 engine), which
-        returns everything the command printed: script lines, engine
-        lines (`tickstat`, `bwlimit`, `perfmon`) and Shine's. The lines reach
-        the log as well. Shine's `ServerAdminPrint` prints nothing without a
-        client, so the Lua puts the nil-client branch back over it, and a
-        vanilla `sv_` command's output comes back under Shine too.
+        Runs the command with `Shared.CaptureConsoleCommand` and returns what
+        it printed: script, engine and Shine lines, which also reach the log.
+        Under Shine, vanilla `sv_` commands print here as they do without it.
 
-        Reading the result:
+        - `dispatched: true`: an admin command (`CreateServerAdminCommand`)
+          ran. `false`: a plain console command, or no such command; the two
+          look the same.
+        - `lines`: what it printed, in order: `audit` for the dispatch
+          receipt, `server` for the rest, without the log's `[hh:mm:ss]`.
+        - An empty `lines` with `dispatched: true` is not failure: a
+          successful `sv_kick` prints nothing.
 
-        - `dispatched: true` means the command was created by
-          `CreateServerAdminCommand` and ran -- proven by the audit line the
-          game emits before every such command. `false` means either a plain
-          console command such as `killall`, or no such command; **the server
-          does not distinguish those two and neither should a client.**
-        - `lines` is what it printed, in order, numbered from 1: `audit` for
-          the dispatch receipt, `server` for everything else. The log's
-          `[hh:mm:ss]` before a script's line is dropped.
-        - **An empty `lines` with `dispatched: true` is normal and is not
-          failure.** A successful `sv_kick` prints nothing at all -- only its
-          failure branch calls `ServerAdminPrint`
-          (`ServerAdminCommands.lua:172`) -- and `sv_cheats` reports nothing
-          either way. Show "ran, no output", never "succeeded".
-
-        Only the synchronous call is captured. Anything printed after it
-        returns is in the log (`getLog`).
+        Only what the command prints before it returns is captured; the rest
+        is in the log (`getLog`).
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: cmd
@@ -588,7 +534,7 @@ paths:
             slots: { value: "sv_reserved_slots 3" }
       responses:
         "200":
-          description: The command ran. What it said, if anything, is in `lines`.
+          description: The command ran. What it printed, if anything, is in `lines`.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CommandResult" }
@@ -602,7 +548,7 @@ paths:
                       - { id: 1, time: 1788642719, src: audit, text: "sv - Admin - 0: : STEAM_0:0:0: sv_kick" }
                       - { id: 2, time: 1788642719, src: server, text: "No matching player" }
                 unknown:
-                  summary: No such command -- nothing is printed anywhere
+                  summary: No such command
                   value: { cmd: sv_nonsense, dispatched: false, lines: [] }
           x-fixtures:
             - runcommand-failed.json
@@ -616,7 +562,7 @@ paths:
       operationId: runCommandPost
       x-request: runcommand
       summary: Run a console command (form body)
-      description: Identical to the `GET` form. See `runCommand`.
+      description: As the `GET` form.
       requestBody:
         required: true
         content:
@@ -645,27 +591,18 @@ paths:
       x-request: getlog
       summary: The engine's log, since a byte offset
       description: |
-        `log-Server.txt`, the engine's own log, read through
-        `Shared.ReadLog` (10-12 engine) wherever `-logdir` puts it. See
-        REQUIREMENTS.md item 7.
+        `log-Server.txt`, read with `Shared.ReadLog`, verbatim: IPs, Steam
+        ids and chat included. It outlives a map change.
 
-        It holds what never passes through Lua -- connects and auth, engine
-        errors, `Script tracing`, Shine's chat and command lines -- and it
-        **outlives a map change**: the file is the engine's, not Lua state.
-        It is served **verbatim**: IPs, Steam ids and chat included (by
-        design, 2026-09-28).
+        With no cursor, the last 64 KB, from the start of a line. Poll with
+        `since` = the previous `to` and `file` = the previous `file_id`; page
+        back with `before` = the first line's `off`. Only complete lines are
+        served. A reply carries at most 64 KB; `more` says to ask again at
+        once.
 
-        With no cursor, the last 64 KB, starting at a line.
-        Poll with `since` = the previous `to` and `file` = the previous
-        `file_id`; page back with `before` = the first line's `off`. Only
-        complete lines are served: a line the engine has not finished is held
-        until it has. A reply carries at most 64 KB; `more`
-        says to ask again at once. An idle poll reads nothing.
-
-        `reset` replaces the cursor: `new_file` when the header's Date and
-        Time differ from `file` (a restart moved the old log to
-        `log-Server.old.txt`), `truncated` when the file is shorter than the
-        cursor. The reply is then a fresh tail.
+        `reset` replaces the cursor, and the reply is a fresh tail:
+        `new_file` when the file's header differs from `file` (the server
+        restarted), `truncated` when the file is shorter than the cursor.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: since
@@ -678,14 +615,12 @@ paths:
           required: false
           description: |
             Byte offset to page back from, the first line's `off`. Up to
-            64 KB before it, starting at a line. Ignored with `since`.
+            64 KB before it, from the start of a line. Ignored with `since`.
           schema: { type: integer, minimum: 0 }
         - name: file
           in: query
           required: false
-          description: |
-            The `file_id` the cursor belongs to. A different one is a
-            `new_file` reset.
+          description: The `file_id` the cursor belongs to.
           schema: { type: string }
       responses:
         "200":
@@ -708,49 +643,37 @@ paths:
       x-request: getperf
       summary: Performance windows since a cursor
       description: |
-        What `perfmon` logs, served. The engine completes a
-        `ServerPerformanceData` about once a second
-        (`Shared.GetServerPerformanceData()`); the Lua accumulates them into
-        windows of `window_s` seconds (10) and keeps `capacity` of them (360,
-        an hour). Each window adds the tickrate counted from `UpdateServer`
-        calls and the longest single tick, because the engine's own tick
-        interval is whole milliseconds (16 at tickrate 60, read as 62.5).
-        Measured on the rig; see REQUIREMENTS.md item 10.
+        `Shared.GetServerPerformanceData()` samples, about one a second,
+        summed into windows of `window_s` seconds (10). The last `capacity`
+        windows (360, an hour) are kept. Each window also has the tickrate
+        counted from `UpdateServer` calls and the longest tick.
 
-        Poll with the `last_id` of the previous reply. **Paged**: a reply
-        holds at most 60 windows past `since`, and `engine` at most 60
-        records past `esince` across its three lists, oldest first; `more`
-        (and `engine.more`) is `true` while the server holds more past
-        `last_id`, and a client asks again at once. An hour in one reply
-        cost most of a tick at 80 to encode (SERVER-COST.md).
+        Poll with the previous `last_id` as `since`. A reply holds at most 60
+        windows; `more` says to ask again at once.
 
-        **Not persistent**: the
-        buffer is Lua state, rebuilt at every map change, so the ids restart
-        from 1 and `loaded_at` moves. A client that sees `loaded_at` change
-        knows a map change happened and that windows between its last poll and
-        the change are gone.
+        `engine` holds the engine's own reports, under a cursor of its own
+        (`esince`, at most 60 records a reply): `tickstat` windows from
+        `Server.GetTickStat()`, and, from `log-Server.txt` scanned every
+        `scan_s` seconds, snapshot rate steps, the bwlimit warning and
+        `perfmon:` blocks.
 
-        `engine` carries the engine's own reports, read with a cursor of their
-        own (`esince`): `tickstat` windows from `Server.GetTickStat()` (10-12
-        engine), and what the engine prints only to `log-Server.txt` --
-        snapshot rate steps, a bwlimit warning and the `perfmon:` block --
-        found by a scan of the log every `scan_s` seconds. Same lifetime as
-        the windows. REQUIREMENTS.md item 10.
+        Both are emptied at a map change: ids restart from 1 and `loaded_at`
+        changes.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: since
           in: query
           required: false
           description: |
-            Return windows with an id greater than this, at most 60. Omit
-            or `0` to start from the oldest the buffer still holds.
+            Return windows with an id greater than this, at most 60. Missing
+            or `0`: from the oldest held.
           schema: { type: integer, minimum: 0, default: 0 }
         - name: esince
           in: query
           required: false
           description: |
-            Return `engine` records with an id greater than this, at most
-            60. Omit or `0` to start from the oldest held.
+            Return `engine` records with an id greater than this, at most 60.
+            Missing or `0`: from the oldest held.
           schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200":
@@ -781,15 +704,10 @@ paths:
       tags: [players]
       operationId: getBans
       x-request: getbans
-      summary: The bans in force, from whichever table decides them
+      summary: The bans in force
       description: |
-        Reads the table that actually decides who is banned: Shine's own when
-        its ban plugin is on, which keeps who banned and when -- which
-        `GetBannedPlayersList()` throws away -- and vanilla's otherwise.
-
-        Normalized so a client need not know which it got: numeric ids,
-        expired bans left out, a `permanent` flag in place of a sentinel
-        time, a stable order, and the server's clock as `now`.
+        Shine's bans when its ban plugin is on, vanilla's otherwise, in one
+        shape. Expired bans are left out.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -812,17 +730,10 @@ paths:
       x-request: getrecentplayers
       summary: Players seen in the last 24 hours, connected or not
       description: |
-        Every human seen in the last `window` seconds, at most
-        `capacity` of them, so a player who has left can still be found and
-        banned. Bots are never recorded.
-
-        The list outlives a map change, which rebuilds all Lua state: it is
-        kept in `config://webadmin/recent-players-{a,b}.json`, saved
-        alternately so a torn write loses one save rather than the list.
-        `storage` says how the load went and whether saves are working.
-
-        `connected` is read off the live player list at request time. A
-        connected player's `last_seen` is `now`.
+        Every human seen in the last `window` seconds, at most `capacity` of
+        them. Kept across map changes in
+        `config://webadmin/recent-players.json`; `storage` says how it loaded
+        and whether saves work. A connected player's `last_seen` is `now`.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
       responses:
@@ -838,46 +749,6 @@ paths:
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
 
-  "/#request=getmapvote":
-    get:
-      tags: [maps]
-      operationId: getMapVote
-      x-request: getmapvote
-      summary: What Shine's mapvote will do with the map cycle
-      description: |
-        `enabled: false` and nothing else when Shine's mapvote
-        plugin is not on. When it is:
-
-        - `maps_from_cycle`: the vote takes its options from the cycle
-          (`GetMapsFromMapCycle`). Otherwise it uses its own map list and the
-          cycle's maps are not what players vote on.
-        - `options`: the maps the vote offers **now**. The plugin reads the
-          cycle once, at map load, so after a `setmapcycle` this lags the
-          file until the next map (measured, CONSTRAINTS item 13).
-        - `round_limit`: rounds before the map ends, `0` for none. When set,
-          it ends the map instead of the cycle's `time`, and `mode` plays no
-          part either way.
-        - `next_map`: `Plugin:GetNextMap()`, the vote's winner if there is
-          one, else the next option after the current map. Absent when the
-          plugin could not say.
-
-        `getmapvote-off.json` is synthetic (`{"enabled": false}`); the Shine
-        one is the rig's, on a Shine config.
-      parameters:
-        - $ref: "#/components/parameters/RequestConst"
-      responses:
-        "200":
-          description: The mapvote plugin's view of the cycle.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/MapVote" }
-          x-fixtures:
-            - getmapvote-off.json
-            - getmapvote-shine.json
-        "401": { $ref: "#/components/responses/DigestChallenge" }
-        "403": { $ref: "#/components/responses/ForeignOrigin" }
-        "503": { $ref: "#/components/responses/Busy" }
-
   # ---------------------------------------------------------------- static
 
   /index.html:
@@ -886,11 +757,9 @@ paths:
       operationId: getPanel
       summary: The admin panel itself
       description: |
-        `Shared.SetWebRoot("web")` serves `ns2/web/`. Files under the root
-        are returned with a guessed content type (`.js` as the obsolete
-        `application/x-javascript`). A bare `/` and anything not on disk get
-        the panel too (`getRoot`), so **a missing asset never looks like a
-        404**.
+        Files under `web/` are served by the engine, with a content type from
+        the extension (`.js` as `application/x-javascript`). Anything else
+        gets the panel (`getRoot`).
       responses:
         "200":
           description: The panel.
@@ -908,52 +777,35 @@ components:
       type: http
       scheme: digest
       description: |
-        HTTP Digest, MD5, handled by the engine (`ComputePasswordDigest` in
-        `server_linux`), never by Lua. The realm is the `-webdomain` value, or
-        `localhost` when unset. Credentials come from `-webuser` / `-webpassword`.
+        HTTP Digest (MD5), over plain HTTP, handled by the engine. Realm: the
+        `-webdomain` value, or `localhost`. Credentials: `-webuser` and
+        `-webpassword`.
 
-        Measured on the 26-09-03 build:
-
-        - A nonce is **reusable** for its lifetime as long as the client
-          increments `nc` -- ordinary RFC 7616 behaviour.
-        - Replaying an already-used `nc` is refused `401` with `stale="true"`.
-        - The nonce expires on **age, not idleness**: polled every 2 s, one
-          nonce took 150 requests and was refused at **301 s**, `nc` having
-          reached `00000097`. The refusal carries a fresh nonce, and the next
-          request signed with it returns `200`.
-        - 10 failed logins per address per minute earns a **1 minute
-          lockout** -- back off on `401`, never retry-loop bad credentials.
-
-        A browser absorbs all of this. Verified in headless Chrome: a
-        `fetch()` poll left running 480 s at a 2 s cadence made 240 requests,
-        all `200`, across a nonce expiry, with no prompt and no `401` visible
-        to DevTools. **A polling panel needs no re-authentication logic of its
-        own.**
-
-        Still plain HTTP.
+        A nonce lasts about 300 s from issue and is reusable with an
+        increasing `nc`. A reused `nc` or an expired nonce gets `401` with
+        `stale="true"` and a new nonce. 10 failed logins from one address in
+        a minute lock it out for a minute.
 
   parameters:
     RequestConst:
       name: request
       in: query
       required: true
-      description: The action selector. Pinned to this operation's value.
+      description: The action, fixed for each operation.
       schema: { type: string }
     RequestJson:
       name: request
       in: query
       required: false
-      description: |
-        Any value that is not one of the fourteen actions, or no value at all,
-        reaches the default handler. The panel sends `json` by convention.
+      description: Any value that is not an action listed here, or none. The panel sends `json`.
       schema: { type: string, default: json }
 
   responses:
     DigestChallenge:
       description: |
-        Digest challenge. `stale="true"` means the credentials were fine and
-        only the nonce was old -- a browser retries silently. Repeated genuine
-        failures trigger a one-minute per-address lockout after 10 in a minute.
+        Digest challenge. `stale="true"`: the nonce expired; retry with the
+        new one. 10 failures from one address in a minute lock it out for a
+        minute.
       headers:
         WWW-Authenticate:
           schema: { type: string }
@@ -961,57 +813,41 @@ components:
 
     ForeignOrigin:
       description: |
-        Refused: the request carried an `Origin` header that does not match
-        `Host`. Compared against the `Host` header, not against `-webdomain`.
-        `Origin: null` is refused too; a request with no `Origin` at all is
-        accepted. **This is why a Vite dev server on `:5173` cannot talk to a
-        real game server** -- develop against `mock/server.js`.
-
-        With **no login configured** (09-25 and later), a `Host` that is
-        neither `localhost` nor an IP literal is refused `403` as well,
-        static files included. See CONSTRAINTS.md, "The Host rule".
+        An `Origin` header that does not match `Host`, `Origin: null`
+        included; a request without `Origin` is accepted. With no login
+        configured, also a `Host` that is neither `localhost` nor an IP
+        literal, static files included.
 
     BodyTooLarge:
-      description: |
-        Request body over the 64 KB cap, or a malformed `Content-Length`. The
-        cap is measured; this exact status is not -- an over-cap body was never
-        captured from a real server. Treat it as a refusal either way.
+      description: A body over 64 KB, or a malformed `Content-Length`.
 
     Busy:
-      description: |
-        The request gave up after 30 s. This is the shape of a busy server, not
-        a hard failure -- retry with backoff rather than surfacing an error.
+      description: The request gave up after 30 s. The server is busy; retry later.
 
   schemas:
 
     SteamId:
       type: integer
-      description: |
-        Steam id as the engine reports it (`client:GetUserId()`). `0` for bots.
-        A number here, unlike mod ids, which are hex strings.
+      description: "`client:GetUserId()`. `0` for bots."
       examples: [10000000, 0]
 
     ModId:
       type: string
       pattern: "^[0-9a-f]+$"
       description: |
-        A workshop id, lowercase hex, no `0x` prefix. JSON has no 64-bit
-        integers, so the server converts with `string.format("%x", id)` on the
-        way out and `tonumber64("0x"..mod)` on the way back in. **Round-trip it
-        as a string; never parse it as a number.** `1e62a2ce` is workshop item
-        `509780686`. `"0"` means "no mod" in `getmaplist`.
+        A workshop id in lowercase hex, no `0x`. Keep it a string: it does
+        not fit a JSON number. `1e62a2ce` is workshop item `509780686`. `"0"`
+        is no mod, in `getmaplist`.
       examples: ["1e62a2ce", "0"]
 
     TeamNumber:
       type: integer
-      description: |
-        `0` ready room, `1` marines, `2` aliens, `3` spectators
-        (`Globals.lua:119-122`).
+      description: "`0` ready room, `1` marines, `2` aliens, `3` spectators."
       enum: [0, 1, 2, 3]
 
     Player:
       type: object
-      description: One connected player, from `GetServerState()`.
+      description: One connected player.
       required:
         [name, steamid, isbot, team, iscomm, score, kills, assists, deaths,
          resources, ping, ipaddress, familyshared, moves_rejected_time,
@@ -1030,86 +866,60 @@ components:
         ping: { type: integer }
         ipaddress:
           type: string
-          description: |
-            **The player's full IP address**, served over plain HTTP to anyone
-            who can authenticate. Mask by default and reveal per row on
-            request. Live captures must never be committed -- the fixtures in
-            this repo are redacted to `0.0.0.0`.
+          description: The player's full IP address.
           examples: ["0.0.0.0"]
         gagged:
           type: boolean
           description: |
-            **Under Shine's basecommands plugin**: muted with
-            `sh_gag`, read through the plugin's `IsClientGagged`, which also
-            expires a timed gag. Absent otherwise.
+            Under Shine's basecommands plugin: gagged with `sh_gag`. Absent
+            otherwise.
         familyshared:
           type: boolean
           description: |
-            (`Server.GetIsFamilyShared`): playing a Steam Family
-            Shared copy. Bots, the listen host and LAN players always read
-            false (the engine's CHANGELOG).
+            `Server.GetIsFamilyShared`: playing a Steam Family Shared copy.
+            Always false for bots, the listen host and LAN players.
         owner_steamid:
           allOf: [{ $ref: "#/components/schemas/SteamId" }]
           description: |
-            Only with `familyshared: true`:
-            `Server.GetOwnerUserId`, the account that owns the game.
+            Only with `familyshared: true`: `Server.GetOwnerUserId`, the
+            account that owns the game.
         moves_rejected_time:
           type: number
           description: |
-            (`ServerClient:GetMovesRejectedTimeCredit`): moves rejected for
-            time credit, "usually a modified client" (CHANGELOG). Measured
-            2026-10-06: an unmodified 09-28 client on the 09-27 rig, idle and
-            minimized most of the time, climbed about 6/s, dropped once (75
-            to 45) and restarted at a map change -- not a monotonic count,
-            and not rare.
+            `GetMovesRejectedTimeCredit`: moves rejected for time credit.
+            Not a monotonic count; restarts at a map change.
         moves_rejected_other:
           type: number
-          description: |
-            (`ServerClient:GetMovesRejectedOther`):
-            moves rejected for anything else; "a poor connection can also
-            cause these" (CHANGELOG).
+          description: "`GetMovesRejectedOther`: moves rejected for any other reason."
         skill:
           type: number
           description: |
-            `ScoringMixin:GetPlayerSkill()`: the Hive skill the
-            server ranks and balances with (under UWE Hotfix 344, read from
-            Steam User Stats). Absent for a player without ScoringMixin.
-            `-1`, with all three below, when the server holds none: every
-            bot, on the rig. Matched what Steam User Stats holds for a human
-            on the rig (2026-10-07).
+            `GetPlayerSkill()`: Hive skill. `-1`, with the three below, when
+            the server holds none (bots). Absent for a player without
+            ScoringMixin.
         skill_offset:
           type: number
           description: |
-            `GetPlayerSkillOffset()`: marines play at `skill +
-            skill_offset`, aliens at `skill - skill_offset`.
+            `GetPlayerSkillOffset()`: marines play at `skill + skill_offset`,
+            aliens at `skill - skill_offset`.
         comm_skill:
           type: number
           description: "`GetCommanderSkill()`: commander skill."
         comm_skill_offset:
           type: number
-          description: |
-            `GetCommanderSkillOffset()`, applied to `comm_skill`
-            the same way.
+          description: "`GetCommanderSkillOffset()`, applied to `comm_skill` the same way."
         skill_tier:
           type: integer
           minimum: -2
           maximum: 7
           description: |
-            `ScoringMixin:GetSkillTier()`: the tier the game
-            draws the scoreboard's skill badge for. `-1` a bot, `-2` no
-            skill, `0` a rookie (level 10 or below), else 1-7 from `skill`
-            less `25 / sqrt(adagrad sum)`, the server's uncertainty, banded
-            at 300, 750, 1400, 2100, 2900 and 4100 (`GetPlayerSkillTier`).
-            Not team-relative, unlike the scoreboard's own badge. The game
-            keeps its first answer for the rest of the map; the Lua puts back
-            whatever was kept, so asking changes nothing. Absent with `skill`,
-            or when `GetSkillTier()` errors.
+            `GetSkillTier()`: the scoreboard's skill badge. `-1` a bot, `-2`
+            no skill, `0` a rookie, else 1-7. Not team-relative. Absent with
+            `skill`, or when the call errors.
 
     ServerState:
       type: object
-      description: |
-        `GetServerState()`. Also the response to every unrecognised request,
-        and to a script at `/`.
+      description: "`GetServerState()`."
       required:
         [cheats, devmode, map, players_online, marines, aliens, uptime,
          player_list, marine_res, alien_res, server_name, frame_rate,
@@ -1120,13 +930,10 @@ components:
         map: { type: string, examples: [ns2_summit] }
         players_online:
           type: integer
-          description: |
-            Player entity count. Rendered before a disconnect completes, so a
-            successful kick can still be reflected here -- verified: a kick
-            that worked still reported 12.
+          description: Player entities, so a player being kicked can still count.
         marines: { type: integer }
         aliens: { type: integer }
-        uptime: { type: integer, description: "Seconds, `math.floor(Shared.GetTime())`." }
+        uptime: { type: integer, description: "Seconds since the map loaded." }
         player_list:
           type: array
           items: { $ref: "#/components/schemas/Player" }
@@ -1141,28 +948,20 @@ components:
         max_players:
           type: integer
           description: |
-            `Server.GetMaxPlayers()`. The reserved slot amount
-            must not exceed it: `sv_reserved_slots` silently ignores a larger
-            value.
+            `Server.GetMaxPlayers()`. `sv_reserved_slots` ignores a value
+            above it.
           examples: [16]
         map_loaded_at:
           type: integer
-          description: |
-            When the current map loaded, Unix seconds
-            (`Shared.GetSystemTime()` as the Lua VM starts, the same stamp
-            as `getperf`'s `loaded_at`). The VM is rebuilt at every map
-            change, so it is the last map change's time, from the server
-            rather than from whenever a panel noticed.
+          description: Unix seconds when the map loaded; `getperf`'s `loaded_at`.
           examples: [1791403505]
         ranking_active:
           type: boolean
           description: |
-            `Server.GetIsRankingActive()`: whether the engine
-            counts this server's rounds for ranking. It turns ranking on by
-            itself when the server is not hidden, is dedicated, has no cheats
-            or Lua hot reloading, has at most 5 spectator slots and 12 to 20
-            player slots, and every mounted mod is whitelisted (CONSTRAINTS
-            item 18).
+            `Server.GetIsRankingActive()`. On when the server is not hidden,
+            is dedicated, has no cheats or Lua hot reloading, has at most 5
+            spectator slots and 12 to 20 player slots, and every mounted mod
+            is whitelisted.
           examples: [false]
         shine:
           $ref: "#/components/schemas/ShineState"
@@ -1170,22 +969,16 @@ components:
     ShineState:
       type: object
       description: |
-        **Only when Shine is loaded** -- the key is absent otherwise. Whether each Shine plugin that replaces vanilla behaviour
-        is enabled, read per request with `Shine:IsExtensionEnabled`, so a
-        plugin loaded or unloaded at runtime shows up at once.
+        Only when Shine is loaded: which of its plugins that replace vanilla
+        behaviour are on, read per request.
 
-        - `ban`: Shine owns the ban list and redirects `sv_ban`/`sv_unban`.
-          Ban with `sh_banid`, unban with `sh_unban`: an `sv_ban` of an id
-          that is not connected reports success but lands only in the
-          vanilla list, which is not enforced (measured 2026-09-27).
-        - `reservedslots`: Shine sets the reserved slot count and grants
-          access by the `sh_reservedslot` permission; the vanilla id list is
-          not what is enforced.
-        - `mapvote`: Shine decides the next map.
-        - `basecommands`: Shine's
-          `sh_gag`/`sh_ungag` exist, the only mute there is -- the game has
-          no mute command (`sv_mute` never existed). Each player then carries
-          `gagged`.
+        - `ban`: Shine owns the ban list. Ban with `sh_banid`, unban with
+          `sh_unban`; an `sv_ban` of an absent id is not enforced.
+        - `reservedslots`: Shine sets the slot count and grants slots by
+          permission; the vanilla list is not enforced.
+        - `mapvote`: Shine picks the next map.
+        - `basecommands`: `sh_gag` and `sh_ungag` exist (the game has no
+          mute), and each player carries `gagged`.
       required: [ban, reservedslots, mapvote, basecommands]
       properties:
         ban: { type: boolean }
@@ -1197,35 +990,29 @@ components:
 
     BanEntry:
       type: object
-      description: |
-        One ban in force, as `getbans` reports it: the same record whether
-        vanilla or Shine owns the list, with Shine's extra fields when it
-        does.
+      description: One ban in force. Shine adds `issued` and `banned_by`.
       required: [id, name, reason, permanent]
       properties:
         id: { $ref: "#/components/schemas/SteamId" }
         name:
           type: string
           description: |
-            `Unknown` (vanilla) or `<unknown>` (Shine) when the id was banned
-            while not connected. Under Shine, such a ban is
-            stored under the name the recent-players list last saw, when the
-            player is in it.
+            `Unknown` (vanilla) or `<unknown>` (Shine) for an id banned while
+            not connected. Under Shine, the name the recent-players list has
+            for it, when it has one.
         reason:
           type: string
           description: '`None provided` (vanilla) or `No reason given.` (Shine) when none was given.'
         permanent:
           type: boolean
-          description: |
-            True for an expiry of `0`, **and** for one more than 100 years
-            away -- Shine stores `6e+24` for some permanent bans.
+          description: An expiry of `0`, or more than 100 years away.
         expires:
           type: integer
           description: Unix seconds. Absent when `permanent`.
-        issued: { type: integer, description: "**Shine only.** Unix seconds." }
+        issued: { type: integer, description: "Shine only. Unix seconds." }
         banned_by:
           type: string
-          description: '**Shine only.** `Console` when banned from the web admin or the console.'
+          description: Shine only. `Console` when banned from the web admin or the console.
 
     BanList:
       type: object
@@ -1234,29 +1021,25 @@ components:
         source:
           type: string
           enum: [vanilla, shine]
-          description: Which table the bans were read from.
+          description: Which ban list was read.
         now:
           type: integer
-          description: |
-            The server's clock, in unix seconds. Measure time left against
-            this, not against the browser's clock.
+          description: The server's clock, in unix seconds.
         bans:
           type: array
           description: |
-            Bans in force only, newest first: Shine's by `issued`, vanilla's
-            in reverse file order (vanilla appends).
+            Newest first: Shine's by `issued`, vanilla's in reverse file
+            order.
           items: { $ref: "#/components/schemas/BanEntry" }
 
     RecentPlayer:
       type: object
-      description: |
-        One player seen recently. `steamid` and `ipaddress` are spelled as in
-        `Player`, on purpose.
+      description: One player seen recently.
       required:
         [steamid, name, names, ipaddress, first_seen, last_seen, played, connected]
       properties:
         steamid: { $ref: "#/components/schemas/SteamId" }
-        name: { type: string, description: "The name last seen. Empty until the first one is." }
+        name: { type: string, description: "The name last seen. Empty until there is one." }
         names:
           type: array
           description: Former names, newest first, at most 5.
@@ -1264,15 +1047,14 @@ components:
         ipaddress:
           type: string
           description: |
-            **The player's full IP address** at their last connection, also
-            written to the file under `config://`. Empty when the engine did
-            not report one. Redacted in the fixtures.
+            The full IP address at their last connection. Empty when the
+            engine gave none.
           examples: ["0.0.0.0"]
         first_seen: { type: integer, description: "Unix seconds, within the window." }
         last_seen: { type: integer, description: "Unix seconds. `now` while connected." }
         played:
           type: number
-          description: Seconds connected within the window, summed over sessions.
+          description: Seconds connected within the window, over all sessions.
         connected: { type: boolean }
 
     RecentPlayers:
@@ -1296,13 +1078,13 @@ components:
               type: string
               enum: [ok, empty, unreadable]
               description: |
-                How this map's load went. `empty`: no file yet. `unreadable`:
-                the save was torn, so the list started empty.
+                How the file loaded at map load. `empty`: no file yet.
+                `unreadable`: the file was torn, so the list started empty.
             error:
               type: string
               description: |
-                Why the last save failed. Absent while saves work. When present,
-                the list will not survive the next map change.
+                Why the last save failed. Absent while saves work. When
+                present, the list will not survive the next map change.
         players:
           type: array
           description: Most recently seen first.
@@ -1318,11 +1100,9 @@ components:
     ReservedSlots:
       type: object
       description: |
-        `GetReservedSlotData()`. Both keys are absent when the server has no
-        reserved-slot config, so the reply can be `{}`.
-
-        Slots are keyed by **name** on the server, so adding a slot under a
-        name that is already present replaces that slot.
+        `GetReservedSlotData()`. `{}` when the server has no reserved-slot
+        config. Slots are keyed by name: adding one under a name already
+        present replaces it.
       properties:
         amount: { type: integer, minimum: 0 }
         ids:
@@ -1331,23 +1111,21 @@ components:
         shine:
           type: object
           description: |
-            Only while Shine's reservedslots plugin is on.
-            Then Shine sets the count (`sh_setresslots`) and grants access by
-            permission, so `amount` and `ids` are not what is enforced.
+            Only while Shine's reservedslots plugin is on. Shine then sets the
+            count (`sh_setresslots`) and grants slots by permission, so
+            `amount` and `ids` are not enforced.
           required: [slots]
           properties:
             slots: { type: integer, minimum: 0 }
 
     ChatEntry:
       type: object
-      description: |
-        One entry of the chat ring. `steamId` is camel-cased here, `steamid`
-        in `player_list` and `id` in a ban: three spellings for one value.
+      description: One chat entry.
       required: [id, time, message, player, steamId, team, teamOnly]
       additionalProperties: false
       properties:
         id: { type: integer, description: "Increasing within a map, from 1." }
-        time: { type: integer, description: "`Shared.GetSystemTime()`, unix seconds, when it was recorded." }
+        time: { type: integer, description: "Unix seconds." }
         message: { type: string }
         player: { type: string, description: "`Admin` for sv_say and sv_tsay." }
         steamId: { $ref: "#/components/schemas/SteamId" }
@@ -1358,7 +1136,7 @@ components:
 
     ChatStream:
       type: object
-      description: A page of the chat ring, from `getchatlist&since=`.
+      description: A page of the chat history.
       required: [entries, last_id, dropped, buffer_size]
       additionalProperties: false
       properties:
@@ -1368,8 +1146,8 @@ components:
         last_id: { type: integer, description: "Pass as `since` on the next poll." }
         dropped:
           type: integer
-          description: Entries that fell out of the ring before being read, this map.
-        buffer_size: { type: integer, description: "Ring capacity, 200." }
+          description: Entries that left the history before being read, this map.
+        buffer_size: { type: integer, description: "History capacity, 200." }
 
     PerfReport:
       type: object
@@ -1379,16 +1157,13 @@ components:
         capacity: { type: integer, description: Windows kept; the oldest is dropped. }
         loaded_at:
           type: integer
-          description: |
-            `Shared.GetSystemTime()` when this Lua VM loaded, i.e. the map
-            load. A different value means the ids restarted.
+          description: Unix seconds when the map loaded. A change means the ids restarted.
         map: { type: string }
         config:
           type: object
           description: |
-            The rates the server runs at now, from the engine's latest sample.
-            A runtime `tickrate`, `sendrate`, `moverate` or `interp` shows at
-            once. Absent until the engine's first sample after a map load.
+            The rates the server runs at, from the engine's latest sample.
+            Absent until the first sample after a map load.
           required: [tickrate, moverate, sendrate, interp_ms, max_players]
           properties:
             tickrate: { type: integer }
@@ -1398,9 +1173,7 @@ components:
             max_players: { type: integer }
             bw_limit:
               type: integer
-              description: |
-                `Server.GetBwLimit()`: bytes a second per player; follows a
-                runtime `bwlimit`.
+              description: "`Server.GetBwLimit()`: bytes a second per player."
         windows:
           type: array
           items: { $ref: "#/components/schemas/PerfWindow" }
@@ -1411,22 +1184,19 @@ components:
             window's id; 0 before the first. Poll again with `since=<last_id>`.
         more:
           type: boolean
-          description: |
-            More windows are held past `last_id`: ask again at once.
+          description: More windows are held past `last_id`; ask again at once.
         engine: { $ref: "#/components/schemas/PerfEngine" }
 
     PerfEngine:
       type: object
       description: |
-        The engine's own reports: tickstat windows from
-        `Server.GetTickStat()`, stamped with the time the window closed, and
-        lines from `log-Server.txt`, stamped with the scan that found them
-        (`time`, unix seconds): the lines carry no time of their own. One id
-        sequence across all three lists.
+        The engine's reports: tickstat windows from `Server.GetTickStat()`,
+        timed when the window closed, and log lines, timed by the scan that
+        found them. One id sequence across all three lists.
       required: [scan_s, last_id, now, tickstats, perfmon, events]
       properties:
-        now: { type: integer, description: "The server's clock, `Shared.GetSystemTime()`." }
-        scan_s: { type: integer, description: Seconds between scans. }
+        now: { type: integer, description: "The server's clock, in unix seconds." }
+        scan_s: { type: integer, description: Seconds between scans of the log. }
         last_id:
           type: integer
           description: |
@@ -1434,15 +1204,13 @@ components:
             when `more`, else the newest.
         more:
           type: boolean
-          description: |
-            More records are held past `last_id`, at most 60 a reply across
-            the three lists.
+          description: More records are held past `last_id`; ask again at once.
         tickstat_last_at:
           type: integer
-          description: When the newest tickstat window closed. Absent when none did since the map load.
+          description: When the newest tickstat window closed. Absent when none has since the map load.
         tickstat_said:
           type: object
-          description: "The last `tickstat: on|off` the command printed, when seen since the map load."
+          description: "The last `tickstat: on|off` the command printed since the map load."
           required: [text, time]
           properties:
             text: { type: string }
@@ -1460,9 +1228,8 @@ components:
     Tickstat:
       type: object
       description: |
-        One tickstat window, `Server.GetTickStat()` as the engine gives it,
-        any field a newer engine adds included. `time` is the window's end on
-        the server's system clock (the engine's own is server time).
+        One window of `Server.GetTickStat()`, with any fields the engine
+        adds. `time`: when it closed, unix seconds.
       required: [id, time]
       properties:
         id: { type: integer }
@@ -1498,7 +1265,7 @@ components:
         specMovesPerSec: { type: number }
         specMoveMsPerTick: { type: number }
         snapBytesP50: { type: number }
-        snapBytesP99: { type: number, description: "Size `bwlimit` from this: at least p99 x sendrate." }
+        snapBytesP99: { type: number }
         snapBytesMax: { type: integer }
         chokedPct: { type: number, description: Share of updates held back by bwlimit. }
         humanMoveMsPerTick: { type: number }
@@ -1509,9 +1276,7 @@ components:
 
     PerfmonBlock:
       type: object
-      description: |
-        The engine's `perfmon:` block, printed only when `perfmon` is typed. It
-        covers the last second.
+      description: The engine's `perfmon:` block, printed when `perfmon` is run. Covers the last second.
       required: [id, time]
       properties:
         id: { type: integer }
@@ -1562,7 +1327,7 @@ components:
             sendrate: { type: integer }
             per_snapshot: { type: integer }
             needed: { type: integer }
-            suggested: { type: integer, description: The bwlimit the engine says avoids it. }
+            suggested: { type: integer, description: The bwlimit the engine suggests. }
 
     PerfWindow:
       type: object
@@ -1571,27 +1336,27 @@ components:
                  lua_kb]
       properties:
         id: { type: integer }
-        time: { type: integer, description: "`Shared.GetSystemTime()` when the window closed." }
-        tickrate: { type: number, description: "`UpdateServer` calls over the window's real duration." }
+        time: { type: integer, description: "Unix seconds when the window closed." }
+        tickrate: { type: number, description: "`UpdateServer` calls a second over the window." }
         worst_tick_ms: { type: number, description: The longest single tick. }
         players: { type: integer }
         score:
           type: integer
           description: |
-            The engine's performance score, -99 to 100, higher better; perfmon
-            colours it green from 10, yellow from 0, orange from -10, red
-            below. 0 with nobody on the server, where it means nothing.
+            The engine's performance score, -99 to 100, higher is better;
+            perfmon shows green from 10, yellow from 0, orange from -10, red
+            below. 0 on an empty server.
         idle_pct: { type: number }
         moves_pct: { type: number, description: Share of the window spent on player moves. }
         entities_pct: { type: number, description: Share spent updating other entities. }
         entities: { type: integer, description: Average entity count. }
         interp_warns:
           type: integer
-          description: Late updates to a player (interval > 0.75 x interp), counted over the window.
+          description: Late updates to a player (interval > 0.75 x interp).
         interp_fails:
           type: integer
-          description: Updates at or past interp, counted over the window. Should stay 0.
-        lua_kb: { type: integer, description: "`collectgarbage(\"count\")`: the Lua heap." }
+          description: Updates at or past interp.
+        lua_kb: { type: integer, description: "The Lua heap, `collectgarbage(\"count\")`." }
 
     InstalledMod:
       type: object
@@ -1601,24 +1366,19 @@ components:
         name:
           type: string
           description: |
-            The workshop title. For a mod the server holds no details of, the
-            engine gives its decimal workshop id instead (`"1423731186"` on the
-            rig, a download that never completed).
+            The workshop title, or the decimal workshop id when the server
+            has no details of the mod.
         active:
           type: boolean
           description: |
-            Mounted now. Fixed when the map loads: the cycle's
-            global `mods`, the loaded map's own `mods`, and two hotfix mods
-            (UWE Hotfix 344, NSL Badges) that the engine mounts with no cycle
-            entry. A cycle edit changes it only at the next map change.
-            Measured on the 09-26 rig with Shine and 23 mods.
+            Mounted now: the cycle's `mods`, the map's own `mods`, and the
+            hotfix mods the engine mounts itself. Changes only at a map
+            change.
         whitelisted:
           type: boolean
           description: |
-            On the ranked-mod whitelist the engine read at boot:
-            `Server.GetIsModWhitelisted`. True for the hotfix mods too (UWE
-            Hotfix 344, NSL Badges; measured on the 10-12 rig). Never unknown:
-            if the engine could not read the list, every mod reads false.
+            `Server.GetIsModWhitelisted`: on the ranked-mod whitelist read at
+            boot. False for every mod if the list could not be read.
 
     MapListEntry:
       type: object
@@ -1630,17 +1390,15 @@ components:
           description: '`"0"` for a stock map, otherwise the mod that provides it.'
 
     MapCycleEntry:
-      description: |
-        Either a bare map name, or an object naming the mods that map needs.
+      description: A map name, or an object naming the mods that map needs.
       oneOf:
         - type: string
           examples: [ns2_summit]
         - type: object
           required: [map]
           description: |
-            Shine's mapvote reads further keys here (`min`, `max`, `chance`,
-            `percent`, `time`, `rounds`, ...). The game ignores them and
-            `setmapcycle` passes them through; a client must keep them.
+            Other keys (Shine's mapvote `min`, `max`, `chance`, `percent`,
+            `time`, `rounds`, ...) pass through.
           additionalProperties: true
           properties:
             map: { type: string }
@@ -1651,15 +1409,9 @@ components:
     MapCycle:
       type: object
       description: |
-        `config://MapCycle.json` with mod ids hex-encoded. Read it, edit it and
-        write the whole document back with `setmapcycle`; there is no partial
-        update. A 17-map cycle is 263 bytes.
-
-        `ModIdsFromHex` **skips any string containing `:`**, which is how an
-        entry can name a non-workshop source and survive the round trip.
-
-        Other keys are allowed and must survive a round trip: Shine's mapvote
-        reads map `groups` from here, for one.
+        `config://MapCycle.json`, mod ids hex-encoded; a string containing
+        `:` is left as it is. Other keys (Shine's mapvote `groups`) pass
+        through.
       additionalProperties: true
       properties:
         maps:
@@ -1670,17 +1422,15 @@ components:
           description: Minutes before the cycle advances.
         mode:
           type: string
-          description: |
-            `order` plays the list in sequence; `random` shuffles. The panel
-            writes only these two (`mapcycle.js:117`).
+          description: "`order` plays the list in sequence; `random` shuffles."
           examples: [order, random]
         mods:
           type: array
-          description: Mods mounted for the whole cycle, hex ids.
+          description: Mods mounted for the whole cycle.
           items: { $ref: "#/components/schemas/ModId" }
         groups:
           type: array
-          description: Shine's mapvote map groups. Opaque to the game.
+          description: Shine's mapvote map groups.
 
     MapCycleWrite:
       description: The answer to `setmapcycle`.
@@ -1692,7 +1442,7 @@ components:
             ok: { const: true }
             cycle:
               allOf: [{ $ref: "#/components/schemas/MapCycle" }]
-              description: '`config://MapCycle.json` read back after the write, hex-encoded.'
+              description: The file read back after the write.
         - type: object
           required: [ok, error]
           additionalProperties: false
@@ -1717,75 +1467,62 @@ components:
 
     WorkshopItem:
       type: object
-      description: One workshop search hit, as `Server.SearchWorshop` returns it.
+      description: One workshop search hit.
       required:
         [id, title, description, authorid, filesize, tags, steamresult,
          childcount, thumbnailurl, version]
       properties:
         id:
           allOf: [{ $ref: "#/components/schemas/ModId" }]
-          description: Hex-encoded on the way out. Feed it to `installmod`.
+          description: Feed it to `installmod`.
         title: { type: string }
-        description: { type: string, description: "Steam BBCode, not HTML. Escape before rendering." }
+        description: { type: string, description: "Steam BBCode, not HTML." }
         authorid:
           type: string
-          description: |
-            The author's 64-bit SteamID64, as a **string** -- unlike `steamid`
-            in `player_list`, which is a number.
+          description: The author's SteamID64, as a string.
           examples: ["76561197980112344"]
         filesize: { type: integer, description: "Bytes." }
         tags: { type: string, description: "Comma-separated, possibly empty." }
-        steamresult: { type: integer, description: "Steam's own result code; `1` is OK." }
+        steamresult: { type: integer, description: "Steam's result code; `1` is OK." }
         childcount: { type: integer }
         thumbnailurl:
           type: string
           format: uri
-          description: |
-            An `images.steamusercontent.com` URL -- **off-server and HTTPS**,
-            on a panel served over plain HTTP. On an isolated network these do
-            not load; the client should tolerate broken thumbnails.
-        version: { type: integer, description: "Unix timestamp of the item's last update." }
+          description: An HTTPS URL on `images.steamusercontent.com`.
+        version: { type: integer, description: "Unix seconds of the item's last update." }
         whitelisted:
           type: boolean
-          description: |
-            On the ranked-mod whitelist the engine read at boot,
-            as for `InstalledMod`.
+          description: On the ranked-mod whitelist, as for `InstalledMod`.
 
     ConsoleLine:
       type: object
-      description: |
-        One captured line.
+      description: One captured line.
       required: [id, time, src, text]
       properties:
         id: { type: integer, description: "The line's place in the reply, from 1." }
-        time: { type: integer, description: "Unix seconds, `Shared.GetSystemTime()`." }
+        time: { type: integer, description: "Unix seconds." }
         src:
           type: string
           enum: [audit, server]
           description: |
-            `audit` the dispatch receipt the game emits before every command
-            created by `CreateServerAdminCommand`; `server` anything else. A
-            console should show `server` and can hide `audit`.
+            `audit`: the receipt the game prints before an admin command.
+            `server`: anything else.
         text: { type: string }
 
     CommandResult:
       type: object
-      description: |
-        The result of `runCommand`.
+      description: The result of `runCommand`.
       required: [cmd, dispatched, lines]
       properties:
         cmd: { type: string, description: "The command line as sent." }
         dispatched:
           type: boolean
           description: |
-            The command was dispatched as an admin command, proven by its audit
-            line. `false` means a plain console command or no such command --
-            indistinguishable on the server side.
+            An admin command ran. `false`: a plain console command, or no
+            such command.
         lines:
           type: array
-          description: |
-            What it printed. **Empty is not failure** -- a successful `sv_kick`
-            prints nothing.
+          description: What it printed. Empty is not failure.
           items: { $ref: "#/components/schemas/ConsoleLine" }
 
     LogLine:
@@ -1798,15 +1535,12 @@ components:
         "off":
           type: integer
           minimum: 0
-          description: |
-            Byte offset of the line in the file: unique within a file, so a
-            client merges replies by it. Bytes, not characters.
+          description: Byte offset of the line in the file, unique within it.
         text:
           type: string
           description: |
-            Verbatim, a trailing CR dropped. The engine writes bytes, not
-            necessarily UTF-8; what is not valid UTF-8 arrives as such and a
-            browser decodes it to U+FFFD.
+            Verbatim, without a trailing CR. Bytes that are not UTF-8 are
+            passed as they are.
 
     LogPage:
       type: object
@@ -1830,7 +1564,7 @@ components:
         lines:
           type: array
           items: { $ref: "#/components/schemas/LogLine" }
-        more: { type: boolean, description: "Stopped at `max_bytes`; ask again at once." }
+        more: { type: boolean, description: "Stopped at 64 KB; ask again at once." }
         at_start: { type: boolean, description: "`from` is 0: nothing earlier to page to." }
         reset:
           type: string
@@ -1839,10 +1573,8 @@ components:
 
     WorkshopSearchResult:
       description: |
-        Two shapes on one status code: still loading, or settled. A failed
-        search is indistinguishable from an empty one (Steam's failure comes
-        back as no items); one with no answer after 30 s settles with
-        `error`.
+        Loading or settled. No matches and a failed search look the same; a
+        search with no answer after 30 s settles with `error`.
       oneOf:
         - type: object
           title: Loading
@@ -1861,20 +1593,17 @@ components:
             items:
               type: array
               maxItems: 50
-              description: |
-                At most 50: the engine hands over no more.
-                Empty for no matches and for a search Steam failed alike.
+              description: At most 50. Empty for no matches and for a failed search.
               items: { $ref: "#/components/schemas/WorkshopItem" }
             capped:
               type: boolean
               description: |
-                50 hits: the search may have found more than it returned.
-                Absent when `error` is set.
+                50 hits: the search may have found more. Absent with `error`.
             error:
               type: string
               description: |
                 The search had no answer after 30 s. Reported once; the next
-                request starts a fresh search.
+                request starts a new search.
 
     InstallModResult:
       description: The answer to `installmod`.
@@ -1889,9 +1618,7 @@ components:
               description: The id as sent to `Server.InstallMod`, lower case, no leading zeros.
             already_installed:
               type: boolean
-              description: |
-                It was in `getinstalledmodslist` already. The engine then checks
-                it for an update and downloads nothing if it is current.
+              description: It was installed already; the engine checks it for an update.
         - type: object
           required: [ok, error]
           additionalProperties: false
@@ -1900,4 +1627,3 @@ components:
             error:
               type: string
               description: 'Why nothing was sent to the engine, e.g. `Not a hex workshop id: zz`.'
-
