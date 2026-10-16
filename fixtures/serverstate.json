@@ -1,4 +1,6 @@
 {
+  "webdomain": "127.0.0.1",
+  "webport": "8080",
   "map": "ns2_summit",
   "players_online": 0,
   "uptime": 33,
@@ -19,7 +21,7 @@
     "mapvote": true,
     "reservedslots": false
   },
-  "cheats": false,
+  "cheats": "false",
   "ranking_active": false,
-  "devmode": false
+  "devmode": "false"
 }

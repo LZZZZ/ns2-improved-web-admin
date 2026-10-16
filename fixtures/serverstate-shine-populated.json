@@ -1,4 +1,6 @@
 {
+  "webdomain": "127.0.0.1",
+  "webport": "8080",
   "marines": 2,
   "map": "ns2_veil",
   "max_players": 16,
@@ -9,7 +11,7 @@
     "basecommands": true
   },
   "aliens": 2,
-  "devmode": false,
+  "devmode": "false",
   "players_online": 4,
   "uptime": 107,
   "player_list": [
@@ -21,7 +23,7 @@
       "ping": 1,
       "resources": 20,
       "ipaddress": "0.0.0.0",
-      "isbot": false,
+      "isbot": "false",
       "iscomm": false,
       "gagged": false,
       "familyshared": false,
@@ -39,7 +41,7 @@
       "ping": 0,
       "resources": 15,
       "ipaddress": "0.0.0.0",
-      "isbot": true,
+      "isbot": "true",
       "iscomm": false,
       "gagged": false,
       "familyshared": false,
@@ -57,7 +59,7 @@
       "ping": 0,
       "resources": 15,
       "ipaddress": "0.0.0.0",
-      "isbot": true,
+      "isbot": "true",
       "iscomm": false,
       "gagged": false,
       "familyshared": false,
@@ -75,7 +77,7 @@
       "ping": 0,
       "resources": 20,
       "ipaddress": "0.0.0.0",
-      "isbot": true,
+      "isbot": "true",
       "iscomm": false,
       "gagged": false,
       "familyshared": false,
@@ -92,5 +94,5 @@
   "frame_rate": 49.865818023682,
   "game_started": false,
   "game_time": 0,
-  "cheats": false
+  "cheats": "false"
 }

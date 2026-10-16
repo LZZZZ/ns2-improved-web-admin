@@ -84,13 +84,16 @@ check(#vm.chat(1).entries == 1, "since=1 returns only what is newer")
 local _, body = vm.request({ request = "getchatlist", since = "2" })
 check(body:find('"entries":%[%]') ~= nil, "since=last_id encodes no entries as []")
 
-check(#vm.request({ request = "getchatlist" }).entries == 2, "no since reads from 0")
-check(#vm.request({ request = "getchatlist", since = "junk" }).entries == 2, "nor does a since that is not a number")
+r = vm.request({ request = "getchatlist" })
+check(#r == 2 and r[1].message == "gl hf" and r.entries == nil, "no since: the stock bare array")
+check(#vm.request({ request = "getchatlist", since = "junk" }) == 2, "and so for a since that is not a number")
 
 for i = 1, 250 do vm.say("spam " .. i, "Carol", 104, 2, false) end
 r = vm.chat(0)
 check(#r.entries == 200 and r.entries[1].id == 53 and r.last_id == 252, "the ring keeps the last 200: 53..252")
 check(r.dropped == 52, "and the 52 that fell out are counted")
+r = vm.request({ request = "getchatlist" })
+check(#r == 20 and r[1].id == 233 and r[20].id == 252, "no since: the last 20, as the stock ring held")
 
 -- A map change is a fresh VM: ids start over, below the old cursor.
 vm = NewVM()

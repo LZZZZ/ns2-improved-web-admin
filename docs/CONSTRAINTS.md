@@ -163,11 +163,12 @@ backward compatible where that is cheap.
    the game's `Server.recentChatMessages`, with `last_id` and `dropped`.
    The PR to ns2-game makes that ring 200 messages with a time each
    (`Server.lua`); a released game keeps 20, with no times. Without `since`
-   the reply is stock's. On 09-27, `sv_say` and `sv_tsay 1` arrived as
+   the reply is stock's: the last 20, as a bare array. On 09-27, `sv_say` and `sv_tsay 1` arrived as
    `Admin` with times, and a map change restarted the ids.
-4. **Consistent types.** Stock sends `cheats`, `devmode` and `isbot` as
-   strings and `iscomm` and `game_started` as booleans. The mod sends all
-   five as booleans; the panel reads both forms.
+4. **Stock types kept.** Stock sends `cheats`, `devmode` and `isbot` as
+   strings (`"true"`/`"false"`) and `iscomm` and `game_started` as
+   booleans. Scripts compare `isbot == "true"`, so the Lua keeps both,
+   and `webdomain`/`webport` too.
 5. **A version field.** `lua_version` in the state blob, absent on a
    stock server, is how a client detects the mod.
 6. **Answer a browser with the panel, not the state blob.** On a stock

@@ -18,7 +18,7 @@ export type TeamNumber = 0 | 1 | 2 | 3;
 export interface RawPlayer {
   name: string;
   steamid: number;
-  isbot: boolean;
+  isbot: "true" | "false";
   team: TeamNumber;
   iscomm: boolean;
   score: number;
@@ -50,8 +50,8 @@ export interface RawPlayer {
 }
 
 export interface RawServerState {
-  cheats: boolean;
-  devmode: boolean;
+  cheats: "true" | "false";
+  devmode: "true" | "false";
   map: string;
   players_online: number;
   marines: number;

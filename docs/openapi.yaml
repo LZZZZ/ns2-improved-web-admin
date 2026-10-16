@@ -29,7 +29,8 @@ info:
       state, both with `200`.
     - **Method is not enforced.** Every write also works as a `GET`. `PUT`,
       `DELETE`, `HEAD` and `OPTIONS` get `405` from the engine.
-    - **Replies are JSON.** A write says what it did or why it refused.
+    - **Replies are JSON**, but for `setreservedslotamount`. Other writes
+      say what they did or why they refused.
     - **Steam ids are numbers, mod ids hex strings.**
     - **Player rows carry full IP addresses**, over plain HTTP.
 
@@ -129,6 +130,39 @@ paths:
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
 
+  "/#command=Send":
+    get:
+      tags: [server]
+      operationId: sendConsoleCommand
+      x-request: json
+      summary: Run a console command, without its output
+      description: |
+        `Shared.ConsoleCommand(rcon)` when `command` is set, then the server
+        state. The state says nothing about the command; `runcommand`
+        returns what it printed.
+      parameters:
+        - $ref: "#/components/parameters/RequestJson"
+        - name: command
+          in: query
+          required: true
+          description: Any value. The 2012 panel sent `Send`.
+          schema: { type: string, default: Send }
+        - name: rcon
+          in: query
+          required: true
+          description: The command line.
+          schema: { type: string }
+          example: sv_kick 10000000
+      responses:
+        "200":
+          description: Server state, built before the command takes effect.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerState" }
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
   # --------------------------------------------------------------- players
 
   "/#request=getreservedslots":
@@ -170,7 +204,7 @@ paths:
         time. Holds player chat, `sv_say`, `sv_tsay` and Shine's `sh_say`.
 
         Poll with the previous reply's `last_id`. Ids restart from 1 at every
-        map change.
+        map change. Without `since`, the last 20 entries as a bare array.
       parameters:
         - $ref: "#/components/parameters/RequestConst"
         - name: since
@@ -178,14 +212,19 @@ paths:
           required: false
           description: |
             Return entries with an id greater than this. Missing or not a
-            number reads as `0`.
-          schema: { type: integer, minimum: 0, default: 0 }
+            number: the last 20, as an array.
+          schema: { type: integer, minimum: 0 }
       responses:
         "200":
           description: Chat entries, oldest first.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ChatStream" }
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/ChatStream" }
+                  - type: array
+                    maxItems: 20
+                    items: { $ref: "#/components/schemas/ChatEntry" }
               examples:
                 player:
                   externalValue: ../fixtures/getchatlist-player.json
@@ -194,6 +233,7 @@ paths:
             - getchatlist-since.json
             - getchatlist-restarted.json
             - getchatlist-player.json
+            - getchatlist-nocursor.json
         "401": { $ref: "#/components/responses/DigestChallenge" }
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
@@ -699,6 +739,30 @@ paths:
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
 
+  "/#request=getperfdata":
+    get:
+      tags: [performance]
+      operationId: getPerfData
+      x-request: getperfdata
+      summary: One sample a minute, the last 30
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: Samples, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 30
+                items: { $ref: "#/components/schemas/PerfSample" }
+          x-fixtures:
+            - legacy/getperfdata.json
+            - legacy/getperfdata-populated.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
   "/#request=getbans":
     get:
       tags: [players]
@@ -719,6 +783,57 @@ paths:
           x-fixtures:
             - getbans.json
             - getbans-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=getbanlist":
+    get:
+      tags: [players]
+      operationId: getBanList
+      x-request: getbanlist
+      summary: Vanilla's ban list
+      description: |
+        `GetBannedPlayersList()`, expired bans left out. Under Shine's ban
+        plugin the list is Shine's: `id` may be a digit string and `time` far
+        beyond any real date for a permanent ban. `getbans` is the
+        normalized form.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+      responses:
+        "200":
+          description: The bans; `[]` for none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BanRecord" }
+          x-fixtures:
+            - legacy/getbanlist.json
+            - legacy/getbanlist-populated.json
+            - legacy/getbanlist-shine.json
+        "401": { $ref: "#/components/responses/DigestChallenge" }
+        "403": { $ref: "#/components/responses/ForeignOrigin" }
+        "503": { $ref: "#/components/responses/Busy" }
+
+  "/#request=setreservedslotamount":
+    get:
+      tags: [players]
+      operationId: setReservedSlotAmount
+      x-request: setreservedslotamount
+      summary: Set the reserved slot count
+      description: |
+        `SetReservedSlotAmount(nil, amount)`; `sv_reserved_slots` does the
+        same and prints the result.
+      parameters:
+        - $ref: "#/components/parameters/RequestConst"
+        - name: amount
+          in: query
+          required: true
+          description: "`0` to `Server.GetMaxPlayers()`; anything else is ignored."
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200": { $ref: "#/components/responses/EmptyWrite" }
         "401": { $ref: "#/components/responses/DigestChallenge" }
         "403": { $ref: "#/components/responses/ForeignOrigin" }
         "503": { $ref: "#/components/responses/Busy" }
@@ -801,6 +916,12 @@ components:
       schema: { type: string, default: json }
 
   responses:
+    EmptyWrite:
+      description: An empty `200`, `Content-Type` `text/html`. Read the state back to confirm.
+      content:
+        text/html:
+          schema: { type: string, const: "" }
+
     DigestChallenge:
       description: |
         Digest challenge. `stale="true"`: the nonce expired; retry with the
@@ -825,6 +946,11 @@ components:
       description: The request gave up after 30 s. The server is busy; retry later.
 
   schemas:
+
+    StringBool:
+      type: string
+      enum: ["true", "false"]
+      description: "A boolean as `tostring()` gives it. Compare with `\"true\"`."
 
     SteamId:
       type: integer
@@ -855,7 +981,7 @@ components:
       properties:
         name: { type: string }
         steamid: { $ref: "#/components/schemas/SteamId" }
-        isbot: { type: boolean }
+        isbot: { $ref: "#/components/schemas/StringBool" }
         team: { $ref: "#/components/schemas/TeamNumber" }
         iscomm: { type: boolean }
         score: { type: integer }
@@ -921,12 +1047,14 @@ components:
       type: object
       description: "`GetServerState()`."
       required:
-        [cheats, devmode, map, players_online, marines, aliens, uptime,
-         player_list, marine_res, alien_res, server_name, frame_rate,
-         game_started, game_time, max_players]
+        [webdomain, webport, cheats, devmode, map, players_online, marines,
+         aliens, uptime, player_list, marine_res, alien_res, server_name,
+         frame_rate, game_started, game_time, max_players]
       properties:
-        cheats: { type: boolean }
-        devmode: { type: boolean }
+        webdomain: { type: string, description: "The -webdomain value." }
+        webport: { type: string, description: "The -webport value." }
+        cheats: { $ref: "#/components/schemas/StringBool" }
+        devmode: { $ref: "#/components/schemas/StringBool" }
         map: { type: string, examples: [ns2_summit] }
         players_online:
           type: integer
@@ -1090,6 +1218,19 @@ components:
           description: Most recently seen first.
           items: { $ref: "#/components/schemas/RecentPlayer" }
 
+    BanRecord:
+      type: object
+      required: [name, id, reason, time]
+      properties:
+        name: { type: string }
+        id:
+          description: A number; a digit string under Shine.
+          oneOf:
+            - { $ref: "#/components/schemas/SteamId" }
+            - { type: string, pattern: "^[0-9]+$" }
+        reason: { type: string }
+        time: { type: number, description: "Unix seconds when it expires; `0` permanent." }
+
     ReservedSlotEntry:
       type: object
       required: [name, id]
@@ -1148,6 +1289,15 @@ components:
           type: integer
           description: Entries that left the history before being read, this map.
         buffer_size: { type: integer, description: "History capacity, 200." }
+
+    PerfSample:
+      type: object
+      required: [players, tickrate, time, ent_count]
+      properties:
+        players: { type: integer }
+        tickrate: { type: number }
+        time: { type: integer, description: "Unix seconds." }
+        ent_count: { type: integer, description: "All entities." }
 
     PerfReport:
       type: object

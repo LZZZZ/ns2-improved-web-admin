@@ -498,6 +498,12 @@ local function EnsureShineAddBanWrapped()
 
 end
 
+-- getperfdata: one sample a minute, the last 30.
+local kMaxPerfDatas = 30
+local kLogPerfDataRate = 60
+local perfDataBuffer = CreateRingBuffer(kMaxPerfDatas)
+local lastPerfDataTime = 0
+
 -- getperf: the engine's ServerPerformanceData samples (about one a second),
 -- accumulated into kPerfWindowSeconds windows. The ring and its ids restart
 -- with the map; `loaded_at` tells clients.
@@ -1024,7 +1030,7 @@ local function GetServerState()
             {
                 name = player:GetName(),
                 steamid = client:GetUserId(),
-                isbot = client:GetIsVirtual() == true,
+                isbot = tostring(client:GetIsVirtual()),
                 team = player:GetTeamNumber(),
                 iscomm = player:GetIsCommander(),
                 score = scoring and player:GetScore() or 0,
@@ -1074,8 +1080,10 @@ local function GetServerState()
 
     return
     {
-        cheats  = Shared.GetCheatsEnabled() == true,
-        devmode = Shared.GetDevMode() == true,
+        webdomain = "[[webdomain]]",
+        webport = "[[webport]]",
+        cheats  = tostring(Shared.GetCheatsEnabled()),
+        devmode = tostring(Shared.GetDevMode()),
         map = tostring(Shared.GetMapName()),
         players_online = playerRecords:GetSize(),
         marines = GetGamerules():GetTeam1():GetNumPlayers(),
@@ -1420,6 +1428,28 @@ kRequests.getinstalledmodslist = GetModList
 kRequests.getmaplist = GetMapList
 kRequests.getmapvote = GetMapVote
 
+function kRequests.getbanlist()
+    -- The game prunes expired bans only when it loads or saves the file.
+    local now = Shared.GetSystemTime()
+    local inForce = { }
+    for _, ban in ipairs(GetBannedPlayersList()) do
+        if ban.time == 0 or ban.time > now then
+            table.insert(inForce, ban)
+        end
+    end
+    return inForce
+end
+
+function kRequests.getperfdata()
+    return perfDataBuffer:ToTable()
+end
+
+function kRequests.setreservedslotamount(actions)
+    -- It takes (client, amount); the stock file passed only the amount.
+    SetReservedSlotAmount(nil, actions.amount)
+    return ""
+end
+
 function kRequests.getreservedslots()
     -- Under Shine's reservedslots plugin, Shine's count is what is enforced.
     local data = GetReservedSlotData()
@@ -1447,7 +1477,11 @@ end
 
 function kRequests.getchatlist(actions)
     local all = Server.recentChatMessages:ToTable()
-    local since = tonumber(actions.since) or 0
+    local since = tonumber(actions.since)
+    -- No cursor: the last 20 as a bare array, as before the ring grew.
+    if not since then
+        return { unpack(all, math.max(1, #all - 19)) }
+    end
     local entries = { }
     for _, entry in ipairs(all) do
         if entry.id > since then table.insert(entries, entry) end
@@ -1533,6 +1567,10 @@ local function OnWebRequest(actions, request)
         return result, body
     end
 
+    if actions.command then
+        Shared.ConsoleCommand(actions.rcon)
+    end
+
     return "application/json", Shared.JsonEncode(GetServerState())
 
 end
@@ -1548,6 +1586,16 @@ local function UpdateServerWebInterface()
     UpdatePerfWindows()
     UpdateTickstat()
     UpdateEngineLog()
+
+    if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then
+        perfDataBuffer:Insert({
+            players = Shared.GetEntitiesWithClassname("Player"):GetSize(),
+            tickrate = Server.GetFrameRate(),
+            time = Shared.GetSystemTime(),
+            ent_count = Shared.GetEntitiesWithClassname("Entity"):GetSize(),
+        })
+        lastPerfDataTime = Shared.GetSystemTime()
+    end
 
 end
 

@@ -116,7 +116,9 @@ end
 -- The engine's defaults: nobody shared, nothing rejected, unranked.
 local state = NewVM({ players = { Player(101, "Alice"), Player(0, "[BOT] Max", true) } })()
 local a = byName(state, "Alice")
-check(a and a.isbot == false and byName(state, "[BOT] Max").isbot == true, "isbot is a real boolean")
+check(a and a.isbot == "false" and byName(state, "[BOT] Max").isbot == "true", "isbot is the stock string")
+check(state.cheats == "false" and state.devmode == "false", "cheats and devmode too")
+check(state.webdomain == "[[webdomain]]" and state.webport == "[[webport]]", "webdomain and webport for the engine to fill")
 check(a.familyshared == false and a.owner_steamid == nil, "not shared: familyshared false, no owner id")
 check(a.moves_rejected_time == 0 and a.moves_rejected_other == 0, "rejected moves: both counts, 0")
 check(a.gagged == nil and state.shine == nil, "no Shine, no gagged and no shine key")

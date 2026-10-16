@@ -55,16 +55,20 @@ max=100`.
 
 ## Request types
 
-14 values plus the fallthrough.
+17 values plus the fallthrough.
 
 | `request` | Method | Parameters | Returns |
 | --- | --- | --- | --- |
 | *(anything unmatched, by convention `json`)* | GET | -- | The server state, below |
+| *(unmatched)* with `command` | GET or POST | `command`, `rcon` | Runs `rcon` as a console command, then the server state |
 | `runcommand` | GET or POST | `cmd` | What the command printed (CONSTRAINTS item 1) |
 | `getbans` | GET | -- | The bans in force, from whichever table decides them ([CONSTRAINTS.md](CONSTRAINTS.md#shine)) |
 | `getrecentplayers` | GET | -- | Everyone seen in the last 24 hours, up to 100 (REQUIREMENTS item 6) |
 | `getreservedslots` | GET | -- | `{ amount, ids: [...] }`, and Shine's count under its plugin |
-| `getchatlist` | GET | `since` | `{ entries, last_id, dropped, buffer_size }` from a ring of 200, with times (item 3) |
+| `getchatlist` | GET | `since` | `{ entries, last_id, dropped, buffer_size }` from a ring of 200, with times (item 3); without `since`, the last 20 as an array |
+| `getbanlist` | GET | -- | `GetBannedPlayersList()`, expired bans left out (item 9) |
+| `setreservedslotamount` | GET or POST | `amount` | Empty `200` (item 7) |
+| `getperfdata` | GET | -- | One sample a minute, the last 30 |
 | `getperf` | GET | `since`, `esince` | `perfmon`'s data in 10 s windows, and the engine's own reports ([below](#getperf)) |
 | `getlog` | GET | `since`, `before`, `file` | `log-Server.txt` by byte offset ([below](#getlog)) |
 | `getinstalledmodslist` | GET | -- | `[{ id, name, active, whitelisted }]` (REQUIREMENTS item 3, CONSTRAINTS item 17) |
@@ -84,9 +88,9 @@ max=100`.
   argument is `{path, method, headers}`, header names in lower case, never
   `authorization` or `cookie`. Lua cannot set a status or a header.
 
-Reserved slots are set with `sv_reserved_slots`, `sv_add_reserved_slot`
-and `sv_remove_reserved_slot` through `runcommand`, which say what they
-did. What a command line can carry is in
+The panel sets reserved slots with `sv_reserved_slots`,
+`sv_add_reserved_slot` and `sv_remove_reserved_slot` through `runcommand`,
+which say what they did. What a command line can carry is in
 [CONSTRAINTS.md](CONSTRAINTS.md#console-arguments).
 
 ## Server state

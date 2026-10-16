@@ -354,8 +354,6 @@ export function createState(fixturesDir, opts = {}) {
 
   const uptimeMinutes = () => Math.floor((Date.now() - bootedAt) / 60000);
 
-  const wireBool = (v) => (opts.mod ? v === "true" : v);
-
   // What the engine adds per player (--mod), made up. The first human plays a
   // Family Shared copy and has had moves rejected; bots read as not shared,
   // as the engine's CHANGELOG says they always do.
@@ -397,15 +395,14 @@ export function createState(fixturesDir, opts = {}) {
     const marines = s.players.filter((p) => p.team === 1).length;
     const aliens = s.players.filter((p) => p.team === 2).length;
     return {
-      // The 2012 file's; the panel's Lua dropped them.
-      ...(opts.mod ? {} : { webdomain: s.webdomain, webport: s.webport }),
+      webdomain: s.webdomain,
+      webport: s.webport,
       server_name: s.server_name,
       map: s.map,
       uptime: uptimeMinutes(),
-      // Stock stringifies these three; the mod sends real booleans
-      // (CONSTRAINTS item 4). State keeps the stock strings.
-      cheats: wireBool(s.cheats),
-      devmode: wireBool(s.devmode),
+      // Strings, as stock sends them.
+      cheats: s.cheats,
+      devmode: s.devmode,
       players_online: s.players.length,
       marines,
       aliens,
@@ -421,7 +418,6 @@ export function createState(fixturesDir, opts = {}) {
         : 0,
       player_list: clone(s.players).map((p) => ({
         ...p,
-        isbot: wireBool(p.isbot),
         // The mod reads Shine's gags under basecommands, and only then.
         ...(opts.mod && shineHas("basecommands") ? { gagged: shineGagged.has(p.steamid) } : {}),
         ...(opts.mod ? betaPlayer(p) : {}),
@@ -1308,7 +1304,6 @@ export function createState(fixturesDir, opts = {}) {
 
     switch (actions.request) {
       case "getbanlist": {
-        if (opts.mod) break;   // the 2012 file's; the panel's Lua dropped it
         const now = Math.floor(Date.now() / 1000);
         // Under Shine's ban plugin this is Shine's list, not vanilla's.
         const all = shineHas("ban") ? shineBanList() : s.bans;
@@ -1328,7 +1323,6 @@ export function createState(fixturesDir, opts = {}) {
           : s.reserved);
 
       case "setreservedslotamount":
-        if (opts.mod) break;
         if (bugs.setreservedslotamount) {
           // The amount arrives as `client`, `amount` is nil, the guard rejects
           // it, and the request still answers 200 with an empty body.
@@ -1344,10 +1338,10 @@ export function createState(fixturesDir, opts = {}) {
         // `Server.recentChatMessages and json.encode(...) or "{ }"` -- when the
         // buffer does not exist the reply is an object, not an array.
         if (opts.noChatBuffer) return ["application/json", "{ }"];
-        // The mod's cursor (CONSTRAINTS item 3), 0 when absent. Stock: the
-        // game's 20 in the game's shape -- no time, which only the mod records.
-        if (opts.mod) {
-          const since = Number.isFinite(Number(actions.since)) ? Number(actions.since) : 0;
+        // The mod's cursor (CONSTRAINTS item 3). Without one, and on stock:
+        // the last 20 as a bare array; only the mod records times.
+        if (opts.mod && actions.since !== undefined && actions.since !== "" && Number.isFinite(Number(actions.since))) {
+          const since = Number(actions.since);
           return json({
             entries: s.chat.filter((e) => e.id > since),
             last_id: s.chat.at(-1)?.id ?? 0,
@@ -1355,10 +1349,9 @@ export function createState(fixturesDir, opts = {}) {
             buffer_size: kModChatBufferSize,
           });
         }
-        return json(s.chat.slice(-kMaxChat).map(({ time, ...e }) => e));
+        return json(s.chat.slice(-kMaxChat).map(({ time, ...e }) => (opts.mod ? { ...e, time } : e)));
 
       case "getperfdata":
-        if (opts.mod) break;
         return json(s.perf.slice(-kMaxPerfDatas));
 
       case "getinstalledmodslist":
@@ -1560,9 +1553,8 @@ export function createState(fixturesDir, opts = {}) {
     // bare `/`, an unknown request type and runcommand. The
     // shipped panel sends request=json, which is one of those unmatched
     // values. See API.md, "There is no directory index either".
-    if (actions.command && !opts.mod) {
-      // The 2012 file's command path, which returns nothing about the
-      // command. The panel's Lua dropped it.
+    if (actions.command) {
+      // The 2012 file's command path, which returns nothing about the command.
       const out = execute(actions.rcon ?? "").mockLog;
       log(`console: ${actions.rcon} -> ${out || "(no output)"}`);
     }
