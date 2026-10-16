@@ -4,7 +4,7 @@
 // each carrying its offset. So the state here is a byte cursor, the file it
 // belongs to, and the lines read so far, merged by offset -- a line can never
 // arrive twice. What this has to get right, all of it from how the file and
-// the Lua behave (docs/REQUIREMENTS.md item 7):
+// the Lua behave:
 //
 //   * The file outlives a map change: nothing restarts when the map does,
 //     and the cursor stays good.
@@ -12,7 +12,7 @@
 //     with a new Date/Time header. The server notices from `file` and answers
 //     with a fresh tail marked `reset`; so does a file shorter than the cursor.
 //   * One reply carries at most 64 KB: more cost the server a third of a tick
-//     to encode (docs/SERVER-COST.md). `more` means ask again at once, which a
+//     to encode. `more` means ask again at once, which a
 //     poll does up to kSkipBytes' worth, one reply after the other; a tab that
 //     was away while megabytes were written takes the latest tail instead of
 //     replaying them, and says so.

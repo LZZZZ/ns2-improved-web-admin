@@ -82,8 +82,7 @@ export function dateTime(unixSeconds: number): string {
 /**
  * Text that is about to become part of a console command line.
  *
- * Measured on the rig (docs/CONSTRAINTS.md, "What console arguments can
- * carry"): arguments split on whitespace, quotes are not parsed and `;` does
+ * Measured on the rig: arguments split on whitespace, quotes are not parsed and `;` does
  * not start a second command. Nothing seen lets a value escape its argument,
  * but slot names can come from player names, so `;`, quotes and control
  * characters are dropped rather than trusted.

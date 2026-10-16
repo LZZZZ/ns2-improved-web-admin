@@ -19,7 +19,9 @@ src=$dst/utils/WebAdminPanel
 rm -rf "$src"
 mkdir -p "$src"
 cd "$here/panel"
-cp -r src public index.html package.json package-lock.json tsconfig.json "$here/LICENSE" "$src/"
+cp -r src public index.html package.json package-lock.json tsconfig.json "$src/"
+# The MIT text only: the notes below it name this repo's paths.
+sed -n '1,/^SOFTWARE\.$/p' "$here/LICENSE" > "$src/LICENSE"
 sed 's|^const out = "../web";$|const out = "../../ns2/web";|' vite.config.ts > "$src/vite.config.ts"
 grep -q '^const out = "../../ns2/web";$' "$src/vite.config.ts"
 echo node_modules/ > "$src/.gitignore"
@@ -78,3 +80,10 @@ assert not left, "openapi.yaml still points into this repo:\n" + "\n".join(left)
 yaml.safe_load(s)
 open(out, "w").write(s)
 PY
+
+# Nothing exported may point at this repo's docs or tools.
+if grep -rnIE 'docs/|tools/|[A-Z][A-Z-]+\.md|CONSTRAINTS|REQUIREMENTS|CURRENT-UI|SERVER-COST' \
+    --exclude=package-lock.json "$src" "$dst/ns2/lua/ServerWebInterface.lua"; then
+  echo "the export points at files ns2-game does not have" >&2
+  exit 1
+fi

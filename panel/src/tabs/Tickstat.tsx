@@ -9,8 +9,7 @@ import type { ChartMarker, ChartSeries } from "../ui/PerfChart";
 /**
  * The engine's own reports: `tickstat` windows (tick spacing, snapshot sizes,
  * choke) from Server.GetTickStat(), and from the server's log, players' rate
- * steps, the bwlimit warning and the `perfmon:` block (docs/REQUIREMENTS.md
- * item 10). Since 2026-10-07 they are not a section of their own:
+ * steps, the bwlimit warning and the `perfmon:` block. Since 2026-10-07 they are not a section of their own:
  * the charts join the tab's grid, the latest window its summary, and the
  * switch leads the summary strip. The table view, with rate steps and perfmon blocks,
  * went in the Performance review (2026-10-08).

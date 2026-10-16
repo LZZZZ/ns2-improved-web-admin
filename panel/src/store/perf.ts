@@ -18,7 +18,7 @@
 //
 // The server answers in pages of at most 60 windows and 60 engine records,
 // with `more` until the cursor has caught up: an hour in one reply cost most
-// of a server tick to encode (docs/SERVER-COST.md). So a poll that gets
+// of a server tick to encode. So a poll that gets
 // `more` asks again at once, page after page, each one its own request.
 
 import { useEffect, useState } from "preact/hooks";

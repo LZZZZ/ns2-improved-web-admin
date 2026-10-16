@@ -1,7 +1,6 @@
 // A map's name, with its minimap on hover or focus.
 //
-// Only the stock maps have one: their overviews ship with the panel, converted by
-// tools/make-minimaps.sh. A mod map's overview is inside its mod, out of the
+// Only the stock maps have one: their overviews ship with the panel. A mod map's overview is inside its mod, out of the
 // web root's reach, so hovering one says so. The image is fetched only when a
 // name is hovered, and from the game server like the rest of the panel.
 

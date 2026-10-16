@@ -49,7 +49,7 @@ const BOT_REASON =
   "Bots report Steam id 0, which matches no player. The server cannot act on this row.";
 
 // The 2012 panel's Mute sent `sv_mute`, which no server has: the game has no
-// mute command at all (CURRENT-UI defect 18). Shine's basecommands does.
+// mute command at all. Shine's basecommands does.
 const MUTE_REASON =
   "The game has no mute command. Muting needs Shine, with its basecommands plugin.";
 

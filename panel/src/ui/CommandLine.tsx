@@ -6,7 +6,7 @@
 // what everyone else ran.
 //
 // As the command's name is typed it suggests names from commands.json (read
-// from the game's and Shine's Lua by tools/make-commands.py), and once it is
+// from the game's and Shine's Lua), and once it is
 // typed it shows that command's arguments and help. A suggestion, never a
 // gate: whatever is typed is sent.
 

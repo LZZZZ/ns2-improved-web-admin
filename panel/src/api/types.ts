@@ -1,4 +1,4 @@
-// The API's types, mirrored from docs/openapi.yaml, in two halves.
+// The API's types, mirrored from openapi.yaml, in two halves.
 //
 // `Raw*` is what the server actually sends, inconsistencies intact: mod ids
 // are hex strings, and the same Steam id is spelled `steamid`, `steamId` and

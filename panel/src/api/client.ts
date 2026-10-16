@@ -2,7 +2,7 @@
 // API shape. Everything it returns is normalized: real booleans, stable keys,
 // Steam ids and mod ids left as the server spells them.
 //
-// Behaviour this has to survive, all of it measured (docs/API.md):
+// Behaviour this has to survive, all of it measured:
 //
 //   * every read is GET / with a `request` query parameter, and an unknown
 //     `request` silently returns the server-state blob rather than an error

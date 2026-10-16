@@ -37,7 +37,7 @@ const RULES: [LogKind, RegExp][] = [
   ["error", /\b(Error|Warning|ERROR|WARNING)\b|Script error|stack traceback/],
   // The engine's own reports: JIT tracing, perfmon, and the 09-27 tickstat,
   // its reply, a player's rate step and the bwlimit warning (all measured on
-  // the rig, REQUIREMENTS item 10).
+  // the rig).
   ["engine", new RegExp([
     "Script tracing", "^perfmon: ", "^Perf ", "^TICKSTAT\\|", "^tickstat: (on|off)$",
     "^client \\d+: snapshot rate ", "^bwlimit \\d+ bytes/sec at sendrate ",

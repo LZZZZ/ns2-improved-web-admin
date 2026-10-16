@@ -16,7 +16,7 @@ import { workshopId } from "./Mods";
 // download it. Loading a downloaded mod is the Mods tab's: it is a map cycle
 // edit, with rules (engine mods, map mods, dependents) that live there.
 //
-// Measured on the 09-26 rig (REQUIREMENTS item 4), and each one shapes what
+// Measured on the 09-26 rig, and each one shapes what
 // this tab says:
 //
 //   * a search returns its first 50 hits and nothing more. The page is
@@ -27,7 +27,7 @@ import { workshopId } from "./Mods";
 //     it is downloaded and never before.
 //
 // Thumbnails are the one thing this browser fetches from Steam; Settings
-// turns them off (REQUIREMENTS items 4 and 9). The search does not start
+// turns them off. The search does not start
 // until the tab is opened.
 
 /** Where to find a mod the search does not reach. */
@@ -61,7 +61,7 @@ export function Workshop({ onOpenMods }: { onOpenMods: (id: string) => void }) {
   const [open, setOpen] = useState<string | null>(null);
 
   // Opening the tab is what starts a search: the 2012 panel searched on every
-  // page load, for a tab nobody had opened (CURRENT-UI defect 13). Coming back
+  // page load, for a tab nobody had opened. Coming back
   // shows the last result without asking again.
   useEffect(() => {
     if (search.status === "idle") void runSearch("");

@@ -1,7 +1,7 @@
 // The workshop search and the installs asked for from it.
 //
 // Both are asynchronous on the server and neither says when it is done, so
-// both are polled here, measured on the 09-26 rig (REQUIREMENTS item 4):
+// both are polled here, measured on the 09-26 rig:
 //
 //   * a search answers `loading` until it settles, 0.3-0.9 s. One that never
 //     answers settles with an error at 30 s; the panel stops at 35 s anyway,

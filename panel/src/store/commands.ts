@@ -68,9 +68,9 @@ export async function sendCommand(
 //
 // Which command does a job depends on who owns it. Under Shine's ban plugin a
 // vanilla sv_ban of an id that is not connected prints "has been banned" and
-// lands only in the vanilla list, which nothing enforces -- a phantom ban
-// (docs/CONSTRAINTS.md, "Shine"). So Shine's own commands are used whenever
-// the server says Shine owns the job.
+// lands only in the vanilla list, which nothing enforces -- a phantom ban.
+// So Shine's own commands are used whenever the server says Shine owns the
+// job.
 
 /** Ban an id for `minutes` (0 is permanent). Kicks the player if connected. */
 export function banCommand(state: ServerState, steamId: number, minutes: number,

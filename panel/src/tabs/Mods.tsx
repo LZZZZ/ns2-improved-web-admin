@@ -29,8 +29,8 @@ import { WhitelistIcon } from "../ui/whitelist";
 // rig's log shows that order (ModMounter::Mount, 2026-09-28): NSL Badges and
 // UWE Hotfix 344, then the cycle's mods as listed, then the map's own.
 //
-// Measured on the 09-26 rig with Shine and 23 mods (REQUIREMENTS item 3).
-// Nothing can uninstall a mod (item 2), so the installed list only grows.
+// Measured on the 09-26 rig with Shine and 23 mods.
+// Nothing can uninstall a mod, so the installed list only grows.
 // Finding and downloading mods is the Workshop tab's: this tab makes no
 // workshop request at all.
 
