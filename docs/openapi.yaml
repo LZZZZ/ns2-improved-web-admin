@@ -1724,7 +1724,7 @@ components:
       properties:
         id:
           allOf: [{ $ref: "#/components/schemas/ModId" }]
-          description: Hex-encoded on the way out, line 260. Feed it to `installmod`.
+          description: Hex-encoded on the way out. Feed it to `installmod`.
         title: { type: string }
         description: { type: string, description: "Steam BBCode, not HTML. Escape before rendering." }
         authorid:

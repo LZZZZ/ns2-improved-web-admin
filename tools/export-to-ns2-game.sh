@@ -33,5 +33,61 @@ Server side: `ns2/lua/ServerWebInterface.lua`.
     npm run check    # typecheck
     npm run build    # writes ns2/web/index.html, assets/, THIRD-PARTY-LICENSES.txt
 
+API: openapi.yaml.
+
 MIT (LICENSE). Bundled libraries: ns2/web/THIRD-PARTY-LICENSES.txt.
 EOF
+
+# The API spec, without what points into this repo: fixture examples and
+# links to docs, fixtures and the mock.
+python3 - "$here/docs/openapi.yaml" "$src/openapi.yaml" <<'PY'
+import re, sys, yaml
+src, out = sys.argv[1], sys.argv[2]
+lines = open(src).read().split("\n")
+indent = lambda l: len(l) - len(l.lstrip())
+
+def end(i):
+    j = i + 1
+    while j < len(lines) and (not lines[j].strip() or indent(lines[j]) > indent(lines[i])):
+        j += 1
+    while not lines[j - 1].strip():
+        j -= 1
+    return j
+
+kept, i = [], 0
+while i < len(lines):
+    line = lines[i]
+    if line.strip() == "x-fixtures:":
+        i = end(i)
+        continue
+    if line.strip() == "examples:":
+        j, entries = i + 1, []
+        while j < end(i):
+            k = end(j)
+            if not any("externalValue" in l for l in lines[j:k]):
+                entries += lines[j:k]
+            j = k
+        kept += [line] + entries if entries else []
+        i = end(i)
+        continue
+    kept.append(line)
+    i += 1
+s = "\n".join(kept)
+
+for pattern, repl in [
+    (r"Machine-readable companion to \[API\.md\]\(API\.md\)\. (Read from.*?needs\)\.).*?check-openapi\.py`\.", r"\1"),
+    (r", CONSTRAINTS item \d+", ""),
+    (r"\s*\((?:CONSTRAINTS|REQUIREMENTS|SERVER-COST)[^)]*\)", ""),
+    (r"; see REQUIREMENTS\.md item \d+\.", "."),
+    (r"\s*(?:See\s+)?(?:CONSTRAINTS|REQUIREMENTS)\.md[^.]*\.", ""),
+    (r"\s*--\s*develop against `mock/server\.js`", ""),
+    (r"\s*Live captures must never be committed.*?`0\.0\.0\.0`\.", ""),
+    (r"\s*Redacted in the fixtures\.", ""),
+]:
+    s = re.sub(pattern, repl, s, flags=re.S)
+
+left = re.findall(r".*(?:\.md\b|CONSTRAINTS|REQUIREMENTS|fixtures|mock/|externalValue|x-fixtures).*", s)
+assert not left, "openapi.yaml still points into this repo:\n" + "\n".join(left)
+yaml.safe_load(s)
+open(out, "w").write(s)
+PY
