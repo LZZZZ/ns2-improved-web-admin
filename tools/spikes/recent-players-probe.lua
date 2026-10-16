@@ -1,10 +1,13 @@
 -- ======= Copyright (c) 2012, Unknown Worlds Entertainment, Inc. All rights reserved. ==========
 --
--- lua\ServerWebAPI.lua
+-- lua\ServerWebInterface.lua
 --
 --    Created by:   Brian Cronin (brianc@unknownworlds.com)
+--    Modified by:  LZZ (lzz@lzzbr.com)
 --
 -- ========= For more information, visit us at http://www.unknownworlds.com =====================
+
+-- The server side of the web admin panel in web/.
 
 Script.Load("lua/RingBuffer.lua")
 
@@ -16,320 +19,62 @@ ProbeClock = Shared.GetSystemTimeReal or os.clock
 ProbeLog("file load: system time %s, clock %s", tostring(Shared.GetSystemTime()),
          Shared.GetSystemTimeReal and "Shared.GetSystemTimeReal" or "os.clock")
 do
-    local ok, f = pcall(io.open, "config://improved-webadmin/recent-players-a.json", "r")
+    local ok, f = pcall(io.open, "config://webadmin/recent-players.json", "r")
     ProbeLog("Q4 read at file load: pcall %s, handle %s", tostring(ok), tostring(f))
     if ok and f then f:close() end
 end
 do
-    local ok, value, pos, err = pcall(function() return json.decode('{"version":1,"seq":') end)
+    local ok, value, pos, err = pcall(function() return json.decode('{"version":1,"players":') end)
     ProbeLog("Q3 json.decode on truncated input: pcall ok=%s, value=%s, 2nd=%s, 3rd=%s",
              tostring(ok), tostring(value), tostring(pos), tostring(err))
 end
 -- ---------------------------------------------------------------------------
 
--- ===================== improved-webadmin =====================================
---
--- The mod's copy of ns2/lua/ServerWebInterface.lua. A mod's lua/ shadows the
--- game's, so this file replaces the vanilla one wholesale. It started as a
--- verbatim copy of the 344 / 26-09-03 original; the changes below are each
--- marked `improved-webadmin:`. The vanilla code is a starting point, not something
--- to preserve: change it wherever that improves the result, keeping the HTTP
--- API backward compatible when that is cheap (docs/DESIGN.md, "Design decisions").
---
--- 1. Console output is captured and returned.
---
---    Vanilla runs `Shared.ConsoleCommand(actions.rcon)` and answers with the
---    ordinary state blob, so a kick that worked and a kick that matched nobody
---    are byte-identical over HTTP. The panel has never been able to tell them
---    apart and fakes it with a timed refresh.
---
---    ServerAdminPrint (core/lua/ServerAdmin.lua:156) and Shared.Message are
---    both plain writable globals that nobody aliases locally, and
---    Shared.ConsoleCommand is synchronous, so wrapping them tees every line
---    into a ring buffer and a command's own output is available the moment it
---    returns. Measured in tools/spikes/console-output-probe.lua; findings in
---    docs/REQUIREMENTS.md item 5.
---
---    Two request types read it:
---
---      request=runcommand&cmd=...   run it and return the lines it produced
---      request=getconsole&since=N   everything since line N, for a console
---
---    The legacy `command`/`rcon` fallthrough still works exactly as before, so
---    the 2012 panel keeps functioning against this server.
---
--- 2. `mod_version` in the server-state response, so a panel can tell whether
---    it is talking to this Lua or to a stock server and say so rather than
---    quietly offering features that cannot work.
---
--- 3. Three one-line bugs fixed, all of them cases where the server reports
---    success it never had. Details in docs/CONSTRAINTS.md items 7-9.
---
---      setreservedslotamount  called SetReservedSlotAmount(amount) against a
---                             function declared (client, amount), so the guard
---                             rejected every call and the whole Reserved Slots
---                             tab has never worked.
---      sv_unban               passed the console argument through as a string
---                             to a map keyed by number, so it could never
---                             match a ban that was plainly in getbanlist.
---      getbanlist             listed bans that had expired and no longer
---                             blocked anyone.
---
---    Found later (CONSTRAINTS items 10 and 11): an unban that did not let the
---    player back in, and sv_remove_reserved_slot never saving its removal.
---
---    Two are fixed here. `sv_unban` is fixed by wrapping the UnbanUser global
---    rather than by shipping a second copy of ServerAdminCommands.lua: it is a
---    global, nobody aliases it, and ServerAdminCommands.lua loads before this
---    file (Server.lua:34 and :35), so the wrapper is in place before anything
---    can call it -- and it fixes the game console's own sv_unban too, not just
---    the web one.
---
--- 4. Shine is first-class (docs/CONSTRAINTS.md, "Shine"). The state blob says
---    whether Shine is loaded and which of the plugins that replace vanilla
---    behaviour are on, and `getbans` reads Shine's own ban table when its ban
---    plugin owns the list -- who banned, when, for how long, none of which
---    GetBannedPlayersList() keeps.
---
--- 5. Recent players: everyone seen in the last 24 hours, up to 100, with name,
---    former names, IP, first and last seen and time played, kept in
---    config://improved-webadmin/ so the list outlives a map change. Read with
---    request=getrecentplayers. See docs/REQUIREMENTS.md item 6.
---
--- =========================================================================
-
-local kModVersion = "0.1.0"
-
--- Lines kept for the console tab. Each carries an increasing id, so a client
--- polls with `since` and learns from a gap that it missed some.
-local kConsoleBufferSize = 500
-local consoleBuffer = CreateRingBuffer(kConsoleBufferSize)
-local nextConsoleId = 1
-local droppedConsoleLines = 0
-
--- Engine chatter that would drown a console. Filtered at capture, and counted
--- so the count is visible rather than the lines just going missing.
---
--- Empty by measurement rather than by omission: an idle server produced zero
--- lines over 75 s, because the periodic `Script tracing` messages in
--- log-Server.txt are written engine-side and never pass through Lua. The
--- mechanism stays for a busy server that proves otherwise.
-local kNoisePatterns = {
-}
-local filteredConsoleLines = 0
-
-local function IsNoise(text)
-    for _, pattern in ipairs(kNoisePatterns) do
-        if string.find(text, pattern) then
-            return true
-        end
-    end
-    return false
-end
-
--- A fourth bug, found while testing the third and worse than it: an unban
--- that works does not actually let the player back in.
---
--- GenerateBannedPlayersMap (ServerAdminCommands.lua:304) only ever *adds* to
--- `bannedPlayersMap`, and UnbanUser removes from `bannedPlayers` without
--- clearing the map, so the removed ban survives in it. GetIsUserBanned and
--- GetIsUserBannedPermanently read that map, and OnCheckConnectionAllowed
--- (line 376) reads them, so until the server restarts the unbanned player is
--- still refused -- while every list says they are not banned. Measured on the
--- rig: after a successful unban, getbanlist was empty and GetIsUserBanned
--- still answered true.
---
--- It cannot bite on a stock server only because sv_unban never works there.
--- Fixing item 8 is what exposes it, so both have to be fixed together.
---
--- Both functions are globals that OnCheckConnectionAllowed calls by name, so
--- replacing them here is enough. They consult the live ban list instead of the
--- map: a linear scan over a list of bans, against a hash lookup, on a path
--- that runs once per connection attempt.
---
--- Compare ids as numbers on both sides. Vanilla stores them as numbers, but
--- Shine's ban plugin replaces GetBannedPlayersList() with one built from its
--- own table, keyed by *string* ids -- seen on a Shine server, where all 119
--- ids came back as strings. A plain `ban.id == id` never matches those.
-local function FindLiveBan(userId)
-
-    local id = tonumber(userId)
-    if not id then return nil end
-
-    for _, ban in ipairs(GetBannedPlayersList()) do
-        if tonumber(ban.id) == id then
-            return ban
-        end
-    end
-
-    return nil
-
-end
-
-if type(GetIsUserBanned) == "function" then
-
-    function GetIsUserBanned(userId)
-        local ban = FindLiveBan(userId)
-        if not ban then return false end
-        return ban.time == 0 or Shared.GetSystemTime() < ban.time
-    end
-
-end
-
-if type(GetIsUserBannedPermanently) == "function" then
-
-    function GetIsUserBannedPermanently(userId)
-        local ban = FindLiveBan(userId)
-        return ban ~= nil and ban.time == 0
-    end
-
-end
-
--- CONSTRAINTS item 8. Ban records key `bannedPlayersMap` by a number
--- (`tonumber(playerId)`, ServerAdminCommands.lua:446) but UnBan hands the raw
--- console argument -- a string -- straight to UnbanUser (line 485), so the
--- lookup always missed and the server answered "No matching Steam Id in ban
--- list" about an entry it was listing at the same moment.
-local originalUnbanUser = UnbanUser
-if type(originalUnbanUser) == "function" then
-
-    function UnbanUser(userId)
-        return originalUnbanUser(tonumber(userId) or userId)
-    end
-
-end
-
--- sv_remove_reserved_slot takes the slot out of memory and then saves with
--- Server.SaveConfigSettings() (ServerAdminCommands.lua:670), where adding a
--- slot and setting the amount use Server.SaveReservedSlotsConfig(). The
--- removal never reaches ReservedSlotsConfig.json: measured on the rig
--- 2026-09-27, the file still held the slot after "Removed reserved slot for
--- One", until an unrelated sv_reserved_slots saved it. A restart in between
--- brings the removed slot back.
---
--- RemoveReservedSlot is a local, so it cannot be wrapped. A second hook on the
--- same console command marks the config dirty and the next tick saves it,
--- which is right whichever of the two hooks the engine runs first.
-local reservedSlotsDirty = false
-Event.Hook("Console_sv_remove_reserved_slot", function()
-    reservedSlotsDirty = true
-end)
-
-local function SaveReservedSlotsIfDirty()
-    if reservedSlotsDirty then
-        reservedSlotsDirty = false
-        Server.SaveReservedSlotsConfig()
-    end
-end
-
--- Every command created by CreateServerAdminCommand emits this line before it
--- runs (core/lua/ServerAdmin.lua:113), so its presence is a receipt that the
--- command existed and was dispatched. Absence means an Event.Hook-style
--- command such as sv_help, or nothing at all.
+-- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
 
-local function TeeConsoleLine(source, text)
-
-    text = tostring(text)
-
-    -- Classified here rather than in runcommand, so a command someone runs
-    -- from the game console is labelled the same way as one from the panel.
-    if string.match(text, kAuditPattern) then
-        source = "audit"
-    end
-    if IsNoise(text) then
-        filteredConsoleLines = filteredConsoleLines + 1
-        return
-    end
-
-    if consoleBuffer:GetNumElements() == kConsoleBufferSize then
-        droppedConsoleLines = droppedConsoleLines + 1
-    end
-
-    consoleBuffer:Insert({
-        id = nextConsoleId,
-        time = Shared.GetSystemTime(),
-        src = source,
-        text = text,
-    })
-    nextConsoleId = nextConsoleId + 1
-
-end
-
--- ServerAdminPrint calls Shared.Message itself, so without this flag every
--- admin message would be captured twice -- sv_help yields 74 lines for 37
--- commands. The flag suppresses the inner call, not the outer one.
-local inServerAdminPrint = false
-
--- Shine replaces ServerAdminPrint on its first tick, without chaining to what
--- was there, and its version returns at once when there is no client -- which
--- is every command run from the web admin. On a Shine server that dropped our
--- wrapper and, with it, the output of every vanilla admin command: sv_kick's
--- "No matching player", the whole of sv_listbans. Measured on the rig with a
--- Shine config, 2026-09-27; Shine's source is lua/shine/core/server/logging.lua.
---
--- So the wrapper re-installs itself over whatever ServerAdminPrint currently
--- is, every tick and before every web request. The flag also keeps a chain
--- that runs through our wrapper twice (another mod wrapping ours, then ours
--- wrapping it) from teeing a line twice. Extra arguments pass through: Shine's
--- version takes a third.
+-- Shine replaces ServerAdminPrint with one that prints nothing without a
+-- client, so sv_ commands run from here returned no output. This puts the
+-- nil-client branch back over whatever is current.
 local ourServerAdminPrint
 
 local function EnsureServerAdminPrintWrapped()
 
     local current = ServerAdminPrint
-    if type(current) ~= "function" or current == ourServerAdminPrint then
-        return
-    end
+    if current == ourServerAdminPrint then return end
 
     ourServerAdminPrint = function(client, message, ...)
-
-        if inServerAdminPrint then
-            return current(client, message, ...)
+        if client == nil then
+            Shared.Message(tostring(message))
+            return
         end
-
-        TeeConsoleLine("admin", message)
-
-        inServerAdminPrint = true
-        local ok, err = pcall(current, client, message, ...)
-        inServerAdminPrint = false
-
-        if not ok then
-            error(err, 0)
-        end
-
+        return current(client, message, ...)
     end
     ServerAdminPrint = ourServerAdminPrint
 
 end
 
-EnsureServerAdminPrintWrapped()
+-- A command's output as lines. Script lines carry the log's "[hh:mm:ss]".
+local function CapturedLines(text)
 
-local originalSharedMessage = Shared.Message
-if type(originalSharedMessage) == "function" then
-
-    Shared.Message = function(message, ...)
-        if not inServerAdminPrint then
-            TeeConsoleLine("server", message)
-        end
-        return originalSharedMessage(message, ...)
+    local lines = { }
+    local now = Shared.GetSystemTime()
+    for line in string.gmatch(text, "[^\n]+") do
+        line = string.gsub(string.gsub(line, "\r$", ""), "^%[%d%d:%d%d:%d%d%]", "")
+        table.insert(lines, {
+            id = #lines + 1,
+            time = now,
+            src = string.match(line, kAuditPattern) and "audit" or "server",
+            text = line,
+        })
     end
+    return lines
 
 end
 
--- Print and Log are deliberately NOT wrapped. They are distinct functions, so
--- an identity check does not rule them out, but they are format-string front
--- ends onto Shared.Message: wrapping them captured `Requesting server ranking
--- be enabled, request success: %s` from Print and then the formatted
--- `... success: false` from Shared.Message underneath it. Every line arrived
--- twice, once as a useless template. Shared.Message already sees everything
--- they emit, formatted. Measured on the rig, 2026-09-05.
-
-
--- Shine, and its plugins that replace something vanilla does. Shine loads
--- after this file, so every lookup happens per request rather than at load.
--- Nil when Shine is absent, which also keeps the key out of the state blob.
-local kShinePlugins = { "ban", "reservedslots", "mapvote" }
+-- Shine plugins that replace vanilla behaviour; basecommands holds sh_gag.
+-- Shine loads after this file, so lookups happen per request.
+local kShinePlugins = { "ban", "reservedslots", "mapvote", "basecommands" }
 
 local function GetShinePlugin(name)
 
@@ -359,15 +104,11 @@ local function GetShineState()
 
 end
 
--- An expiry further out than this is not a date but a way of writing "never":
--- Shine was seen storing 6e+24 on a real server. Reported as permanent, so no
--- client has to guess where the line is.
+-- An expiry further out than this means permanent (Shine stores e.g. 6e+24).
 local kPermanentAfter = 100 * 365 * 24 * 60 * 60
 
--- The bans in force, newest first, from whichever table actually decides them.
--- Under Shine's ban plugin that is Shine's own table, which keeps who banned,
--- when and for how long; GetBannedPlayersList() throws all three away, and
--- hands the rest over in pairs() order, which changes between calls.
+-- The bans in force, newest first. Shine's table keeps issuer and issue time,
+-- which GetBannedPlayersList() drops.
 local function GetBansInForce()
 
     local now = Shared.GetSystemTime()
@@ -396,7 +137,6 @@ local function GetBansInForce()
                 name = tostring(data.Name or ""),
                 reason = tostring(data.Reason or ""),
                 issued = tonumber(data.Issued),
-                duration = tonumber(data.Duration),
                 banned_by = data.BannedBy and tostring(data.BannedBy) or nil,
             }, data.UnbanTime)
         end
@@ -411,7 +151,7 @@ local function GetBansInForce()
 
     end
 
-    -- Vanilla appends, so the list is already oldest first.
+    -- Vanilla appends, so the list is oldest first.
     local list = GetBannedPlayersList()
     for i = #list, 1, -1 do
         local ban = list[i]
@@ -426,47 +166,24 @@ local function GetBansInForce()
 
 end
 
--- Recent players (docs/REQUIREMENTS.md item 6): everyone seen in the last day,
--- so a player who has already left can still be found and banned.
---
--- It has to outlive a map change, and a map change rebuilds all Lua state, so
--- the list lives in a file under config://. Measured on 09-26: mod Lua can
--- write there, but "a" truncates like "w" and there is no os.rename or
--- os.remove. The file is therefore rewritten whole, and a crash mid-write
--- leaves it torn with no way to swap a finished copy in.
---
--- Two slots stand in for write-then-rename. Saves alternate between them,
--- each stamped with an increasing `seq`, and the loader takes the newest one
--- that parses. A torn write costs one save, not the list, and the next save
--- overwrites the torn slot.
---
--- Nothing here depends on whether ClientDisconnect fires at a map change: a
--- disconnect only stamps a time, and `connected` is read off the live player
--- list at request time, so a map change never reads as everyone leaving.
+-- Recent players: seen in the last 24 h, at most 100, saved under config://
+-- to survive map changes. A torn save starts the list empty.
 local kRecentWindow = 24 * 60 * 60
 local kRecentCapacity = 100
 local kRecentFormerNames = 5
 local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
-local kRecentSlots = {
-    "config://improved-webadmin/recent-players-a.json",
-    "config://improved-webadmin/recent-players-b.json",
-}
+local kRecentFile = "config://webadmin/recent-players.json"
 
 -- Account id -> entry, as saved.
 local recentPlayers = { }
--- Account id -> the system time `played` was last brought up to, while that
--- player is connected on this map.
+-- Account id -> the time `played` was last updated to, for connected players.
 local recentAccrued = { }
--- nil until the file has been read. Then "ok", "fallback" (the newest slot was
--- torn and the older one was used), "empty" (no file yet) or "unreadable".
+-- nil until loaded, then "ok", "empty" (no file) or "unreadable".
 local recentLoadStatus
-local recentSeq = 0
-local recentNextSlot = 1
 local recentDirty = false
 local recentUrgent = false
-local recentSavedAt
 local recentSaveError
 local lastRecentSweep = 0
 local lastRecentSave = 0
@@ -502,68 +219,37 @@ local function SanitizeRecentEntry(raw)
 
 end
 
--- One slot: "absent", or "torn", or the decoded document.
-local function ReadRecentSlot(path)
+local function EnsureRecentLoaded()
 
-    local file = io.open(path, "r")
-    if not file then return "absent" end
+    if recentLoadStatus then return end
+
+    local file = io.open(kRecentFile, "r")
+    if not file then
+        recentLoadStatus = "empty"
+        return
+    end
 
     local text = file:read("*a")
     file:close()
 
     local ok, data = pcall(json.decode, text or "")
-    if ok and type(data) == "table" and data.version == kRecentFileVersion
-            and tonumber(data.seq) and type(data.players) == "table" then
-        data.seq = tonumber(data.seq)
-        return data
-    end
-    return "torn"
-
-end
-
-local function EnsureRecentLoaded()
-
-    if recentLoadStatus then return end
-
-    local best, bestSlot
-    local torn, present = 0, 0
-    for slot, path in ipairs(kRecentSlots) do
-        local data = ReadRecentSlot(path)
-        if data ~= "absent" then present = present + 1 end
-        if data == "torn" then
-            torn = torn + 1
-        elseif type(data) == "table" and (not best or data.seq > best.seq) then
-            best, bestSlot = data, slot
-        end
-    end
-
-    if best then
-        for _, raw in ipairs(best.players) do
-            local entry = SanitizeRecentEntry(raw)
-            if entry then
-                recentPlayers[entry.steamid] = entry
-            end
-        end
-        recentSeq = best.seq
-        recentNextSlot = bestSlot % #kRecentSlots + 1
-        recentSavedAt = tonumber(best.saved)
-    end
-
-    if present == 0 then
-        recentLoadStatus = "empty"
-    elseif not best then
+    if not (ok and type(data) == "table" and data.version == kRecentFileVersion
+            and type(data.players) == "table") then
         recentLoadStatus = "unreadable"
-    elseif torn > 0 then
-        -- The torn slot is the next one written, so it is gone after one save.
-        recentLoadStatus = "fallback"
-    else
-        recentLoadStatus = "ok"
+        return
     end
+
+    for _, raw in ipairs(data.players) do
+        local entry = SanitizeRecentEntry(raw)
+        if entry then
+            recentPlayers[entry.steamid] = entry
+        end
+    end
+    recentLoadStatus = "ok"
 
 end
 
--- The humans connected right now, by account id, from the same walk the state
--- blob does.
+-- Connected humans, by account id.
 local function GetConnectedClients()
 
     local connected = { }
@@ -582,8 +268,8 @@ local function ClientAddress(client)
     return address and IPAddressToString(address) or ""
 end
 
--- Oldest out first, then the rest past the capacity. Someone still connected
--- is never dropped, however long they have been on.
+-- Drops entries past the window, then the oldest past capacity. Connected
+-- players are always kept.
 local function PruneRecent(now, connected)
 
     local kept = { }
@@ -624,8 +310,8 @@ local function RecentEntry(id, now)
 
 end
 
--- Player:GetName() answers kDefaultPlayerName while a name is still empty, so
--- that placeholder never replaces a real name or becomes a former one.
+-- GetName() returns kDefaultPlayerName before a name is set; that never
+-- replaces a real name or becomes a former one.
 local function SetRecentName(entry, name)
 
     if type(name) ~= "string" or name == "" or name == entry.name then return end
@@ -667,15 +353,13 @@ local function SaveRecent(now)
     end
 
     local probeStart = ProbeClock()
-    local seq = recentSeq + 1
-    local path = kRecentSlots[recentNextSlot]
     local ok, err = pcall(function()
-        local file, openError = io.open(path, "w")
+        local file, openError = io.open(kRecentFile, "w")
         if not file then
-            error(openError or ("cannot open " .. path), 0)
+            error(openError or ("cannot open " .. kRecentFile), 0)
         end
-        file:write(json.encode({
-            version = kRecentFileVersion, seq = seq, saved = now, players = list,
+        file:write(Shared.JsonEncode({
+            version = kRecentFileVersion, players = list,
         }))
         file:close()
     end)
@@ -685,15 +369,7 @@ local function SaveRecent(now)
     lastRecentSave = now
     recentDirty = false
     recentUrgent = false
-
-    if ok then
-        recentSeq = seq
-        recentNextSlot = recentNextSlot % #kRecentSlots + 1
-        recentSavedAt = now
-        recentSaveError = nil
-    else
-        recentSaveError = tostring(err)
-    end
+    recentSaveError = not ok and tostring(err) or nil
 
 end
 
@@ -733,14 +409,12 @@ Event.Hook("ClientDisconnect", function(client)
     end
     recentAccrued[id] = nil
 
-    -- Saved on the next tick rather than here, so a map change or a mass
-    -- disconnect costs one write, not one per player.
+    -- Saved on the next tick, so a mass disconnect costs one write.
     recentDirty = true
     recentUrgent = true
 
 end)
 
--- Once per tick; does real work every kRecentSweepSeconds.
 local function UpdateRecentPlayers()
 
     local now = Shared.GetSystemTime()
@@ -786,8 +460,7 @@ local function GetRecentPlayers()
             names = entry.names,
             ipaddress = entry.ipaddress,
             first_seen = entry.first_seen,
-            -- A connected player is being seen now, whatever the last sweep
-            -- wrote, and has played up to now.
+            -- Connected: seen now, and played up to now.
             last_seen = connected[id] and now or entry.last_seen,
             played = entry.played + ((connected[id] and since) and math.max(0, now - since) or 0),
             connected = connected[id] ~= nil,
@@ -805,7 +478,6 @@ local function GetRecentPlayers()
         capacity = kRecentCapacity,
         storage = {
             loaded = recentLoadStatus,
-            saved_at = recentSavedAt,
             error = recentSaveError,
         },
         players = players,
@@ -813,130 +485,619 @@ local function GetRecentPlayers()
 
 end
 
-local function ConsoleLinesSince(sinceId)
+-- Shine's sh_banid names an absent player "<unknown>"; use the name from
+-- recent players instead. Shine can re-create the plugin, so this re-applies.
+local kShineUnknownName = "<unknown>"
+local shineAddBanWrappers = setmetatable({ }, { __mode = "k" })
 
-    local lines = { }
-    for _, line in ipairs(consoleBuffer:ToTable()) do
-        if line.id > sinceId then
-            table.insert(lines, line)
-        end
+local function EnsureShineAddBanWrapped()
+
+    local plugin = GetShinePlugin("ban")
+    if not plugin or type(plugin.AddBan) ~= "function"
+            or plugin.AddBan == shineAddBanWrappers[plugin] then
+        return
     end
-    return lines
+
+    local original = plugin.AddBan
+    local wrapper = function(self, id, name, ...)
+
+        if name == kShineUnknownName then
+            EnsureRecentLoaded()
+            local entry = recentPlayers[tonumber(id)]
+            if entry and entry.name ~= "" and entry.name ~= kDefaultPlayerName then
+                name = entry.name
+                Shared.Message(string.format('Named the ban of %s "%s", from recent players.',
+                                             tostring(id), name))
+            end
+        end
+
+        return original(self, id, name, ...)
+
+    end
+
+    shineAddBanWrappers[plugin] = wrapper
+    plugin.AddBan = wrapper
 
 end
 
+-- getperf: the engine's ServerPerformanceData samples (about one a second),
+-- accumulated into kPerfWindowSeconds windows. The ring and its ids restart
+-- with the map; `loaded_at` tells clients.
+local kPerfWindowSeconds = 10
+local kMaxPerfWindows = 360   -- an hour
+local perfWindows = CreateRingBuffer(kMaxPerfWindows)
+local nextPerfWindowId = 1
+local perfLoadedAt = Shared.GetSystemTime()
+local perfAcc = nil           -- ServerPerformanceData, made on first use
+local perfLastStamp = nil
+local perfTicks = 0
+local perfWorstTick = 0
+local perfWindowStart = nil   -- Shared.GetSystemTimeReal() at the window's start
+local perfLastTick = nil
 
+local function PerfRound(v, places)
+    local m = 10 ^ (places or 1)
+    return math.floor(v * m + 0.5) / m
+end
 
-local kMaxPerfDatas = 30
+-- One closed window: ServerPerformanceData.DetailText's figures.
+local function PerfWindowFromAcc(acc, ticks, elapsed, worstTick)
+    local durationMs = acc:GetDurationMs()
+    return {
+        id = nextPerfWindowId,
+        time = Shared.GetSystemTime(),
+        tickrate = PerfRound(elapsed > 0 and ticks / elapsed or 0, 2),
+        worst_tick_ms = PerfRound(worstTick * 1000, 1),
+        players = acc:GetNumPlayers(),
+        -- 0 with nobody on the server.
+        score = acc:GetScore(),
+        idle_pct = PerfRound(100 * acc:GetTimeSpentIdling() / durationMs),
+        moves_pct = PerfRound(100 * acc:GetTimeSpentOnMoves() / durationMs),
+        entities_pct = PerfRound(100 * acc:GetTimeSpentOnUpdate() / durationMs),
+        entities = acc:GetEntityCount(),
+        -- Counts over the window; perfmon prints them per second.
+        interp_warns = acc:GetNumInterpWarns(),
+        interp_fails = acc:GetNumInterpFails(),
+        lua_kb = math.floor(collectgarbage("count")),
+    }
+end
 
--- How often to log performance data in seconds.
-local kLogPerfDataRate = 60
+local function UpdatePerfWindows()
 
--- The last kMaxPerfDatas performance samples (one is taken every kLogPerfDataRate seconds).
-local perfDataBuffer = CreateRingBuffer(kMaxPerfDatas)
+    -- Ticks are counted here: GetUpdateIntervalMs() is whole milliseconds.
+    local now = Shared.GetSystemTimeReal()
+    if perfLastTick then
+        local interval = now - perfLastTick
+        if interval > perfWorstTick then perfWorstTick = interval end
+    end
+    perfLastTick = now
+    perfTicks = perfTicks + 1
 
--- The last time performance data was sampled.
-local lastPerfDataTime = 0
+    local data = Shared.GetServerPerformanceData()
+    local stamp = data:GetTimestamp()
+    if stamp == perfLastStamp then return end
+    perfLastStamp = stamp
 
--- Stores cached workshop mod results for 60 seconds.
-local getmodsCache = { }
+    -- Accumulate() of an empty sample (as after a map load) crashes the
+    -- server with SIGFPE, which pcall cannot catch.
+    if data:GetDurationMs() <= 0 then return end
+
+    if not perfAcc then
+        perfAcc = ServerPerformanceData()
+        -- Start here, so the tick count and the samples cover the same span.
+        perfWindowStart, perfTicks, perfWorstTick = now, 0, 0
+        return
+    end
+
+    perfAcc:Accumulate(data)
+    if perfAcc:GetDurationMs() >= kPerfWindowSeconds * 1000 then
+        perfWindows:Insert(PerfWindowFromAcc(perfAcc, perfTicks, now - perfWindowStart, perfWorstTick))
+        nextPerfWindowId = nextPerfWindowId + 1
+        perfAcc:Clear()
+        perfWindowStart, perfTicks, perfWorstTick = now, 0, 0
+    end
+
+end
+
+-- Most records per getperf reply; the client pages with `more`. An hour in
+-- one reply took 8.4 ms to encode, 60 take 1.4 ms.
+local kPerfReplyMax = 60
+
+-- The windows after `sinceId`, the next cursor, and whether more are held.
+local function PerfWindowsSince(sinceId)
+    local windows = { }
+    for _, w in ipairs(perfWindows:ToTable()) do
+        if w.id > sinceId then
+            if #windows == kPerfReplyMax then
+                return windows, windows[#windows].id, true
+            end
+            table.insert(windows, w)
+        end
+    end
+    return windows, nextPerfWindowId - 1, false
+end
+
+-- The rates the server runs at now. nil until the engine's first sample.
+local function PerfConfig()
+    local data = Shared.GetServerPerformanceData()
+    if data:GetTickrate() <= 0 then return nil end
+    return {
+        tickrate = data:GetTickrate(),
+        moverate = data:GetMoverate(),
+        sendrate = data:GetSendrate(),
+        interp_ms = data:GetInterpMs(),
+        max_players = data:GetMaxPlayers(),
+        bw_limit = Server.GetBwLimit(),
+    }
+end
+
+-- getlog: the server's log by byte offset, at most 64 KB a reply (256 KB took
+-- 4.4 ms to encode). The header's Date and Time identify the file: a
+-- different file, or one shorter than the cursor, gets a fresh tail marked
+-- `reset`.
+local kLogTailBytes = 64 * 1024
+local kLogMaxBytes = 64 * 1024
+
+-- Bytes [from, to) of the log.
+local function LogRead(from, to)
+    if to <= from then return "" end
+    return (Shared.ReadLog(from, to - from))
+end
+
+local function LogSize()
+    local _, size = Shared.ReadLog(-1, 1)
+    return size
+end
+
+-- "09/28/2026 02:50:11 AM" from the header, or "" for a file without one.
+local function LogFileId()
+    local date, time = string.match(LogRead(0, 128), "^Date: ([^\r\n]*)\r?\nTime: ([^\r\n]-):?\r?\n")
+    return date and (date .. " " .. time) or ""
+end
+
+-- The complete lines in `text`, which starts at byte `from`, and where the
+-- next read starts: a last line with no newline is left for it.
+local function LogLines(text, from)
+    local lines = { }
+    local pos = 1
+    while true do
+        local nl = string.find(text, "\n", pos, true)
+        if not nl then break end
+        local line = string.sub(text, pos, nl - 1)
+        if string.sub(line, -1) == "\r" then line = string.sub(line, 1, -2) end
+        table.insert(lines, { off = from + pos - 1, text = line })
+        pos = nl + 1
+    end
+    return lines, from + pos - 1
+end
+
+-- `text`, read from byte `from`, cut to its first line start. nil when none.
+local function FromLineStart(text, from)
+    if from == 0 then return text, 0 end
+    local nl = string.find(text, "\n", 1, true)
+    if not nl then return nil end
+    return string.sub(text, nl + 1), from + nl
+end
+
+local function LogTail(size)
+    local start = math.max(0, size - kLogTailBytes)
+    local text, from = FromLineStart(LogRead(start, size), start)
+    if not text then text, from = "", size end
+    local lines, to = LogLines(text, from)
+    return from, to, lines, false
+end
+
+local function LogSince(size, since)
+    local stop = math.min(size, since + kLogMaxBytes)
+    local text = LogRead(since, stop)
+    local lines, to = LogLines(text, since)
+    -- A line longer than the cap would stall the cursor: serve it cut.
+    if to == since and stop == since + kLogMaxBytes then
+        lines, to = { { off = since, text = text } }, stop
+    end
+    return since, to, lines, to < size and stop < size
+end
+
+local function LogBefore(before)
+    local from = math.max(0, before - kLogTailBytes)
+    local raw = LogRead(from, before)
+    local text, start = FromLineStart(raw, from)
+    if not text then
+        -- One line longer than a page: serve it cut.
+        return from, before, { { off = from, text = raw } }, false
+    end
+    return start, before, (LogLines(text, start)), false
+end
+
+local function GetLog(actions)
+
+    local size = LogSize()
+    local fileId = LogFileId()
+    local since = tonumber(actions.since)
+    local before = tonumber(actions.before)
+    local wanted = since or before
+
+    local reset
+    if wanted and actions.file ~= nil and actions.file ~= fileId then
+        reset = "new_file"
+    elseif wanted and (wanted > size or wanted < 0) then
+        reset = "truncated"
+    end
+
+    local from, to, lines, more
+    if since and not reset then
+        from, to, lines, more = LogSince(size, math.floor(since))
+    elseif before and not reset then
+        from, to, lines, more = LogBefore(math.floor(before))
+    else
+        from, to, lines, more = LogTail(size)
+    end
+
+    return {
+        file_id = fileId,
+        size = size,
+        from = from,
+        to = to,
+        lines = lines,
+        more = more,
+        at_start = from == 0,
+        reset = reset,
+    }
+
+end
+
+-- getperf's `engine`: tickstat windows from Server.GetTickStat(), which is
+-- nil while `tickstat` is off; and, from the log, rate steps, the bwlimit
+-- warning, `perfmon` blocks and `tickstat: on|off`. Log lines carry no time,
+-- so each is stamped when a scan finds it. Patterns are anchored at both
+-- ends, so a player name cannot fake a line.
+local kTickstatPollSeconds = 1
+local kEngineScanSeconds = 2
+-- A scan normally meets about 1 KB; 256 KB takes 1.8 ms.
+local kEngineScanMaxBytes = 256 * 1024
+local kMaxTickstats = 360          -- an hour at `tickstat 10`
+local kMaxPerfmonBlocks = 60
+local kMaxEngineEvents = 200
+local engineTickstats = CreateRingBuffer(kMaxTickstats)
+local enginePerfmon = CreateRingBuffer(kMaxPerfmonBlocks)
+local engineEvents = CreateRingBuffer(kMaxEngineEvents)
+local nextEngineId = 1
+local engineCursor = nil           -- byte offset; set by the first scan
+local engineFileId = nil
+local enginePartialBlock = nil     -- a perfmon block still being read
+local engineLastScan = nil
+local tickstatLastPoll = nil
+local tickstatLastWindow = nil     -- the engine's `time` of the last window kept
+local tickstatLastAt = nil
+local tickstatSaid = nil           -- the last `tickstat: on|off`
+
+-- The perfmon block, one line each; `score` closes it.
+local kPerfmonLines = {
+    { "^perfmon: tick jitter avg (%S+)ms max (%S+)ms %(n=(%S+)%)$",
+      "jitter_avg_ms", "jitter_max_ms", "jitter_n" },
+    { "^perfmon: snapshot write avg (%S+)ms max (%S+)ms %(n=(%S+)%)$",
+      "snapshot_write_avg_ms", "snapshot_write_max_ms", "snapshot_write_n" },
+    { "^perfmon: entities skipped (%S+) / (%S+) %((%S+)%%%)$",
+      "entities_skipped", "entities_total", "entities_skipped_pct" },
+    { "^perfmon: moves rejected: time credit (%S+), other (%S+)$",
+      "rejected_time_credit", "rejected_other" },
+    { "^perfmon: moves rewound with missing snapshots (%S+) %(since map load%)$", "rewound_missing" },
+    { "^perfmon: score (%S+) = idle (%S+)%% %- delivery (%S+)%% %- overload (%S+)%% " ..
+      "%(updates (%S+), warn (%S+), fail (%S+)%)$",
+      "score", "idle_pct", "delivery_pct", "overload_pct", "updates", "warn", "fail" },
+}
+
+-- On a match, set the spec's fields on `into`.
+local function EngineMatch(spec, text, into)
+    local caps = { string.match(text, spec[1]) }
+    if #caps == 0 then return false end
+    for i = 2, #spec do
+        into[spec[i]] = tonumber(caps[i - 1])
+    end
+    return true
+end
+
+local function EngineRecord(fields, now)
+    fields.id = nextEngineId
+    fields.time = now
+    nextEngineId = nextEngineId + 1
+    return fields
+end
+
+local function UpdateTickstat()
+
+    local now = Shared.GetSystemTimeReal()
+    if tickstatLastPoll and now - tickstatLastPoll < kTickstatPollSeconds then return end
+    tickstatLastPoll = now
+
+    local stat = Server.GetTickStat()
+    if not stat or stat.time == tickstatLastWindow then return end
+    tickstatLastWindow = stat.time
+
+    -- Sent as the engine gives it, but `time` becomes the window's end on the
+    -- system clock: the engine's is the server's. A copy, so the engine's
+    -- table keeps its own `time`.
+    local record = { }
+    for k, v in pairs(stat) do record[k] = v end
+    local at = Shared.GetSystemTime() - math.max(0, Shared.GetTime() - stat.time)
+    engineTickstats:Insert(EngineRecord(record, at))
+    tickstatLastAt = at
+
+end
+
+local function ClosePerfmonBlock()
+    if enginePartialBlock then
+        enginePerfmon:Insert(enginePartialBlock)
+        enginePartialBlock = nil
+    end
+end
+
+local function ParseEngineLine(text, now)
+
+    if string.sub(text, 1, 9) == "perfmon: " then
+        local fields = { }
+        for i, spec in ipairs(kPerfmonLines) do
+            if EngineMatch(spec, text, fields) then
+                if i == 1 then
+                    ClosePerfmonBlock()
+                    enginePartialBlock = EngineRecord({ }, now)
+                end
+                if enginePartialBlock then
+                    for k, v in pairs(fields) do enginePartialBlock[k] = v end
+                    if i == #kPerfmonLines then ClosePerfmonBlock() end
+                end
+                return
+            end
+        end
+        return
+    end
+
+    local client, from, to, choked, clear, bw = string.match(text,
+        "^client (%d+): snapshot rate (%S+) %-> (%S+)/s %((%S+)%% choked, (%S+) ms to clear each, bwlimit (%S+)%)$")
+    if client then
+        engineEvents:Insert(EngineRecord({
+            kind = "rate", client = tonumber(client), from_rate = tonumber(from),
+            to_rate = tonumber(to), choked_pct = tonumber(choked),
+            clear_ms = tonumber(clear), bwlimit = tonumber(bw) }, now))
+        return
+    end
+
+    local bwlimit, sendrate, per, needed, suggested = string.match(text,
+        "^bwlimit (%d+) bytes/sec at sendrate (%d+) leaves (%d+) bytes per snapshot, " ..
+        "below the (%d+) a full game needs: .- bwlimit (%d+) or more avoids it%.$")
+    if bwlimit then
+        engineEvents:Insert(EngineRecord({
+            kind = "bwlimit_low", bwlimit = tonumber(bwlimit), sendrate = tonumber(sendrate),
+            per_snapshot = tonumber(per), needed = tonumber(needed),
+            suggested = tonumber(suggested) }, now))
+        return
+    end
+
+    local said = string.match(text, "^tickstat: (%a+)$")
+    if said then
+        tickstatSaid = { text = said, time = now }
+    end
+
+end
+
+-- What the engine wrote since the last scan. The first scan after a map load
+-- only sets the cursor.
+local function ScanEngineLog()
+
+    local size = LogSize()
+    local fileId = LogFileId()
+    if engineCursor == nil then
+        engineCursor, engineFileId = size, fileId
+        return
+    end
+    if fileId ~= engineFileId or size < engineCursor then
+        -- A new file, or this one cut: all of it is new.
+        engineCursor, engineFileId = 0, fileId
+        enginePartialBlock = nil
+    end
+    if size - engineCursor > kEngineScanMaxBytes then
+        -- Too far behind: only the last kEngineScanMaxBytes.
+        local from = size - kEngineScanMaxBytes
+        local _, start = FromLineStart(LogRead(from, size), from)
+        engineCursor = start or size
+    end
+    local lines, to = LogLines(LogRead(engineCursor, size), engineCursor)
+    local now = Shared.GetSystemTime()
+    for _, line in ipairs(lines) do
+        ParseEngineLine(line.text, now)
+    end
+    engineCursor = to
+
+end
+
+local function UpdateEngineLog()
+    local now = Shared.GetSystemTimeReal()
+    if engineLastScan and now - engineLastScan < kEngineScanSeconds then return end
+    engineLastScan = now
+    ScanEngineLog()
+end
+
+local function EngineSince(buffer, sinceId)
+    local list = { }
+    for _, r in ipairs(buffer:ToTable()) do
+        if r.id > sinceId then table.insert(list, r) end
+    end
+    return list
+end
+
+-- Records since `sinceId`, at most kPerfReplyMax across the three lists. They
+-- share one id sequence but leave their rings at different rates, so a page
+-- ends at the kPerfReplyMax-th lowest id held.
+local function EngineReport(sinceId)
+    local report = {
+        last_id = nextEngineId - 1,
+        more = false,
+        -- The server's clock, for judging whether tickstat is still running.
+        now = Shared.GetSystemTime(),
+        scan_s = kEngineScanSeconds,
+        tickstat_last_at = tickstatLastAt,
+        tickstat_said = tickstatSaid,
+    }
+    local lists = {
+        EngineSince(engineTickstats, sinceId),
+        EngineSince(enginePerfmon, sinceId),
+        EngineSince(engineEvents, sinceId),
+    }
+    if #lists[1] + #lists[2] + #lists[3] > kPerfReplyMax then
+        local ids = { }
+        for _, list in ipairs(lists) do
+            for _, r in ipairs(list) do ids[#ids + 1] = r.id end
+        end
+        table.sort(ids)
+        local upTo = ids[kPerfReplyMax]
+        for i, list in ipairs(lists) do
+            local kept = { }
+            for _, r in ipairs(list) do
+                if r.id <= upTo then kept[#kept + 1] = r end
+            end
+            lists[i] = kept
+        end
+        report.last_id = upTo
+        report.more = true
+    end
+    report.tickstats, report.perfmon, report.events = lists[1], lists[2], lists[3]
+    return report
+end
 
 Shared.SetWebRoot("web")
 
---
--- Returns a list of all of the mods installed on the server (not necessarily active)
---
+-- The installed mods. `active`: mounted now, hotfix mods included.
 local function GetModList()
 
-    local returnList = { }
-    
-    for i = 1, Server.GetNumMods() do
-        local id   = Server.GetModId(i)
-        local name = Server.GetModTitle(i)
-        returnList[i] = { id = id, name = name }
+    local active = { }
+    for i = 1, Server.GetNumActiveMods() do
+        active[Server.GetActiveModId(i)] = true
     end
-    
+
+    local returnList = { }
+    for i = 1, Server.GetNumMods() do
+        local id = Server.GetModId(i)
+        returnList[i] = {
+            id = id, name = Server.GetModTitle(i), active = active[id] == true,
+            whitelisted = Server.GetIsModWhitelisted(id),
+        }
+    end
     return returnList
-    
+
 end
 
 local function GetMapList()
 
     local returnList = { }
-    
     for i = 1, Server.GetNumMaps() do
-        local name  = Server.GetMapName(i)
-        local modId = Server.GetMapModId(i)
-        returnList[i] = { name = name, modId = modId }
+        returnList[i] = { name = Server.GetMapName(i), modId = Server.GetMapModId(i) }
     end
-    
     return returnList
-    
+
 end
 
 local function GetTeamResourceCount()
 
     local marineRes = 0
     local alienRes = 0
-    
+
     local teamInfo = GetEntitiesForTeam("TeamInfo", 1)
     if table.icount(teamInfo) > 0 then
         marineRes = teamInfo[1]:GetTeamResources()
     end
-    
+
     teamInfo = GetEntitiesForTeam("TeamInfo", 2)
     if table.icount(teamInfo) > 0 then
         alienRes = teamInfo[1]:GetTeamResources()
     end
-    
+
     return marineRes, alienRes
-    
+
 end
 
--- Returns a Lua table containing the state of the server.
+-- A ScoringMixin number, or nil when the method is missing, errors or does
+-- not return a number.
+local function SkillOf(player, method)
+    local f = player[method]
+    if type(f) ~= "function" then return nil end
+    local ok, v = pcall(f, player)
+    return ok and tonumber(v) or nil
+end
+
 local function GetServerState()
 
     local playerRecords = Shared.GetEntitiesWithClassname("Player")
-    
+
+    -- Shine's gags. IsClientGagged also expires a timed gag.
+    local gags = GetShinePlugin("basecommands")
+    if gags and type(gags.IsClientGagged) ~= "function" then
+        gags = nil
+    end
+
     local playerList = { }
     for _, player in ientitylist(playerRecords) do
-    
+
+        -- nil if the player was just removed.
         local client = Server.GetOwner(player)
-        -- The ServerClient may be nil if this player was just removed from the server
-        -- right before this function was called.
         if client then
-        
+
+            local scoring = HasMixin(player, "Scoring")
             local playerData =
             {
                 name = player:GetName(),
                 steamid = client:GetUserId(),
-                isbot = tostring(client:GetIsVirtual()),
+                isbot = client:GetIsVirtual() == true,
                 team = player:GetTeamNumber(),
                 iscomm = player:GetIsCommander(),
-                score = HasMixin(player, "Scoring") and player:GetScore() or 0,
-                kills = HasMixin(player, "Scoring") and player:GetKills() or 0,
-                assists = HasMixin(player, "Scoring") and player:GetAssistKills() or 0,
-                deaths = HasMixin(player, "Scoring") and player:GetDeaths() or 0,
+                score = scoring and player:GetScore() or 0,
+                kills = scoring and player:GetKills() or 0,
+                assists = scoring and player:GetAssistKills() or 0,
+                deaths = scoring and player:GetDeaths() or 0,
                 resources = player:GetResources(),
                 ping = client:GetPing(),
-                ipaddress = IPAddressToString(Server.GetClientAddress(client))
+                ipaddress = IPAddressToString(Server.GetClientAddress(client)),
+                familyshared = Server.GetIsFamilyShared(client),
+                -- Time-credit rejections usually mean a modified client;
+                -- "other" can be a poor connection.
+                moves_rejected_time = client:GetMovesRejectedTimeCredit(),
+                moves_rejected_other = client:GetMovesRejectedOther(),
             }
+            if playerData.familyshared then
+                playerData.owner_steamid = tonumber(Server.GetOwnerUserId(client))
+            end
+            if gags then
+                local ok, gagged = pcall(gags.IsClientGagged, gags, client)
+                if ok then
+                    playerData.gagged = gagged == true
+                end
+            end
+            -- Marines play at skill + offset, aliens at skill - offset.
+            local skill = SkillOf(player, "GetPlayerSkill")
+            if skill then
+                playerData.skill = skill
+                playerData.skill_offset = SkillOf(player, "GetPlayerSkillOffset")
+                playerData.comm_skill = SkillOf(player, "GetCommanderSkill")
+                playerData.comm_skill_offset = SkillOf(player, "GetCommanderSkillOffset")
+                -- -1 bot, -2 no skill, 0 rookie, 1-7. GetSkillTier() caches
+                -- its first answer for the map; keep that cache as it was.
+                local kept = player.skillTier
+                playerData.skill_tier = SkillOf(player, "GetSkillTier")
+                player.skillTier = kept
+            end
             table.insert(playerList, playerData)
-            
+
         end
-        
+
     end
-    
+
     local marineRes, alienRes = GetTeamResourceCount()
     local gamestarted = GetGamerules():GetGameStarted()
     local gametime = gamestarted and math.floor(Shared.GetTime() - GetGamerules():GetGameStartTime()) or 0
-    
+
     return
     {
-        webdomain = "[[webdomain]]",
-        webport = "[[webport]]",
-        cheats  = tostring(Shared.GetCheatsEnabled()),
-        devmode = tostring(Shared.GetDevMode()),
+        cheats  = Shared.GetCheatsEnabled() == true,
+        devmode = Shared.GetDevMode() == true,
         map = tostring(Shared.GetMapName()),
         players_online = playerRecords:GetSize(),
         marines = GetGamerules():GetTeam1():GetNumPlayers(),
@@ -949,18 +1110,16 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        -- improved-webadmin: absent on a stock server, which is how a panel knows.
-        mod_version = kModVersion,
-        -- improved-webadmin: the reserved slot amount cannot exceed it.
+        -- Upper bound for the reserved slot amount.
         max_players = Server.GetMaxPlayers(),
-        -- improved-webadmin: absent when Shine is not loaded.
+        -- The Lua VM is rebuilt at a map change.
+        map_loaded_at = perfLoadedAt,
+        -- One condition is that every mounted mod is whitelisted.
+        ranking_active = Server.GetIsRankingActive(),
+        -- Absent without Shine.
         shine = GetShineState()
     }
-    
-end
 
-local function DecToHex(id)
-    return string.format("%x", tonumber(id))
 end
 
 local function ModsIdsToHex(t)
@@ -989,254 +1148,433 @@ local function ModIdsFromHex(t)
     end
 end
 
-local function OnWebRequest(actions)
+local kMapCycleFile = "config://MapCycle.json"
 
-    -- improved-webadmin: before anything a request runs can print.
-    EnsureServerAdminPrintWrapped()
+-- table.copyDict (Table.lua) returns the original, not a copy. The metatable
+-- is kept: dkjson uses it to tell an empty object from an empty array.
+local function DeepCopy(value)
 
-    -- improved-webadmin: run a command and return what it printed.
-    if actions.request == "runcommand" then
-
-        local command = actions.cmd or ""
-        local firstId = nextConsoleId
-        local started = Shared.GetTime()
-
-        Shared.ConsoleCommand(command)
-
-        local elapsed = Shared.GetTime() - started
-        local produced = ConsoleLinesSince(firstId - 1)
-
-        -- The audit line is already labelled; its presence is the receipt.
-        local dispatched = false
-        for _, line in ipairs(produced) do
-            if line.src == "audit" then
-                dispatched = true
-            end
-        end
-        local lines = produced
-
-        return "application/json", json.encode({
-            cmd = command,
-            -- True when the command was dispatched as an admin command. False
-            -- means either a plain console command or no such command -- the
-            -- server does not distinguish those, and neither should a client.
-            dispatched = dispatched,
-            elapsed = elapsed,
-            lines = lines,
-            last_id = nextConsoleId - 1,
-        })
-
-    -- improved-webadmin: the console stream, everything captured since `since`.
-    elseif actions.request == "getconsole" then
-
-        local since = tonumber(actions.since) or 0
-        local lines = ConsoleLinesSince(since)
-
-        return "application/json", json.encode({
-            lines = lines,
-            last_id = nextConsoleId - 1,
-            -- Lines that fell out of the ring before anyone read them, and
-            -- lines dropped as engine noise. Both are reported rather than
-            -- silently vanishing.
-            dropped = droppedConsoleLines,
-            filtered = filteredConsoleLines,
-            buffer_size = kConsoleBufferSize,
-        })
-
-    -- improved-webadmin: the bans in force, from the table that decides them.
-    elseif actions.request == "getbans" then
-
-        local source, now, bans = GetBansInForce()
-        return "application/json", json.encode({
-            source = source,
-            -- The server's clock, so a client measures time left against it
-            -- rather than against its own.
-            now = now,
-            bans = bans,
-        })
-
-    -- improved-webadmin: players seen in the last day, connected or not.
-    elseif actions.request == "getrecentplayers" then
-
-        return "application/json", json.encode(GetRecentPlayers())
-
+    if type(value) ~= "table" then
+        return value
     end
+    local copy = { }
+    for k, v in pairs(value) do
+        copy[k] = DeepCopy(v)
+    end
+    return setmetatable(copy, getmetatable(value))
 
-    if actions.request == "getbanlist" then
+end
 
-        -- CONSTRAINTS item 9. The game prunes expired bans only when the ban
-        -- file is loaded or saved (ServerAdminCommands.lua:312), so between
-        -- those moments getbanlist reports bans that stopped blocking anyone
-        -- some time ago -- and the Unban button on them does nothing, because
-        -- there is nothing left to unban. Report what is actually in force.
-        local now = Shared.GetSystemTime()
-        local inForce = { }
-        for _, ban in ipairs(GetBannedPlayersList()) do
-            if ban.time == 0 or ban.time > now then
-                table.insert(inForce, ban)
-            end
-        end
+-- MapCycle.json, which rotation reads, rather than the copy loaded with the
+-- map; LoadConfigFile would log a line per call. nil unless it is a cycle.
+local function ReadMapCycleFile()
 
-        return "application/json", json.encode(inForce)
-    elseif actions.request == "getreservedslots" then
+    local file = io.open(kMapCycleFile, "r")
+    if not file then
+        return nil
+    end
+    local text = file:read("*a")
+    file:close()
 
-        -- improved-webadmin: when Shine's reservedslots plugin is on, it sets the
-        -- slot count and grants access by permission; the vanilla list is not
-        -- what is enforced. Its count rides along, and the 2012 panel ignores
-        -- the extra key.
-        local data = GetReservedSlotData()
-        local plugin = GetShinePlugin("reservedslots")
-        if plugin and type(plugin.Config) == "table" then
-            data.shine = { slots = tonumber(plugin.Config.Slots) or 0 }
-        end
-        return "application/json", json.encode(data)
-    elseif actions.request == "getperfdata" then
-        return "application/json", json.encode(perfDataBuffer:ToTable())
-    elseif actions.request == "getchatlist" then
-        return "application/json", Server.recentChatMessages and json.encode(Server.recentChatMessages:ToTable()) or "{ }"
-    elseif actions.request == "getinstalledmodslist" then
-        return "application/json", json.encode(GetModList())
-    elseif actions.request == "getmaplist" then
-        return "application/json", json.encode(GetMapList())
-    elseif actions.request == "getmapcycle" then
-        local mapcycle = table.copyDict(MapCycle_GetMapCycle())
+    local ok, cycle = pcall(json.decode, text)
+    if ok and type(cycle) == "table" and type(cycle.maps) == "table" then
+        return cycle
+    end
+    return nil
 
-        -- Json doesn't really have 64 numbers just use the old hex format
-        ModsIdsToHex(mapcycle)
-        for _, map in ipairs(mapcycle.maps) do
+end
+
+-- Mod ids go out as hex: JSON has no 64-bit integers.
+local function MapCycleForClient(cycle)
+
+    ModsIdsToHex(cycle)
+    for _, map in ipairs(cycle.maps) do
+        if type(map) == "table" then
             ModsIdsToHex(map)
         end
-        
-        return "application/json", json.encode(mapcycle)
-    elseif actions.request == "setmapcycle" then
-        local mapcycle = json.decode(actions.data)
+    end
+    return cycle
 
-        if not mapcycle then
-            Log("setmapcycle web request passed bad json data")
+end
+
+local function CheckModIds(mods, where)
+
+    if mods == nil then
+        return nil
+    end
+    if type(mods) ~= "table" then
+        return where .. " must be a list"
+    end
+    for i, mod in ipairs(mods) do
+        if type(mod) == "string" then
+            -- A `:` marks a non-workshop source, passed through as is.
+            if not string.find(mod, ":")
+                and not (string.find(mod, "^%x+$") and tonumber64("0x" .. mod)) then
+                return string.format("%s[%d] is not a hex mod id: %s", where, i, mod)
+            end
+        elseif type(mod) ~= "number" then
+            return string.format("%s[%d] is not a mod id", where, i)
+        end
+    end
+    return nil
+
+end
+
+-- Why the game could not use this cycle, or nil.
+local function CheckMapCycle(cycle)
+
+    if type(cycle) ~= "table" then
+        return "not a JSON object"
+    end
+    if type(cycle.maps) ~= "table" or #cycle.maps == 0 then
+        return "`maps` must be a list with at least one map"
+    end
+    for i, entry in ipairs(cycle.maps) do
+        if type(entry) == "table" then
+            if type(entry.map) ~= "string" or entry.map == "" then
+                return string.format("maps[%d] has no map name", i)
+            end
+            local err = CheckModIds(entry.mods, string.format("maps[%d].mods", i))
+            if err then
+                return err
+            end
+        elseif type(entry) ~= "string" or entry == "" then
+            return string.format("maps[%d] is not a map name", i)
+        end
+    end
+    if cycle.time ~= nil and (type(cycle.time) ~= "number" or cycle.time < 0) then
+        return "`time` must be a number of minutes, 0 or more"
+    end
+    if cycle.mode ~= nil and cycle.mode ~= "order" and cycle.mode ~= "random" then
+        return "`mode` must be \"order\" or \"random\""
+    end
+    return CheckModIds(cycle.mods, "mods")
+
+end
+
+-- Shine's mapvote. It reads the cycle at plugin start, so a cycle edit
+-- reaches the vote at the next map.
+local function GetMapVote()
+
+    local plugin = GetShinePlugin("mapvote")
+    if not plugin then
+        return { enabled = false }
+    end
+
+    local config = type(plugin.Config) == "table" and plugin.Config or { }
+
+    local nextMap
+    if type(plugin.GetNextMap) == "function" then
+        local ok, result = pcall(plugin.GetNextMap, plugin)
+        if ok and type(result) == "string" then
+            nextMap = result
+        end
+    end
+
+    local options = { }
+    if type(plugin.MapChoices) == "table" then
+        for _, choice in ipairs(plugin.MapChoices) do
+            local name = type(choice) == "table" and choice.map or choice
+            if type(name) == "string" then
+                table.insert(options, name)
+            end
+        end
+    end
+
+    return {
+        enabled = true,
+        maps_from_cycle = config.GetMapsFromMapCycle == true,
+        -- The plugin's value can differ from its config per map.
+        round_limit = tonumber(plugin.RoundLimit) or tonumber(config.RoundLimit) or 0,
+        next_map = nextMap,
+        options = options,
+    }
+
+end
+
+-- Workshop search. Server.SearchWorshop returns at most 50 results and
+-- ignores the page, so only the first is asked for. Its callback gets an
+-- empty table both for no matches and for a failed search, so an empty
+-- result is not reported as an error.
+local kWorkshopLimit = 50
+local kWorkshopTimeout = 30         -- seconds before a search is given up
+local kWorkshopCacheSeconds = 60
+
+-- By search text: running ({ started, generation }) or done
+-- ({ cached_at, result }, the reply already encoded).
+local workshopSearches = { }
+local workshopGeneration = 0
+
+local function SearchWorkshop(searchtext)
+
+    local now = Shared.GetTime()
+    for key, entry in pairs(workshopSearches) do
+        if entry.cached_at and now - entry.cached_at >= kWorkshopCacheSeconds then
+            workshopSearches[key] = nil
+        end
+    end
+
+    local entry = workshopSearches[searchtext]
+    if entry then
+        if entry.cached_at then
+            return entry.result
+        end
+        if now - entry.started < kWorkshopTimeout then
+            return Shared.JsonEncode({ loading = true, elapsed = now - entry.started })
+        end
+        -- Reported once; the next request starts a fresh search.
+        workshopSearches[searchtext] = nil
+        return Shared.JsonEncode({
+            items = { },
+            error = string.format("The workshop search had no answer after %d s.",
+                                  kWorkshopTimeout),
+        })
+    end
+
+    workshopGeneration = workshopGeneration + 1
+    local generation = workshopGeneration
+    workshopSearches[searchtext] = { started = now, generation = generation }
+
+    Server.SearchWorshop(searchtext, 1, function(results)
+
+        -- Ignore a search that was given up on and restarted.
+        local current = workshopSearches[searchtext]
+        if not current or current.generation ~= generation then
             return
         end
 
-        ModIdsFromHex(mapcycle)
-        for _, map in ipairs(mapcycle.maps) do
-            ModIdsFromHex(map)
-        end
-
-        MapCycle_SetMapCycle(mapcycle)
-        return ""
-        
-    elseif actions.request == "setreservedslotamount" then
-    
-        -- CONSTRAINTS item 7. Vanilla calls SetReservedSlotAmount(amount)
-        -- against a function declared (client, amount), so the amount landed
-        -- in `client`, `amount` was nil, and the guard rejected every call
-        -- while the request still answered 200.
-        SetReservedSlotAmount(nil, actions.amount)
-        return ""
-        
-    elseif actions.request == "installmod" then
-    
-        Server.InstallMod(actions.modid)
-        return ""
-        
-    elseif actions.request == "getmods" then
-
-        local searchtext = actions.searchtext
-        local page = 1
-        local key
-
-        if actions.p then
-            page = tonumber(actions.p)
-        end
-
-        if type(searchtext) == "string" then
-            key = searchtext..page
-        else
-            key = page
-        end
-
-        local timeRequested = Shared.GetTime()
-
-        if getmodsCache[key] then
-            local startedLoading = getmodsCache[key].startedLoading
-            if startedLoading then
-                -- Request times out after 30 seconds
-                if timeRequested - startedLoading < 30 then
-                    return "application/json", '{"loading": true}'
-                end
-            else
-                -- Cache workshop mods for 60 seconds
-                if timeRequested - getmodsCache[key].cached_at < 60 then
-                    return "application/json", getmodsCache[key].result
-                else
-                    getmodsCache[key] = nil
+        local items = { }
+        if type(results) == "table" then
+            for _, mod in ipairs(results) do
+                if type(mod) == "table" and type(mod.id) == "number" then
+                    mod.whitelisted = Server.GetIsModWhitelisted(mod.id)
+                    mod.id = string.format("%x", mod.id)
+                    table.insert(items, mod)
                 end
             end
         end
 
-        getmodsCache[key] = { startedLoading = timeRequested }
+        workshopSearches[searchtext] = {
+            cached_at = Shared.GetTime(),
+            result = Shared.JsonEncode({
+                items = items,
+                -- There may be more matches than the engine returns.
+                capped = #items >= kWorkshopLimit,
+            }),
+        }
 
-        if searchtext then
-            Server.SearchWorshop(searchtext, page,  function(modResults)
-                local result = {}
+    end)
 
-                if modResults then
-                    for _, mod in ipairs(modResults) do
-                        mod.id = string.format("%x", mod.id)
-                    end
-                    result.items = modResults
-                end
+    return Shared.JsonEncode({ loading = true, elapsed = 0 })
 
-                result = json.encode(result)
+end
 
-                getmodsCache[key] = {
-                    cached_at = Shared.GetTime(),
-                    result = result
-                }
-            end)
+-- Server.InstallMod returns nothing and silently drops or misreads bad ids
+-- (`-5` becomes 18446744073709551611), so only plain hex ids are passed on.
+-- Whether the download worked shows later in getinstalledmodslist.
+local function InstallMod(modid)
+
+    if type(modid) ~= "string" or not string.find(modid, "^%x+$") or #modid > 16 then
+        return { ok = false, error = "Not a hex workshop id: "
+                 .. string.sub(tostring(modid), 1, 40) }
+    end
+    local id = string.gsub(string.lower(modid), "^0+", "")
+    if id == "" then
+        return { ok = false, error = "0 is not a workshop id." }
+    end
+
+    local installed = false
+    for i = 1, Server.GetNumMods() do
+        if Server.GetModId(i) == id then
+            installed = true
+            break
         end
+    end
 
-        return "application/json", '{"loading": true}'
-        
+    Server.InstallMod(id)
+    return { ok = true, id = id, already_installed = installed }
+
+end
+
+-- If web/index.html cannot be read. Lua cannot redirect, hence the refresh.
+local kRootPage = [[<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=/index.html">
+<title>NS2 web admin</title>
+</head>
+<body>
+<p>The web admin panel is at <a href="/index.html">/index.html</a>.</p>
+</body>
+</html>
+]]
+
+-- Handlers by `request`. Each returns a table to send as JSON, or the content
+-- type and body itself.
+local kRequests = { }
+
+function kRequests.runcommand(actions)
+    local command = tostring(actions.cmd or "")
+    local lines = CapturedLines(Shared.CaptureConsoleCommand(command))
+    local dispatched = false
+    for _, line in ipairs(lines) do
+        if line.src == "audit" then dispatched = true end
     end
-    
-    if actions.command then
-        Shared.ConsoleCommand(actions.rcon)
+    return {
+        cmd = command,
+        -- False for a plain console command and for no such command alike:
+        -- the server cannot tell them apart.
+        dispatched = dispatched,
+        lines = lines,
+    }
+end
+
+function kRequests.getbans()
+    local source, now, bans = GetBansInForce()
+    -- `now` is the server's clock, for computing time left.
+    return { source = source, now = now, bans = bans }
+end
+
+kRequests.getrecentplayers = GetRecentPlayers
+kRequests.getlog = GetLog
+kRequests.getinstalledmodslist = GetModList
+kRequests.getmaplist = GetMapList
+kRequests.getmapvote = GetMapVote
+
+function kRequests.getreservedslots()
+    -- Under Shine's reservedslots plugin, Shine's count is what is enforced.
+    local data = GetReservedSlotData()
+    local plugin = GetShinePlugin("reservedslots")
+    if plugin and type(plugin.Config) == "table" then
+        data.shine = { slots = tonumber(plugin.Config.Slots) or 0 }
     end
-    
-    return "application/json", json.encode(GetServerState())
-    
+    return data
+end
+
+function kRequests.getperf(actions)
+    local windows, lastId, more = PerfWindowsSince(tonumber(actions.since) or 0)
+    return {
+        engine = EngineReport(tonumber(actions.esince) or 0),
+        window_s = kPerfWindowSeconds,
+        capacity = kMaxPerfWindows,
+        loaded_at = perfLoadedAt,
+        map = Shared.GetMapName(),
+        config = PerfConfig(),
+        windows = windows,
+        last_id = lastId,
+        more = more,
+    }
+end
+
+function kRequests.getchatlist(actions)
+    local all = Server.recentChatMessages:ToTable()
+    local since = tonumber(actions.since) or 0
+    local entries = { }
+    for _, entry in ipairs(all) do
+        if entry.id > since then table.insert(entries, entry) end
+    end
+    return {
+        entries = entries,
+        last_id = #all > 0 and all[#all].id or 0,
+        -- Messages pushed out of the ring.
+        dropped = #all > 0 and all[1].id - 1 or 0,
+        buffer_size = Server.recentChatMessages.size,
+    }
+end
+
+function kRequests.getmapcycle()
+    return MapCycleForClient(ReadMapCycleFile() or DeepCopy(MapCycle_GetMapCycle()))
+end
+
+-- Refuses a cycle the game cannot use, and replies with what the file holds
+-- afterwards.
+function kRequests.setmapcycle(actions)
+    local ok, mapcycle = pcall(json.decode, actions.data or "")
+    local problem = (not ok or mapcycle == nil) and "not valid JSON" or CheckMapCycle(mapcycle)
+    if problem then
+        Log("setmapcycle refused: %s", problem)
+        return { ok = false, error = problem }
+    end
+
+    ModIdsFromHex(mapcycle)
+    for _, map in ipairs(mapcycle.maps) do
+        if type(map) == "table" then
+            ModIdsFromHex(map)
+        end
+    end
+    MapCycle_SetMapCycle(mapcycle)
+
+    local written = ReadMapCycleFile()
+    if not written then
+        return { ok = false, error = "the game took the cycle, but MapCycle.json did not read back" }
+    end
+    return { ok = true, cycle = MapCycleForClient(written) }
+end
+
+function kRequests.installmod(actions)
+    return InstallMod(actions.modid)
+end
+
+function kRequests.getmods(actions)
+    local searchtext = type(actions.searchtext) == "string" and actions.searchtext or ""
+    return "application/json", SearchWorkshop(searchtext)
+end
+
+-- The panel itself, so a browser at / stays at /.
+local function PanelPage()
+    local file = io.open("web/index.html", "r")
+    if not file then return kRootPage end
+    local html = file:read("*a")
+    file:close()
+    return html
+end
+
+-- The engine serves files under web/ itself; everything else reaches this
+-- hook. `request` is { path, method, headers }, header names in lower case.
+local function OnWebRequest(actions, request)
+
+    if next(actions) == nil then
+        if request.path ~= "/" or string.find(request.headers.accept or "", "text/html", 1, true) then
+            return "text/html", PanelPage()
+        end
+        -- Scripts (auto-shutdown and the like) read the state here.
+        return "application/json", Shared.JsonEncode(GetServerState())
+    end
+
+    -- Before the request can print or ban.
+    EnsureServerAdminPrintWrapped()
+    EnsureShineAddBanWrapped()
+
+    local handler = kRequests[actions.request]
+    if handler then
+        local result, body = handler(actions)
+        if type(result) == "table" then
+            return "application/json", Shared.JsonEncode(result)
+        end
+        return result, body
+    end
+
+    return "application/json", Shared.JsonEncode(GetServerState())
+
 end
 Event.Hook("WebRequest", OnWebRequest)
 
---
--- This function should be called once per tick.
---
 local function UpdateServerWebInterface()
 
-    -- improved-webadmin: catch a replacement (Shine's, on its first tick) before an
-    -- in-game command's output is lost from the console stream.
+    -- Shine replaces ServerAdminPrint on its first tick.
     EnsureServerAdminPrintWrapped()
+    EnsureShineAddBanWrapped()
 
-    -- improved-webadmin: persist a reserved slot removal (see above).
-    SaveReservedSlotsIfDirty()
-
-    -- improved-webadmin: keep the recent-players list and its file current.
     UpdateRecentPlayers()
+    UpdatePerfWindows()
+    UpdateTickstat()
+    UpdateEngineLog()
 
-    if Shared.GetSystemTime() - lastPerfDataTime >= kLogPerfDataRate then
-    
-        local playerRecords = Shared.GetEntitiesWithClassname("Player")
-        local entCount = Shared.GetEntitiesWithClassname("Entity"):GetSize()
-        local newData = { players = playerRecords:GetSize(), tickrate = Server.GetFrameRate(), time = Shared.GetSystemTime(), ent_count = entCount }
-        perfDataBuffer:Insert(newData)
-        
-        lastPerfDataTime = Shared.GetSystemTime()
-        
-    end
-    
 end
 
 Event.Hook("UpdateServer", UpdateServerWebInterface)
+
 
 -- recent-players probe: what the hooks see ----------------------------------
 local function Try(f)

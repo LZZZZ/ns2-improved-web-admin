@@ -261,8 +261,8 @@ captures are never committed (`fixtures/live/` is gitignored).
 
 `getrecentplayers` serves the same two values for everyone seen in the
 last 24 hours, connected or not, with former names, and writes them to
-`config://webadmin/recent-players-{a,b}.json`, where they stay
-until they age out; Lua cannot delete the files. The Recent players tab
+`config://webadmin/recent-players.json`, where they stay
+until they age out; Lua cannot delete the file. The Recent players tab
 shows IPs unmasked by design
 ([DESIGN.md](DESIGN.md#what-the-panel-deliberately-does-not-do));
 Steam ids stay masked.

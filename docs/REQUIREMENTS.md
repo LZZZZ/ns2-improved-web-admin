@@ -14,7 +14,7 @@ measurement names the engine drop it ran on.
 | 3 | Installed mods: loaded first, with the id | Built and verified on the rig (Lua `active` flag, Mods tab) |
 | 4 | Mod browser: details before install | Built and verified on the rig (Workshop tab). No paging: the engine returns 50 hits |
 | 5 | Console commands return their output | Built (`runcommand`, through the 10-12 engine's `Shared.CaptureConsoleCommand`) |
-| 6 | Ban from a list of recent players | Built and verified on the rig (`getrecentplayers`, a two-slot file) |
+| 6 | Ban from a list of recent players | Built and verified on the rig (`getrecentplayers`, one file) |
 | 7 | Tail the server log | Built and verified on the rig (`getlog` through the 10-12 engine's `Shared.ReadLog`, Console tab) |
 | 8 | Light, fast, dark, full width | Built (front end) |
 | 9 | Per-admin settings in the browser | Built (Settings tab) |
@@ -243,12 +243,10 @@ can leave the file torn, and nothing can delete it.
 **Built: 24 hours, at most 100 players**, both stated by the server and
 shown in the tab. A connected player is never aged out.
 
-- **Two slots replace write-then-rename.** Saves alternate between
-  `config://webadmin/recent-players-a.json` and `-b.json`, each
-  with an increasing `seq`. The loader decodes both under `pcall` and takes
-  the newest that parses, reporting `ok`, `fallback` (newest torn),
-  `empty` (no file yet) or `unreadable` (both torn: start empty). A failing
-  save is reported with its error. The tab shows each.
+- **One file, no rename:** `config://webadmin/recent-players.json`. The
+  loader decodes it under `pcall`, reporting `ok`, `empty` (no file yet) or
+  `unreadable` (torn: start empty). The list is not worth a second file. A
+  failing save is reported with its error. The tab shows each.
 - **Per player:** Steam id, name, up to 5 former names (searched too), IP,
   first and last seen, time played. Bots are skipped. Times are
   `Shared.GetSystemTime()`, since `Shared.GetTime()` restarts with the map.
@@ -263,7 +261,7 @@ shown in the tab. A connected player is never aged out.
   masked. See [API.md](API.md#privacy).
 
 Harness `tools/spikes/recent-players-harness.lua` covers rename history,
-bots, a map change (a fresh VM over the same files), torn slots, capacity
+bots, a map change (a fresh VM over the same file), a torn file, capacity
 and the window.
 
 Measured on the rig (09-26 hotfix, one human; probe
@@ -278,9 +276,9 @@ Measured on the rig (09-26 hotfix, one human; probe
 | What does a save cost? | 0.08-0.42 ms for a one-player file. |
 
 End to end: a rename kept the old name; a disconnect was saved on the next
-tick; a rejoin kept `first_seen`, and time away was not counted; with the
-newest slot cut in half, the boot reported `fallback` and served the older
-slot intact (`fixtures/getrecentplayers-rig.json`). The synthetic
+tick; a rejoin kept `first_seen`, and time away was not counted
+(`fixtures/getrecentplayers-rig.json`, captured when the store still kept
+two files). The synthetic
 `getrecentplayers.json` seeds the mock, since a gate needs more players.
 
 **Names on bans of absent players (Shine only).** Shine's `sh_banid`

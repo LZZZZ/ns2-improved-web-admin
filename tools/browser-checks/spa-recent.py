@@ -11,7 +11,7 @@ saying plainly what it cannot know:
                beside links to the player's Steam profile and ns2panel.com;
                a kicked player turns from connected to "left"; Ban sends
                sv_ban with `;` stripped and reports what the server printed;
-               a banned row disables Ban and says why; a torn, unreadable or
+               a banned row disables Ban and says why; an unreadable or
                failing save file is reported; sort and filter survive a poll
   * --shine    a player Shine already bans is marked, and Ban goes out as
                sh_banid and is stored under the player's name, where vanilla
@@ -219,9 +219,6 @@ async def mod(c):
     check("a kicked player turns from connected to left", status.startswith("left"), status)
 
     check("no storage note while the file is fine", await notes(c) == "")
-    control(MOD, "recent-load?status=fallback")
-    await open_tab(c, MOD)
-    check("a torn save is reported", "was torn" in await notes(c), (await notes(c))[:60])
     control(MOD, "recent-load?status=unreadable")
     await open_tab(c, MOD)
     check("an unreadable save is reported", "could not be read" in await notes(c),

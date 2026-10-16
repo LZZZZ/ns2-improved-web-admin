@@ -121,7 +121,7 @@ GET /__mock/state          the whole simulated server as JSON
 GET /__mock/503?n=3        answer the next 3 requests with 503
 GET /__mock/slow?ms=2000   delay every reply by 2000 ms
 GET /__mock/reset          reload the fixtures
-GET /__mock/recent-load?status=fallback[&error=...]
+GET /__mock/recent-load?status=unreadable[&error=...]
                            what getrecentplayers reports about its file
 GET /__mock/round?started=1|0
                            start or end the round
@@ -153,7 +153,7 @@ GET /__mock/log?append=<text>[&n=3] | partial=<text> | burst=<bytes>
   fails (at once, empty). A stock server restarts a search after 30 s, so
   a hang that outlasts the restart needs `n=2`. `install=never` is an id
   Steam does not have. `timeout` shortens the mod's 30 s.
-- `recent-load` takes `ok`, `fallback`, `empty` or `unreadable`; `error`
+- `recent-load` takes `ok`, `empty` or `unreadable`; `error`
   reports a failing save.
 - `cycle-file` appends `mod` as written, so `mod=zzzz` plants a junk id.
 - `503` is what a real server sends when a request gives up after 30 s.

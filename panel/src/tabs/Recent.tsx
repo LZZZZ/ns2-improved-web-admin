@@ -51,10 +51,7 @@ function windowText(seconds: number): string {
 /** What the server said about the file the list is kept in, when it matters. */
 function storageNotes(data: RecentPlayers): string[] {
   const notes: string[] = [];
-  if (data.loaded === "fallback") {
-    notes.push("The newest save of this list was torn, so it was restored "
-      + "from the one before: up to a minute of comings and goings may be missing.");
-  } else if (data.loaded === "unreadable") {
+  if (data.loaded === "unreadable") {
     notes.push("The saved list could not be read, so it started empty on this map.");
   }
   if (data.saveError) {

@@ -148,29 +148,21 @@ local function GetBansInForce()
 end
 
 -- Recent players: seen in the last 24 h, at most 100, saved under config://
--- to survive map changes. Lua here has no os.rename, so saves alternate
--- between two files stamped with an increasing `seq`, and the loader takes
--- the newest that parses: a torn write loses one save, not the list.
+-- to survive map changes. A torn save starts the list empty.
 local kRecentWindow = 24 * 60 * 60
 local kRecentCapacity = 100
 local kRecentFormerNames = 5
 local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
-local kRecentSlots = {
-    "config://webadmin/recent-players-a.json",
-    "config://webadmin/recent-players-b.json",
-}
+local kRecentFile = "config://webadmin/recent-players.json"
 
 -- Account id -> entry, as saved.
 local recentPlayers = { }
 -- Account id -> the time `played` was last updated to, for connected players.
 local recentAccrued = { }
--- nil until loaded, then "ok", "fallback" (newest file torn, older one used),
--- "empty" (no file) or "unreadable".
+-- nil until loaded, then "ok", "empty" (no file) or "unreadable".
 local recentLoadStatus
-local recentSeq = 0
-local recentNextSlot = 1
 local recentDirty = false
 local recentUrgent = false
 local recentSaveError
@@ -208,62 +200,33 @@ local function SanitizeRecentEntry(raw)
 
 end
 
--- "absent", "torn", or the decoded document.
-local function ReadRecentSlot(path)
+local function EnsureRecentLoaded()
 
-    local file = io.open(path, "r")
-    if not file then return "absent" end
+    if recentLoadStatus then return end
+
+    local file = io.open(kRecentFile, "r")
+    if not file then
+        recentLoadStatus = "empty"
+        return
+    end
 
     local text = file:read("*a")
     file:close()
 
     local ok, data = pcall(json.decode, text or "")
-    if ok and type(data) == "table" and data.version == kRecentFileVersion
-            and tonumber(data.seq) and type(data.players) == "table" then
-        data.seq = tonumber(data.seq)
-        return data
-    end
-    return "torn"
-
-end
-
-local function EnsureRecentLoaded()
-
-    if recentLoadStatus then return end
-
-    local best, bestSlot
-    local torn, present = 0, 0
-    for slot, path in ipairs(kRecentSlots) do
-        local data = ReadRecentSlot(path)
-        if data ~= "absent" then present = present + 1 end
-        if data == "torn" then
-            torn = torn + 1
-        elseif type(data) == "table" and (not best or data.seq > best.seq) then
-            best, bestSlot = data, slot
-        end
-    end
-
-    if best then
-        for _, raw in ipairs(best.players) do
-            local entry = SanitizeRecentEntry(raw)
-            if entry then
-                recentPlayers[entry.steamid] = entry
-            end
-        end
-        recentSeq = best.seq
-        recentNextSlot = bestSlot % #kRecentSlots + 1
-    end
-
-    if present == 0 then
-        recentLoadStatus = "empty"
-    elseif not best then
+    if not (ok and type(data) == "table" and data.version == kRecentFileVersion
+            and type(data.players) == "table") then
         recentLoadStatus = "unreadable"
-    elseif torn > 0 then
-        -- The torn file is the next one written.
-        recentLoadStatus = "fallback"
-    else
-        recentLoadStatus = "ok"
+        return
     end
+
+    for _, raw in ipairs(data.players) do
+        local entry = SanitizeRecentEntry(raw)
+        if entry then
+            recentPlayers[entry.steamid] = entry
+        end
+    end
+    recentLoadStatus = "ok"
 
 end
 
@@ -370,15 +333,13 @@ local function SaveRecent(now)
         table.insert(list, entry)
     end
 
-    local seq = recentSeq + 1
-    local path = kRecentSlots[recentNextSlot]
     local ok, err = pcall(function()
-        local file, openError = io.open(path, "w")
+        local file, openError = io.open(kRecentFile, "w")
         if not file then
-            error(openError or ("cannot open " .. path), 0)
+            error(openError or ("cannot open " .. kRecentFile), 0)
         end
         file:write(Shared.JsonEncode({
-            version = kRecentFileVersion, seq = seq, players = list,
+            version = kRecentFileVersion, players = list,
         }))
         file:close()
     end)
@@ -386,14 +347,7 @@ local function SaveRecent(now)
     lastRecentSave = now
     recentDirty = false
     recentUrgent = false
-
-    if ok then
-        recentSeq = seq
-        recentNextSlot = recentNextSlot % #kRecentSlots + 1
-        recentSaveError = nil
-    else
-        recentSaveError = tostring(err)
-    end
+    recentSaveError = not ok and tostring(err) or nil
 
 end
 

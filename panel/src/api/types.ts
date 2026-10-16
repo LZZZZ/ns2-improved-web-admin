@@ -212,7 +212,7 @@ export interface ReservedSlots {
 
 // ---------------------------------------------------------- recent players
 
-export type RecentLoad = "ok" | "fallback" | "empty" | "unreadable";
+export type RecentLoad = "ok" | "empty" | "unreadable";
 
 export interface RawRecentPlayer {
   steamid: number;

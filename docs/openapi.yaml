@@ -1294,11 +1294,10 @@ components:
           properties:
             loaded:
               type: string
-              enum: [ok, fallback, empty, unreadable]
+              enum: [ok, empty, unreadable]
               description: |
-                How this map's load went. `fallback`: the newest save was torn
-                and the one before it was used. `empty`: no file yet.
-                `unreadable`: both saves were torn, so the list started empty.
+                How this map's load went. `empty`: no file yet. `unreadable`:
+                the save was torn, so the list started empty.
             error:
               type: string
               description: |

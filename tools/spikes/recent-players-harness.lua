@@ -3,7 +3,7 @@
 -- Runs the shipped file under LuaJIT with the engine calls it touches stubbed,
 -- over a directory standing in for config://. Each "VM" is a fresh environment
 -- over the same files, which is what a map change is. It checks the logic --
--- renames, bots, surviving a map change, a torn slot, capacity, the window --
+-- renames, bots, surviving a map change, a torn file, capacity, the window --
 -- not the engine: what the hooks really do at a map change is a rig question
 -- (docs/REQUIREMENTS.md item 6).
 --
@@ -138,18 +138,15 @@ vm.disconnect(b)
 vm.tick()                      -- urgent save on the next tick
 r = vm.recent()
 check(find(r, 202).connected == false and find(r, 202).played == 100, "disconnect: not connected, played 100 s")
-local function slotHas(text)
-    for _, slot in ipairs({ "a", "b" }) do
-        local f = realOpen(DISK .. "/webadmin/recent-players-" .. slot .. ".json")
-        if f then
-            local found = f:read("*a"):find(text, 1, true)
-            f:close()
-            if found then return true end
-        end
-    end
-    return false
+local FILE = DISK .. "/webadmin/recent-players.json"
+local function fileHas(text)
+    local f = realOpen(FILE)
+    if not f then return false end
+    local found = f:read("*a"):find(text, 1, true)
+    f:close()
+    return found ~= nil
 end
-check(slotHas('"played":100'), "saved on the tick after a disconnect")
+check(fileHas('"played":100'), "saved on the tick after a disconnect")
 
 -- Map change: fresh VM over the same disk. Alice reconnects; Bob does not.
 clock.now = clock.now + 20
@@ -162,26 +159,16 @@ check(find(r, 202) and find(r, 202).connected == false, "Bob survives the map ch
 check(find(r, 101).names[1] == "Alice" and find(r, 101).connected, "Alice survives, reconnected, former names kept")
 check(find(r, 101).first_seen == 1790000000, "first_seen kept across the map change")
 
--- Force a save into slot b, then tear it: the loader must fall back to a.
+-- Tear the file: unreadable, and the list starts empty rather than failing.
 vm.disconnect(a2); vm.tick()
-check(realOpen(DISK .. "/webadmin/recent-players-b.json"), "slot b written by the next save")
-local f = realOpen(DISK .. "/webadmin/recent-players-b.json", "r"); local text = f:read("*a"); f:close()
-f = realOpen(DISK .. "/webadmin/recent-players-b.json", "w"); f:write(text:sub(1, math.floor(#text / 2))); f:close()
+local f = realOpen(FILE, "r"); local text = f:read("*a"); f:close()
+f = realOpen(FILE, "w"); f:write(text:sub(1, math.floor(#text / 2))); f:close()
 vm = NewVM(clock)
 r = vm.recent()
-check(r.storage.loaded == "fallback", "torn newest slot: status fallback")
-check(find(r, 202) and find(r, 101), "fallback kept both players from the older slot")
-vm.tick(); clock.now = clock.now + 61; vm.connect(303, "Carol", "203.0.113.9"); vm.tick()
-f = realOpen(DISK .. "/webadmin/recent-players-b.json", "r"); text = f:read("*a"); f:close()
-check(dkjson.decode(text) ~= nil, "the next save overwrites the torn slot")
-
--- Both torn: unreadable, and the list starts empty rather than failing.
-for _, s in ipairs({ "a", "b" }) do
-    f = realOpen(DISK .. "/webadmin/recent-players-" .. s .. ".json", "w"); f:write("{\"version\":1,"); f:close()
-end
-vm = NewVM(clock)
-r = vm.recent()
-check(r.storage.loaded == "unreadable" and #r.players == 0, "both slots torn: unreadable, empty list")
+check(r.storage.loaded == "unreadable" and #r.players == 0, "torn file: unreadable, empty list")
+clock.now = clock.now + 61; vm.connect(303, "Carol", "203.0.113.9"); vm.tick()
+f = realOpen(FILE, "r"); text = f:read("*a"); f:close()
+check(dkjson.decode(text) ~= nil, "the next save overwrites the torn file")
 
 -- Window and capacity.
 vm = NewVM(clock)

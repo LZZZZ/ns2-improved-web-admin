@@ -24,12 +24,12 @@ ProbeClock = Shared.GetSystemTimeReal or os.clock
 ProbeLog("file load: system time %s, clock %s", tostring(Shared.GetSystemTime()),
          Shared.GetSystemTimeReal and "Shared.GetSystemTimeReal" or "os.clock")
 do
-    local ok, f = pcall(io.open, "config://improved-webadmin/recent-players-a.json", "r")
+    local ok, f = pcall(io.open, "config://webadmin/recent-players.json", "r")
     ProbeLog("Q4 read at file load: pcall %s, handle %s", tostring(ok), tostring(f))
     if ok and f then f:close() end
 end
 do
-    local ok, value, pos, err = pcall(function() return json.decode('{"version":1,"seq":') end)
+    local ok, value, pos, err = pcall(function() return json.decode('{"version":1,"players":') end)
     ProbeLog("Q3 json.decode on truncated input: pcall ok=%s, value=%s, 2nd=%s, 3rd=%s",
              tostring(ok), tostring(value), tostring(pos), tostring(err))
 end
@@ -39,7 +39,7 @@ anchor = 'Script.Load("lua/RingBuffer.lua")\n'
 assert s.count(anchor) == 1
 s = s.replace(anchor, top, 1)
 
-a = "    local seq = recentSeq + 1\n"
+a = "    local ok, err = pcall(function()\n        local file, openError = io.open(kRecentFile, \"w\")\n"
 assert s.count(a) == 1
 s = s.replace(a, "    local probeStart = ProbeClock()\n" + a)
 a = "    lastRecentSave = now\n"

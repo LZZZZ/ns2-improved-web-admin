@@ -135,7 +135,7 @@ Control endpoints (not part of the real API, and never requested by the panel):
                              a player says something (n times, numbered)
   GET /__mock/cycle-file?time=45[&append=ns2_x][&mod=<id>]
                              edit MapCycle.json behind the game's back
-  GET /__mock/recent-load?status=fallback[&error=...]
+  GET /__mock/recent-load?status=unreadable[&error=...]
                              what getrecentplayers reports about its file
   GET /__mock/workshop?search=hang|offline[&n=2][&install=never][&timeout=<s>]
                              the next n workshop searches hang or fail, the
@@ -333,11 +333,11 @@ function control(url, res) {
       chaos.delayMs = Number(q.get("ms") ?? 0);
       return send(res, 200, "text/plain", `delay ${chaos.delayMs}ms\n`);
     case "/__mock/recent-load": {
-      // What getrecentplayers says about its file: ok, fallback, empty or
-      // unreadable, and with error= a save that is failing.
+      // What getrecentplayers says about its file: ok, empty or unreadable,
+      // and with error= a save that is failing.
       const status = q.get("status") ?? "ok";
-      if (!["ok", "fallback", "empty", "unreadable"].includes(status)) {
-        return send(res, 400, "text/plain", "status: ok|fallback|empty|unreadable\n");
+      if (!["ok", "empty", "unreadable"].includes(status)) {
+        return send(res, 400, "text/plain", "status: ok|empty|unreadable\n");
       }
       state.setRecentStorage(status, q.get("error") ?? undefined);
       return send(res, 200, "text/plain", `recent load -> ${status}\n`);

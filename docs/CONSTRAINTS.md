@@ -431,8 +431,8 @@ Still not there: `ModServices.GetWhitelistedModIds()` and
 item 2); `Server.SearchWorshop` honouring its page, reporting Steam's
 failure and finding a mod by id (REQUIREMENTS item 4); `Accumulate()`
 refusing an empty sample instead of dying (item 14); a float
-`GetUpdateIntervalMs()`; and a rename inside `config://`, which would
-retire recent players' two slots. `ModServices.GetModState(modId)` exists
+`GetUpdateIntervalMs()`; and a rename inside `config://`, so a torn
+recent-players save would not lose the list. `ModServices.GetModState(modId)` exists
 and may report download progress for `installmod`; that needs a rig
 probe, not an ask.
 
