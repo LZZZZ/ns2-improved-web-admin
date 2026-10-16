@@ -13,7 +13,7 @@
   "frame_rate": 49.998134613037,
   "game_started": false,
   "game_time": 0,
-  "mod_version": "0.1.0",
+  "lua_version": "0.1.0",
   "marines": 0,
   "max_players": 16,
   "shine": {

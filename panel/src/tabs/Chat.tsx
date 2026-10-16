@@ -4,7 +4,7 @@ import { TEAM_NAMES } from "../api/types";
 import type { CommandOutcome } from "../store/commands";
 import { sendCommand } from "../store/commands";
 import {
-  getChatState, refreshChat, setChatIntervalMs, setChatMod,
+  getChatState, refreshChat, setChatIntervalMs, setChatLua,
   useChat,
 } from "../store/chat";
 import { useSettings } from "../store/settings";
@@ -26,7 +26,7 @@ const AUDIENCES: { value: Audience; label: string }[] = [
  * The chat, as the server records it, and a way to talk to it.
  *
  * The 2012 panel showed this on its Players tab. Its log was the server's
- * last 20 messages, re-read every 2 s; with the mod the server keeps 200, with
+ * last 20 messages, re-read every 2 s; with the panel Lua the server keeps 200, with
  * times, and hands over only what is new.
  */
 export function Chat({ state, onOpenSettings }: {
@@ -34,10 +34,10 @@ export function Chat({ state, onOpenSettings }: {
   onOpenSettings: () => void;
 }) {
   const settings = useSettings();
-  const hasMod = state.modVersion !== null;
+  const hasLua = state.luaVersion !== null;
   // A layout effect runs before useChat's effect, so the first read already
   // asks the right way.
-  useLayoutEffect(() => setChatMod(hasMod), [hasMod]);
+  useLayoutEffect(() => setChatLua(hasLua), [hasLua]);
   const chat = useChat();
 
   const [audience, setAudience] = useState<Audience>("all");
@@ -79,7 +79,7 @@ export function Chat({ state, onOpenSettings }: {
     setLanded(null);
     wasAtBottom.current = true;
     const before = getChatState().cursor;
-    setLast(await sendCommand(command, hasMod));
+    setLast(await sendCommand(command, hasLua));
     await refreshChat();
     // The chat itself is the receipt. Under Shine sv_say becomes sh_say and
     // prints nothing but Shine's own line, so the command's output cannot
@@ -99,7 +99,7 @@ export function Chat({ state, onOpenSettings }: {
             It answered the chat request with an empty object, which is what
             the stock web interface does when the game's chat buffer does not
             exist. Chat still reaches the server's log: see the Console
-            tab, with this panel's mod.
+            tab, with this panel's Lua.
           </p>
         </div>
       </section>
@@ -118,11 +118,11 @@ export function Chat({ state, onOpenSettings }: {
         {chat.error && <span class="tone-error">{chat.error.message}</span>}
       </div>
 
-      {!hasMod && (
+      {!hasLua && (
         <p class="muted chat-stock">
           A stock server keeps only its last 20 messages and gives them no
           times; anything said while this tab was closed may already be gone.
-          This panel's mod keeps 200, with times.
+          This panel's Lua keeps 200, with times.
         </p>
       )}
 

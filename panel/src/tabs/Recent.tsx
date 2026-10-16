@@ -66,7 +66,7 @@ function storageNotes(data: RecentPlayers): string[] {
 
 /**
  * Everyone seen in the last day, connected or not, so a player who has left
- * can still be found and banned. The mod's Lua keeps the list in a file, since
+ * can still be found and banned. The panel Lua keeps the list in a file, since
  * a map change wipes everything held in Lua.
  *
  * IPs are shown in the clear here, by design (docs/DESIGN.md, "What the panel
@@ -74,16 +74,16 @@ function storageNotes(data: RecentPlayers): string[] {
  * spotting a returning player under another account is what they are for.
  */
 export function Recent({ state }: { state: ServerState }) {
-  if (state.modVersion === null) {
+  if (state.luaVersion === null) {
     return (
       <section class="wrap">
         <div class="banner">
           <h2>This server keeps no list of recent players</h2>
           <p>
             The stock web interface only knows who is connected right now, and
-            forgets even that at every map change. Mount this mod's{" "}
-            <code>lua/</code> on the server and this tab lists everyone seen in
-            the last day, with a ban button for each.
+            forgets even that at every map change. Run this panel's{" "}
+            <code>ServerWebInterface.lua</code> on the server and this tab lists
+            everyone seen in the last day, with a ban button for each.
           </p>
         </div>
       </section>

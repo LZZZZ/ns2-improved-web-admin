@@ -353,7 +353,7 @@ async def main():
                                 " return true; };"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.removeItem('webadmin.settings'); } catch {}")
             await stock(c)
             await mod_whitelist(c)
             await mod(c)

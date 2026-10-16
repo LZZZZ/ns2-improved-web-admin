@@ -5,7 +5,7 @@
 //
 //   * a search answers `loading` until it settles, 0.3-0.9 s. On a stock
 //     server one that never answers restarts every 30 s and answers `loading`
-//     forever, so the panel gives up on its own after 35 s. The mod settles it
+//     forever, so the panel gives up on its own after 35 s. The panel Lua settles it
 //     with an error at 30 s.
 //   * an install is proved only by the id appearing in getinstalledmodslist,
 //     which happens once the mod is downloaded and unpacked, under its real
@@ -30,7 +30,7 @@ export type SearchState =
   | { status: "idle" }
   | { status: "loading"; query: string; startedAt: number }
   | { status: "results"; query: string; items: WorkshopItem[]; capped: boolean }
-  /** The mod's timeout, or a request that failed. */
+  /** The panel Lua's timeout, or a request that failed. */
   | { status: "error"; query: string; error: string }
   /** Stock: no answer in time, and the server cannot say why. */
   | { status: "gave-up"; query: string };
@@ -138,7 +138,7 @@ async function watch(): Promise<void> {
 }
 
 /** Ask the server to download a mod, and watch the installed list for it. */
-export async function requestInstall(item: WorkshopItem, hasMod: boolean): Promise<void> {
+export async function requestInstall(item: WorkshopItem, hasLua: boolean): Promise<void> {
   const id = item.id.toLowerCase();
   const command = `installmod ${id}`;
   installs = new Map(installs).set(id, {
@@ -147,7 +147,7 @@ export async function requestInstall(item: WorkshopItem, hasMod: boolean): Promi
   emit();
 
   try {
-    const result = await installMod(id, hasMod);
+    const result = await installMod(id, hasLua);
     if (result.kind === "refused") {
       setInstall(id, { state: "refused", note: result.error });
       record(command, `refused, nothing sent: ${result.error}`, "error");

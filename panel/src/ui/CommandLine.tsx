@@ -1,7 +1,7 @@
 // The server's command line, on the Console tab: the 2012
 // Console tab's input, with what the command printed shown under it.
 //
-// With the mod's Lua a command comes back with what it printed, so the result
+// With the panel Lua a command comes back with what it printed, so the result
 // is shown here as it is; the log above shows it too once the engine writes
 // it, along with what everyone else ran. A stock server cannot return output,
 // and gets no input: the panel does not offer what it cannot honour.

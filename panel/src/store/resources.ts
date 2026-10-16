@@ -17,14 +17,14 @@ export const serverState = createResource(
 // them itself after each command it sends. A slow poll catches the rest.
 export const kListIntervalMs = 10_000;
 
-// Which request answers depends on the server: getbans needs the mod.
+// Which request answers depends on the server: getbans needs the panel Lua.
 export const bans = createResource(
-  (signal) => getBans(serverState.get().data?.modVersion != null, signal),
+  (signal) => getBans(serverState.get().data?.luaVersion != null, signal),
   kListIntervalMs);
 
 export const reservedSlots = createResource(getReservedSlots, kListIntervalMs);
 
-// Mod only; the tab does not subscribe on a stock server.
+// Panel Lua only; the tab does not subscribe on a stock server.
 export const recentPlayers = createResource(getRecentPlayers, kListIntervalMs);
 
 // What the server can load. Changes only when a mod is installed, so polled
@@ -33,7 +33,7 @@ export const kCatalogueIntervalMs = 60_000;
 export const mapList = createResource(getMapList, kCatalogueIntervalMs);
 export const installedMods = createResource(getInstalledMods, kCatalogueIntervalMs);
 
-// Mod only, and only asked while Shine's mapvote is on. Its next map moves
+// Panel Lua only, and only asked while Shine's mapvote is on. Its next map moves
 // when a vote ends, so it keeps the list pace.
 export const mapVote = createResource(getMapVote, kListIntervalMs);
 

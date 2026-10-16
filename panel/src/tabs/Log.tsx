@@ -28,7 +28,7 @@ export function Log({ state, onOpenSettings }: {
   state: ServerState;
   onOpenSettings: () => void;
 }) {
-  if (state.modVersion === null) {
+  if (state.luaVersion === null) {
     return (
       <section class="wrap">
         <div class="banner">
@@ -42,8 +42,9 @@ export function Log({ state, onOpenSettings }: {
             as unverified because that is all that is true.
           </p>
           <p>
-            Mount this mod's <code>lua/</code> on the server and this tab shows
-            the log as the engine writes it, and runs commands with their output.
+            Run this panel's <code>ServerWebInterface.lua</code> on the server
+            and this tab shows the log as the engine writes it, and runs
+            commands with their output.
           </p>
         </div>
       </section>

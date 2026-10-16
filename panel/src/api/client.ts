@@ -141,7 +141,7 @@ export function normalizeServerState(raw: RawServerState): ServerState {
     gameStarted: raw.game_started,
     gameTimeSeconds: raw.game_time,
     players: (raw.player_list ?? []).map(normalizePlayer),
-    modVersion: raw.mod_version ?? null,
+    luaVersion: raw.lua_version ?? null,
     maxPlayers: raw.max_players ?? null,
     mapLoadedAt: typeof raw.map_loaded_at === "number" ? raw.map_loaded_at * 1000 : null,
     rankingActive: typeof raw.ranking_active === "boolean" ? raw.ranking_active : null,
@@ -157,11 +157,11 @@ export function normalizeServerState(raw: RawServerState): ServerState {
 }
 
 // An expiry further out than this is Shine's way of writing "never" (6e+24
-// seen on a real server). The mod's getbans applies the same line.
+// seen on a real server). The panel Lua's getbans applies the same line.
 const kPermanentAfter = 100 * 365 * 24 * 60 * 60;
 
 /**
- * The stock path: getbanlist, read the way the mod's getbans would have
+ * The stock path: getbanlist, read the way the panel Lua's getbans would have
  * reported it. Expired bans are dropped -- a stock server keeps listing them
  * after it stops enforcing them -- and an absurd expiry reads as permanent.
  */
@@ -197,15 +197,15 @@ export async function getServerState(signal?: AbortSignal): Promise<ServerState>
 }
 
 /**
- * The bans in force. With the mod that is `getbans`, read from whichever table
+ * The bans in force. With the panel Lua that is `getbans`, read from whichever table
  * decides them; on a stock server it is `getbanlist`, which cannot say whether
  * Shine owns the list.
  */
 export async function getBans(
-  hasMod: boolean,
+  hasLua: boolean,
   signal?: AbortSignal,
 ): Promise<BanList> {
-  if (!hasMod) {
+  if (!hasLua) {
     const raw = await getJson<RawBan[]>({ request: "getbanlist" }, signal);
     return { source: "stock", bans: normalizeBanList(raw), skewSeconds: 0 };
   }
@@ -226,7 +226,7 @@ export async function getBans(
   };
 }
 
-/** Players seen in the last day, connected or not. Mod only. */
+/** Players seen in the last day, connected or not. Panel Lua only. */
 export async function getRecentPlayers(signal?: AbortSignal): Promise<RecentPlayers> {
   const raw = await getJson<RawRecentPlayers>({ request: "getrecentplayers" }, signal);
   return {
@@ -283,7 +283,7 @@ function normalizeConsoleLine(raw: RawConsoleLine): ConsoleLine {
 }
 
 /**
- * Run a console command on a server carrying the mod's Lua, and get back what
+ * Run a console command on a server carrying the panel Lua, and get back what
  * it printed.
  *
  * `dispatched` is the audit line the game emits before every command made with
@@ -309,7 +309,7 @@ export async function runCommand(
 const kStockChatBufferSize = 20;   // Server.lua:74
 
 /**
- * The chat. With the mod and a cursor, the mod's ring of 200 from `since` on,
+ * The chat. With the panel Lua and a cursor, the panel Lua's ring of 200 from `since` on,
  * with times. Without (`since` null), the game's last 20, all of them every
  * time and with no times; or `{ }`, when the server has no chat buffer.
  */
@@ -359,7 +359,7 @@ function normalizeChat(raw: RawChatMessage, time: number | null): ChatEntry {
 // ------------------------------------------------------------ server log
 
 /**
- * The server's log through the mod's getlog. No cursor: its last 64 KB.
+ * The server's log through the panel Lua's getlog. No cursor: its last 64 KB.
  * `since` and `file`: what was written after `since` in that file. `before`:
  * the page ending there. A reply that is not a page -- a stock server
  * answering with the state blob -- is an error, not an empty log.
@@ -391,7 +391,7 @@ export async function getLog(
 // ------------------------------------------------------------ performance
 
 /**
- * The mod's performance windows since `since` (0 for all it holds), one page
+ * The panel Lua's performance windows since `since` (0 for all it holds), one page
  * of them: `more` says the server holds more past `lastId`. A reply that is
  * not a report -- a stock server answering with the state blob -- is an
  * error, not an empty chart.
@@ -482,7 +482,7 @@ export async function getPerfData(signal?: AbortSignal): Promise<PerfPoint[]> {
 
 // ------------------------------------------------------------------- maps
 
-/** MapCycle.json on the mod; on a stock server, the copy loaded with the map. */
+/** MapCycle.json on the panel Lua; on a stock server, the copy loaded with the map. */
 export async function getMapCycle(signal?: AbortSignal): Promise<RawMapCycle> {
   const raw = await getJson<RawMapCycle>({ request: "getmapcycle" }, signal);
   if (typeof raw !== "object" || raw === null || !Array.isArray(raw.maps)) {
@@ -492,17 +492,17 @@ export async function getMapCycle(signal?: AbortSignal): Promise<RawMapCycle> {
 }
 
 /**
- * Replace the whole cycle. Posted, since a cycle can outgrow a URL. The mod
+ * Replace the whole cycle. Posted, since a cycle can outgrow a URL. The panel Lua
  * answers with the file read back or the reason it refused; a stock server
  * answers an empty 200 either way, which says nothing.
  */
 export async function setMapCycle(
   cycle: RawMapCycle,
-  hasMod: boolean,
+  hasLua: boolean,
   signal?: AbortSignal,
 ): Promise<MapCycleWrite> {
   const params = { request: "setmapcycle", data: JSON.stringify(cycle) };
-  if (!hasMod) {
+  if (!hasLua) {
     await call(params, signal, "POST");
     return { kind: "unverified" };
   }
@@ -532,7 +532,7 @@ export async function getInstalledMods(signal?: AbortSignal): Promise<InstalledM
   }));
 }
 
-/** Shine's mapvote, as far as it concerns the cycle. Mod only. */
+/** Shine's mapvote, as far as it concerns the cycle. Panel Lua only. */
 export async function getMapVote(signal?: AbortSignal): Promise<MapVote> {
   const raw = await getJson<RawMapVote>({ request: "getmapvote" }, signal);
   return {
@@ -599,11 +599,11 @@ export async function searchWorkshop(
  */
 export async function installMod(
   id: string,
-  hasMod: boolean,
+  hasLua: boolean,
   signal?: AbortSignal,
 ): Promise<InstallModResult> {
   const params = { request: "installmod", modid: id };
-  if (!hasMod) {
+  if (!hasLua) {
     await call(params, signal, "POST");
     return { kind: "unverified" };
   }

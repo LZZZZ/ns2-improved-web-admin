@@ -58,7 +58,7 @@ export const DEFAULTS: Settings = {
   logHiddenKinds: ["engine", "other"],
 };
 
-const KEY = "improved-webadmin.settings";
+const KEY = "webadmin.settings";
 
 /**
  * Whether this browser keeps what is saved. Private modes and blocked site

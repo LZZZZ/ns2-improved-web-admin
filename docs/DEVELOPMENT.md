@@ -13,7 +13,7 @@ Testing against a real dedicated server is in [TESTING.md](TESTING.md).
 | `mock/` | The mock server ([mock/README.md](../mock/README.md)). |
 | `fixtures/` | Redacted responses captured from real servers. |
 | `tools/` | Gates, generators, probes and harnesses (below). |
-| `workshop/` | The Workshop page, not uploaded as content: `preview.jpg`, `description.bbcode` (`{version}` becomes `kModVersion`; a line starting `{if-id}` is kept only once the item id is known, `{if-no-id}` only before, with `{id}` and `{hexid}` filled in), and `publishedfileid`. |
+| `workshop/` | The Workshop page, not uploaded as content: `preview.jpg`, `description.bbcode` (`{version}` becomes `kVersion`; a line starting `{if-id}` is kept only once the item id is known, `{if-no-id}` only before, with `{id}` and `{hexid}` filled in), and `publishedfileid`. |
 
 The Workshop item is `web/`, `lua/` and `LICENSE`, staged by
 `tools/build-workshop.sh`.

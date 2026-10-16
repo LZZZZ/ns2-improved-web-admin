@@ -31,12 +31,12 @@ export function CycleBanners({ cycle }: { cycle: MapCycleState }) {
 }
 
 /** Undo the last write, and read the cycle again. */
-export function UndoReload({ cycle, hasMod }: { cycle: MapCycleState; hasMod: boolean }) {
+export function UndoReload({ cycle, hasLua }: { cycle: MapCycleState; hasLua: boolean }) {
   return (
     <>
       <button class="btn"
               disabled={cycle.undo === null || cycle.saving || cycle.conflict !== null}
-              onClick={() => undoMapCycle(hasMod)}
+              onClick={() => undoMapCycle(hasLua)}
               title="Write back the cycle as it was before the last change">
         Undo last change
       </button>

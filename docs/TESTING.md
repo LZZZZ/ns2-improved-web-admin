@@ -102,7 +102,7 @@ example); any home directory left becomes `/home/user`.
 
 `redact-fixtures.py` rewrites all of `fixtures/live/`, so a capture with
 the mod mounted overwrites the stock fixtures (`serverstate.json` gains
-`mod_version`). Capture the two sets separately, or use `--src`, and `git
+`lua_version`). Capture the two sets separately, or use `--src`, and `git
 checkout` what you did not mean to replace.
 
 A populated `player_list`, real chat, a successful kick or a ban need a
@@ -133,7 +133,7 @@ existing name is served at once.
 restores ranking), `BannedPlayers.json`, `ReservedSlotsConfig.json` if the
 slot count changed, the item's own `ServerWebInterface.lua`, and delete
 what tests leave in `config/`: `ConsistencyConfig.json` (written on a boot
-with a mod mounted) and `improved-webadmin/`.
+with a mod mounted) and `webadmin/`.
 
 **The published item.** To test the upload rather than the working tree,
 put `e3742516` in `MapCycle.json`'s `mods` instead of the Combat Fix
@@ -259,5 +259,5 @@ Afterwards restore `MapCycle.json`, `shine/temp/lastmaps.json` and
 `shuffle_friend_groups.json` (Shine rewrites both), remove the mount mod's
 copy, and delete what the boot creates in the config directory:
 `ConsistencyConfig.json`, a default `shine/plugins/LifeformPicker.json`,
-that day's log in `shine/logs/`, and `improved-webadmin/`, which holds a
+that day's log in `shine/logs/`, and `webadmin/`, which holds a
 joined player's real name, IP and Steam id.

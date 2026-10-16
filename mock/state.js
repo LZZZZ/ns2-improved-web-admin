@@ -127,7 +127,7 @@ export function createState(fixturesDir, opts = {}) {
   const kWorkshopLimit = 50;
   let workshopTimeoutS = 30;
   const workshopNext = { search: null, searches: 0, install: null };
-  const kModVersion = "0.2.0";
+  const kVersion = "0.2.0";
 
   // ------------------------------------------------------------- whitelist
 
@@ -438,7 +438,7 @@ export function createState(fixturesDir, opts = {}) {
       // Absent on a stock server, which is how the panel knows which it is
       // talking to and what it can honestly offer.
       ...(opts.mod ? {
-        mod_version: kModVersion, max_players: maxPlayers, map_loaded_at: perfWin.loadedAt,
+        lua_version: kVersion, max_players: maxPlayers, map_loaded_at: perfWin.loadedAt,
         // Unranked, as any server with this mod mounted is until it is
         // whitelisted (CONSTRAINTS item 18); --ranked for the game's own copy.
         ranking_active: opts.ranked === true,

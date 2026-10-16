@@ -244,7 +244,7 @@ can leave the file torn, and nothing can delete it.
 shown in the tab. A connected player is never aged out.
 
 - **Two slots replace write-then-rename.** Saves alternate between
-  `config://improved-webadmin/recent-players-a.json` and `-b.json`, each
+  `config://webadmin/recent-players-a.json` and `-b.json`, each
   with an increasing `seq`. The loader decodes both under `pcall` and takes
   the newest that parses, reporting `ok`, `fallback` (newest torn),
   `empty` (no file yet) or `unreadable` (both torn: start empty). A failing

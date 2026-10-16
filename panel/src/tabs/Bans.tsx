@@ -42,7 +42,7 @@ function compare(a: Ban, b: Ban, key: SortKey): number {
 export function Bans({ state }: { state: ServerState }) {
   const settings = useSettings();
   const list = useResource(bansResource);
-  const hasMod = state.modVersion !== null;
+  const hasLua = state.luaVersion !== null;
   const data = list.data;
   const shineOwns = data?.source === "shine";
 
@@ -50,7 +50,7 @@ export function Bans({ state }: { state: ServerState }) {
   // A stock server may hand the list over in a different order on every poll
   // (Shine's pairs() order), so its default is by name, which is stable.
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>(
-    { key: hasMod ? "order" : "name", dir: 1 });
+    { key: hasLua ? "order" : "name", dir: 1 });
 
   const [idInput, setIdInput] = useState("");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
@@ -87,7 +87,7 @@ export function Bans({ state }: { state: ServerState }) {
 
   const unban = (b: Ban) => {
     if (!confirm(`Unban ${b.name} (${b.steamId})?`)) return;
-    void sendCommand(unbanCommand(state, b.steamId), hasMod, [bansResource]);
+    void sendCommand(unbanCommand(state, b.steamId), hasLua, [bansResource]);
   };
 
   const addBan = async (e: Event) => {
@@ -96,7 +96,7 @@ export function Bans({ state }: { state: ServerState }) {
     if (!confirm(`Ban ${parsedId} ${banSpan(minutes)}?`)) return;
     setBusy(true);
     const outcome = await sendCommand(
-      banCommand(state, parsedId, minutes, terms.reason), hasMod, [bansResource]);
+      banCommand(state, parsedId, minutes, terms.reason), hasLua, [bansResource]);
     setBusy(false);
     if (outcome.tone !== "error") {
       setIdInput("");
@@ -108,7 +108,7 @@ export function Bans({ state }: { state: ServerState }) {
 
   return (
     <section class="wrap bans-tab">
-      {!hasMod && (
+      {!hasLua && (
         <div class="banner">
           <h2>Stock server Lua</h2>
           <p>
@@ -116,7 +116,7 @@ export function Bans({ state }: { state: ServerState }) {
             here, though the server still lists them. Unban cannot work on the
             stock Lua. A ban is sent unverified, and if this server runs
             Shine, a ban of someone who is not connected may not take effect:
-            only the mod can tell which list is enforced.
+            only the panel Lua can tell which list is enforced.
           </p>
         </div>
       )}
@@ -133,7 +133,7 @@ export function Bans({ state }: { state: ServerState }) {
           {data
             ? `${rows.length} of ${data.bans.length} bans`
             : (list.loading ? "Loading bans..." : "")}
-          {data && hasMod && ` · ${shineOwns ? "Shine's ban list" : "the game's ban list"}`}
+          {data && hasLua && ` · ${shineOwns ? "Shine's ban list" : "the game's ban list"}`}
         </span>
         <span class="spacer" />
         {list.error && <span class="tone-error">{list.error.message}</span>}
@@ -187,8 +187,8 @@ export function Bans({ state }: { state: ServerState }) {
                   </td>
                 )}
                 <td>
-                  <IconButton icon={ShieldOff} label="Unban" extraClass="unban" disabled={!hasMod}
-                              reason={hasMod ? undefined : STOCK_UNBAN_REASON}
+                  <IconButton icon={ShieldOff} label="Unban" extraClass="unban" disabled={!hasLua}
+                              reason={hasLua ? undefined : STOCK_UNBAN_REASON}
                               onClick={() => unban(b)} />
                 </td>
               </tr>

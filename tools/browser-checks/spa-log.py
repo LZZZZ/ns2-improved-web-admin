@@ -135,7 +135,7 @@ async def main():
             await c.send("Network.enable")
             await c.send("Page.addScriptToEvaluateOnNewDocument",
                          source="window.confirm = () => true;"
-                                "try { localStorage.removeItem('improved-webadmin.settings'); } catch {}")
+                                "try { localStorage.removeItem('webadmin.settings'); } catch {}")
 
             print("\n== nothing is read before the tab opens")
             await c.send("Page.navigate", url=MOD + "/index.html")
@@ -167,7 +167,7 @@ async def main():
                 await c.eval(f"document.querySelector('input[name=kind-{kind}]').click()")
             await asyncio.sleep(0.5)
             stored = json.loads(await c.eval(
-                "localStorage.getItem('improved-webadmin.settings')") or "{}")
+                "localStorage.getItem('webadmin.settings')") or "{}")
             check("ticking them is kept in the browser",
                   stored.get("logHiddenKinds") == [], str(stored.get("logHiddenKinds")))
             tail = json.loads(get(f"{MOD}/?request=getlog"))

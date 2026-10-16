@@ -1,6 +1,6 @@
 // The Log tab's copy of the server's log.
 //
-// The mod's getlog serves the engine's log by byte offset, whole lines only,
+// The panel Lua's getlog serves the engine's log by byte offset, whole lines only,
 // each carrying its offset. So the state here is a byte cursor, the file it
 // belongs to, and the lines read so far, merged by offset -- a line can never
 // arrive twice. What this has to get right, all of it from how the file and

@@ -57,7 +57,7 @@ export function Workshop({ state, onOpenMods }: {
   state: ServerState;
   onOpenMods: (id: string) => void;
 }) {
-  const hasMod = state.modVersion !== null;
+  const hasLua = state.luaVersion !== null;
   const settings = useSettings();
   const { search, installs } = useWorkshop();
   const mods = useResource(installedMods);
@@ -107,7 +107,7 @@ export function Workshop({ state, onOpenMods }: {
           : "It is whitelisted: loading it keeps the server ranked."))) {
       return;
     }
-    void requestInstall(item, hasMod);
+    void requestInstall(item, hasLua);
   };
 
   return (
@@ -131,7 +131,7 @@ export function Workshop({ state, onOpenMods }: {
         </p>
       </div>
 
-      <SearchStatus search={search} hasMod={hasMod} onRetry={() => void runSearch(
+      <SearchStatus search={search} hasLua={hasLua} onRetry={() => void runSearch(
         search.status === "idle" ? "" : search.query)} />
 
       {search.status === "results" && search.items.length > 0 && (
@@ -169,7 +169,7 @@ export function Workshop({ state, onOpenMods }: {
 }
 
 function SearchStatus(
-  { search, hasMod, onRetry }: { search: SearchState; hasMod: boolean; onRetry: () => void },
+  { search, hasLua, onRetry }: { search: SearchState; hasLua: boolean; onRetry: () => void },
 ) {
   const what = (q: string) => (q ? <>for <b class="query">{q}</b></> : "for everything");
   switch (search.status) {
@@ -198,7 +198,7 @@ function SearchStatus(
       return (
         <p class="search-status tone-error">
           No answer {what(search.query)} after 35 s.{" "}
-          {hasMod ? "" : "A stock server cannot tell a failed search from a slow one. "}
+          {hasLua ? "" : "A stock server cannot tell a failed search from a slow one. "}
           <button class="btn btn-sm" onClick={onRetry}>Retry</button>
         </p>
       );

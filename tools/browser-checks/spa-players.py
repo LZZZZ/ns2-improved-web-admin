@@ -48,7 +48,7 @@ BETA = os.environ.get("BETA_URL", "http://127.0.0.1:8102")
 BASE = MOCK + "/index.html"
 PORT = 9226
 
-# Set when the mock is running with --mod, i.e. it answers with a mod_version.
+# Set when the mock is running with --mod, i.e. it answers with a lua_version.
 # The panel must then drop the stock-server banner -- the same detection,
 # asserted from the other side.
 EXPECT_MOD = os.environ.get("SPA_EXPECT_MOD") == "1"
@@ -85,7 +85,7 @@ async def main():
                          source="window.confirm = () => true;"
                                 # Settings persist per origin, and the last tab is
                                 # reopened: start every page load from the defaults.
-                                "try { localStorage.setItem('improved-webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
+                                "try { localStorage.setItem('webadmin.settings', '{\"hideIdentifiers\":true}'); } catch {}")
             await c.send("Page.navigate", url=BASE)
             await asyncio.sleep(4)
 

@@ -17,7 +17,7 @@ const SHINE_REASON =
 export function Slots({ state }: { state: ServerState }) {
   const settings = useSettings();
   const res = useResource(reservedSlots);
-  const hasMod = state.modVersion !== null;
+  const hasLua = state.luaVersion !== null;
   const shineOwns = state.shine?.reservedSlots === true;
   const data = res.data;
   const refresh = [reservedSlots];
@@ -49,7 +49,7 @@ export function Slots({ state }: { state: ServerState }) {
 
   const run = async (command: string) => {
     setBusy(true);
-    const outcome = await sendCommand(command, hasMod, refresh);
+    const outcome = await sendCommand(command, hasLua, refresh);
     setBusy(false);
     return outcome;
   };
@@ -129,13 +129,13 @@ export function Slots({ state }: { state: ServerState }) {
           </p>
         </div>
       )}
-      {!hasMod && (
+      {!hasLua && (
         <div class="banner">
           <h2>Stock server Lua</h2>
           <p>
             Changes are sent unverified. On the stock Lua a removed slot is
             not saved to disk until something else saves the slot config, so
-            a restart before then brings it back. The mod fixes that.
+            a restart before then brings it back. The panel Lua fixes that.
           </p>
         </div>
       )}

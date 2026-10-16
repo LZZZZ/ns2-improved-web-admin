@@ -124,7 +124,7 @@ engine.
 | --- | --- |
 | A dedicated server fetching an unlisted item | Works: `Queuing download of NS2 Improved Web Admin[3816039702]`, then `Mounting mod ... from <modstorage>/content/4920/3816039702/` |
 | What it downloaded | Byte-identical to `build/workshop/content/`: `web/`, `lua/`, `LICENSE` |
-| `lua/ServerWebInterface.lua` | Shadows the game's: `mod_version: "0.2.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
+| `lua/ServerWebInterface.lua` | Shadows the game's: `lua_version: "0.2.0"`, and `runcommand` returns `No matching player` for a kick that matched nobody |
 | `web/` | `index.html` and the other 22 files `200`, byte-identical |
 | The mod's data folder | `config://improved-webadmin/whitelist.json` written (116 ids; the mod has not written it since 10-12) |
 | `getinstalledmodslist` | The item listed `active`, as `e3742516` |
@@ -168,7 +168,7 @@ backward compatible where that is cheap.
 4. **Consistent types.** Stock sends `cheats`, `devmode` and `isbot` as
    strings and `iscomm` and `game_started` as booleans. The mod sends all
    five as booleans; the panel reads both forms.
-5. **A version field.** `mod_version` in the state blob, absent on a
+5. **A version field.** `lua_version` in the state blob, absent on a
    stock server, is how a client detects the mod.
 6. **Answer a browser with the panel, not the state blob.** On a stock
    server `/` returns the state blob, IPs included

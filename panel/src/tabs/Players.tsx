@@ -115,14 +115,14 @@ export function Players({ state }: { state: ServerState }) {
 
   const act = (command: string, confirmText?: string) => {
     if (confirmText && !confirm(confirmText)) return;
-    // With the mod's Lua the result comes back with the command; without it,
+    // With the panel Lua the result comes back with the command; without it,
     // nothing does. sendCommand says which, rather than assuming.
-    void sendCommand(command, state.modVersion !== null);
+    void sendCommand(command, state.luaVersion !== null);
   };
 
   const canMute = state.shine?.baseCommands === true;
   const showShared = state.players.some((p) => p.familyShared !== null);
-  // The mod sends skill; a stock server does not, and gets no column.
+  // The panel Lua sends skill; a stock server does not, and gets no column.
   const showSkill = state.players.some((p) => p.skill !== null);
   const columns = COLUMNS.filter((c) => c.key !== "skill" || showSkill);
   const tableWidth = NAME_MIN_WIDTH

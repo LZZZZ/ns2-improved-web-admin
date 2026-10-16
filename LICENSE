@@ -25,7 +25,7 @@ SOFTWARE.
 What the MIT License above does not cover
 
 The license above applies to the original work in this repository. The
-following are not ours to license. They are included because the mod needs
+following are not ours to license. They are included because the panel needs
 them to work alongside Natural Selection 2, and they remain under their
 owners' terms:
 
@@ -34,7 +34,7 @@ owners' terms:
    ("Copyright (c) 2012, Unknown Worlds Entertainment, Inc. All rights
    reserved."), and the probes in tools/spikes/*-probe.lua are built from it.
    The vanilla code in those files belongs to Unknown Worlds Entertainment.
-   Our changes to them, marked "improved-webadmin:", are under the MIT License.
+   Our changes to them are under the MIT License.
 
 2. Art taken from Natural Selection 2, (c) Unknown Worlds Entertainment:
    the map overviews in panel/src/minimaps/, the skill tier badges in

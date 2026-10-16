@@ -17,11 +17,11 @@ const kShineReceipt = /^Console\[N\/A\] ran command \S+ with arguments:/;
 /**
  * Send a console command and report exactly what is known about it.
  *
- * On a server carrying the mod's Lua that is a real answer: the command's own
+ * On a server carrying the panel Lua that is a real answer: the command's own
  * output comes back with it. On a stock server it is not, and the difference
  * is stated rather than smoothed over.
  *
- * Note what an empty result means on the mod: the command ran and printed
+ * Note what an empty result means on the panel Lua: the command ran and printed
  * nothing. That is the normal case for a kick that worked -- only the failure
  * branch prints -- so it is reported as "no output", never as success.
  */
@@ -35,7 +35,7 @@ export interface CommandOutcome {
 
 export async function sendCommand(
   command: string,
-  hasMod: boolean,
+  hasLua: boolean,
   /** Lists the command may have changed, re-read once it has run. */
   refresh: Resource<unknown>[] = [],
 ): Promise<CommandOutcome> {
@@ -48,7 +48,7 @@ export async function sendCommand(
   try {
     let outcome: CommandOutcome;
 
-    if (hasMod) {
+    if (hasLua) {
       const result = await runCommand(command);
 
       const receipt = result.lines.some((l) => kShineReceipt.test(l.text));

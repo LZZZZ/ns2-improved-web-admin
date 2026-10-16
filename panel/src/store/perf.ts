@@ -2,7 +2,7 @@
 //
 // Two sources, one shape (PerfPoint):
 //
-//   * the mod's getperf: 10 s windows with ids, read with a cursor. The server
+//   * the panel Lua's getperf: 10 s windows with ids, read with a cursor. The server
 //     keeps an hour of them since the map loaded; a map change rebuilds the Lua
 //     VM, so `loadedAt` moves and the ids restart from 1. This store keeps what
 //     it has already read across those restarts -- one segment per map load --
@@ -13,7 +13,7 @@
 //     whole window in every reply. It is replaced on each poll, never appended
 //     to -- appending is the 2012 panel's defect (CURRENT-UI defect 2).
 //
-// The mod's reply also carries `engine`: tickstat windows, and what the engine
+// The panel Lua's reply also carries `engine`: tickstat windows, and what the engine
 // prints only to its log (rate steps, the perfmon: block), read with a cursor
 // of its own and kept in the same segments, so a map change restarts both.
 //
@@ -51,14 +51,14 @@ export interface PerfSegment {
 export type EngineStatus = Omit<PerfEngine, "tickstats" | "perfmon" | "events">;
 
 export interface PerfState {
-  source: "mod" | "stock" | null;
+  source: "lua" | "stock" | null;
   segments: PerfSegment[];
   config: PerfConfig | null;
   windowSeconds: number | null;
   capacity: number | null;
   /** The oldest point this page still holds, in milliseconds. */
   keptSince: number | null;
-  /** Null on stock, or from a mod that predates it. */
+  /** Null on stock, or from a panel Lua that predates it. */
   engine: EngineStatus | null;
   error: Error | null;
   loading: boolean;
@@ -140,7 +140,7 @@ async function pollMod(): Promise<boolean> {
     status = rest;
   }
   emit({
-    source: "mod", segments, config: report.config,
+    source: "lua", segments, config: report.config,
     windowSeconds: report.windowSeconds, capacity: report.capacity,
     keptSince: first?.at ?? null, engine: status,
   });
@@ -157,13 +157,13 @@ async function pollStock(): Promise<void> {
   });
 }
 
-let hasMod = false;
+let hasLua = false;
 
 function poll(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
-      if (hasMod) {
+      if (hasLua) {
         let page = 1;
         while ((await pollMod()) && page < kMaxPages) page++;
       } else {
@@ -181,7 +181,7 @@ function poll(): Promise<void> {
 }
 
 function intervalMs(): number {
-  if (!hasMod) return kStockIntervalMs;
+  if (!hasLua) return kStockIntervalMs;
   return (state.windowSeconds ?? 10) * 1000;
 }
 
@@ -200,10 +200,10 @@ function onVisibility() {
   void poll().then(schedule);
 }
 
-/** Switch source. A server that gained or lost the mod starts a new history. */
-function setSource(mod: boolean) {
-  if (mod === hasMod && state.source !== null) return;
-  hasMod = mod;
+/** Switch source. A server that gained or lost the panel Lua starts a new history. */
+function setSource(lua: boolean) {
+  if (lua === hasLua && state.source !== null) return;
+  hasLua = lua;
   cursor = 0;
   engineCursor = 0;
   state = { ...empty };
@@ -224,7 +224,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Turn the engine's tickstat on at `seconds` (0 turns it off). The command
  * answers `tickstat: on|off`, which runcommand captures: that is the proof.
- * The mod's scan of the log picks the same line up within `scan_s`, so the
+ * The panel Lua's scan of the log picks the same line up within `scan_s`, so the
  * switch reads one more report after that, for everyone's status to agree.
  */
 export async function setTickstat(seconds: number): Promise<TickstatOutcome> {
@@ -251,10 +251,10 @@ export async function setTickstat(seconds: number): Promise<TickstatOutcome> {
   return { kind: "unconfirmed", note };
 }
 
-export function usePerf(mod: boolean): PerfState {
+export function usePerf(lua: boolean): PerfState {
   const [, force] = useState(0);
   useEffect(() => {
-    setSource(mod);
+    setSource(lua);
     const listener = () => force((n) => n + 1);
     listeners.add(listener);
     if (listeners.size === 1) {
@@ -269,6 +269,6 @@ export function usePerf(mod: boolean): PerfState {
         timer = null;
       }
     };
-  }, [mod]);
+  }, [lua]);
   return state;
 }

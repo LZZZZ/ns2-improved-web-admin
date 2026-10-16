@@ -56,7 +56,7 @@ const SHINE_MODE_REASON =
   "Shine's mapvote picks the next map, by vote or else in list order; the mode is not used.";
 
 export function Maps({ state }: { state: ServerState }) {
-  const hasMod = state.modVersion !== null;
+  const hasLua = state.luaVersion !== null;
   const cycle = useMapCycle();
   const maps = useResource(mapList);
   const mods = useResource(installedMods);
@@ -69,14 +69,14 @@ export function Maps({ state }: { state: ServerState }) {
 
   return (
     <section class="wrap maps-tab">
-      {!hasMod && (
+      {!hasLua && (
         <div class="banner">
           <h2>Stock server Lua</h2>
           <p>
             A stock server answers every cycle write with an empty reply, and
             shows the cycle it loaded with the map rather than MapCycle.json. A
             hand edit of the file does not show here until the map changes,
-            and a change made here writes over it. The mod reads and confirms
+            and a change made here writes over it. The panel Lua reads and confirms
             the file.
           </p>
         </div>
@@ -85,7 +85,7 @@ export function Maps({ state }: { state: ServerState }) {
       {cycle.shown ? (
         <Editor
           state={state}
-          hasMod={hasMod}
+          hasLua={hasLua}
           cycle={cycle.shown}
           saving={cycle.saving}
           locked={cycle.conflict !== null}
@@ -104,7 +104,7 @@ export function Maps({ state }: { state: ServerState }) {
 
 interface EditorProps {
   state: ServerState;
-  hasMod: boolean;
+  hasLua: boolean;
   cycle: RawMapCycle;
   saving: boolean;
   locked: boolean;
@@ -114,13 +114,13 @@ interface EditorProps {
 }
 
 function Editor(p: EditorProps) {
-  const { state, hasMod, cycle, locked } = p;
+  const { state, hasLua, cycle, locked } = p;
   const store = useMapCycle();
-  const shineVote = hasMod && state.shine?.mapVote === true;
+  const shineVote = hasLua && state.shine?.mapVote === true;
   const vote = shineVote ? <VoteNext /> : null;
 
   const commit = (label: string, edit: (c: RawMapCycle) => RawMapCycle) =>
-    commitMapCycle(edit, label, hasMod);
+    commitMapCycle(edit, label, hasLua);
 
   const modName = useMemo(() => {
     const byId = new Map((p.mods ?? []).map((m) => [m.id.toLowerCase(), m.name]));
@@ -193,7 +193,7 @@ function Editor(p: EditorProps) {
     const players = state.playersOnline;
     if (!confirm(`Change map to ${map} now?`
       + (players > 0 ? ` ${players} player${players === 1 ? "" : "s"} will go with it.` : ""))) return;
-    void sendCommand(`sv_changemap ${consoleArg(map)}`, hasMod,
+    void sendCommand(`sv_changemap ${consoleArg(map)}`, hasLua,
       shineVote ? [mapVote] : []);
   };
 
@@ -314,7 +314,7 @@ function Editor(p: EditorProps) {
             </select>
           </label>
           <span class="spacer" />
-          <UndoReload cycle={store} hasMod={hasMod} />
+          <UndoReload cycle={store} hasLua={hasLua} />
         </div>
         {(p.saving || p.last || (time.trim() !== "" && !timeValid)) && (
           <p class={`muted form-hint${p.last?.tone === "error" ? " tone-error" : ""}`}

@@ -11,7 +11,7 @@
   "frame_rate": 30.007535934448,
   "game_started": true,
   "game_time": 143,
-  "mod_version": "0.1.0",
+  "lua_version": "0.1.0",
   "marines": 0,
   "max_players": 16,
   "aliens": 0,

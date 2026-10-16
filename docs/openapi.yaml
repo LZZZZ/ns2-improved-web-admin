@@ -97,7 +97,7 @@ tags:
       a stock server**, where these `request` values are unrecognised and fall
       through to the server-state blob like any other unknown value -- so a
       client cannot tell a mod request type from a typo by status code. Detect
-      the mod with `mod_version` in the state blob instead.
+      the mod with `lua_version` in the state blob instead.
 
 paths:
 
@@ -1223,7 +1223,7 @@ paths:
         banned. Bots are never recorded.
 
         The list outlives a map change, which rebuilds all Lua state: it is
-        kept in `config://improved-webadmin/recent-players-{a,b}.json`, saved
+        kept in `config://webadmin/recent-players-{a,b}.json`, saved
         alternately so a torn write loses one save rather than the list.
         `storage` says how the load went and whether saves are working.
 
@@ -1589,7 +1589,7 @@ components:
         game_time:
           type: integer
           description: Seconds since round start, `0` when no round is running.
-        mod_version:
+        lua_version:
           type: string
           description: |
             **Mod only.** The version of NS2 Improved Web Admin's Lua serving this

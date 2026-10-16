@@ -27,7 +27,7 @@ import { clock, duration } from "./format";
 import { MapName } from "./Minimap";
 import { TickSpark } from "./TickSpark";
 
-// The six tabs the shipped panel has, plus what the mod's Lua makes possible:
+// The six tabs the shipped panel has, plus what the panel Lua makes possible:
 // recent players, and the server's log with its command line (one tab since
 // 2026-10-07; it was Console and Log). The 2012 Mods tab is two here:
 // Mods loads and unloads what is installed, Workshop finds and downloads; and
@@ -155,7 +155,7 @@ export function App() {
           </div>
         )}
 
-        {data && data.modVersion === null && (
+        {data && data.luaVersion === null && (
           <div class="wrap">
             <div class="banner">
               <h2>Stock server Lua</h2>

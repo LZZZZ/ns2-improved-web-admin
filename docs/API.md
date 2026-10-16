@@ -14,7 +14,7 @@ additions under the `mod` tag, checked against the fixtures by
 ## What the mod adds
 
 On a stock server these request types are unknown and fall through to the
-state blob, so a client detects the mod by `mod_version` in the state
+state blob, so a client detects the mod by `lua_version` in the state
 blob, never by a status code.
 
 | Request type | What it returns | Details |
@@ -34,7 +34,7 @@ mounted now (REQUIREMENTS item 3) and `whitelisted` (item 17), as `getmods`
 marks each result, and a request with no parameters is answered by path
 and `Accept` (item 6).
 
-State blob additions: `mod_version`, `max_players`, `map_loaded_at`,
+State blob additions: `lua_version`, `max_players`, `map_loaded_at`,
 `ranking_active`, `shine` when Shine is loaded, and real booleans
 (item 4). Player rows gain Hive `skill` with its offsets and `skill_tier`
 (item 16), `gagged` under Shine's basecommands, Family Sharing
@@ -346,7 +346,7 @@ captures are never committed (`fixtures/live/` is gitignored).
 
 `getrecentplayers` serves the same two values for everyone seen in the
 last 24 hours, connected or not, with former names, and writes them to
-`config://improved-webadmin/recent-players-{a,b}.json`, where they stay
+`config://webadmin/recent-players-{a,b}.json`, where they stay
 until they age out; Lua cannot delete the files. The Recent players tab
 shows IPs unmasked by design
 ([DESIGN.md](DESIGN.md#what-the-panel-deliberately-does-not-do));

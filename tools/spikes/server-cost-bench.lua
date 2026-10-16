@@ -32,7 +32,7 @@ if ownDisk then
     DISK = os.tmpname()
     os.remove(DISK)
 end
-os.execute("mkdir -p '" .. DISK .. "/improved-webadmin'")
+os.execute("mkdir -p '" .. DISK .. "/webadmin'")
 local LOG = DISK .. "/log-Server.txt"
 
 local realOpen = io.open

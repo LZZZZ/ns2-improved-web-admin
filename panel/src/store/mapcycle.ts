@@ -11,7 +11,7 @@
 //     panel last saw it -- another admin, or a hand edit of the file -- the
 //     write is not made. The operator reloads and redoes the change.
 //   * what the server holds afterwards is what the panel shows, and the
-//     activity strip says how that was established: the mod returns the file
+//     activity strip says how that was established: the panel Lua returns the file
 //     read back, a stock server returns nothing, so there the cycle is read
 //     again and the note says it is the server's copy, not the file.
 //
@@ -101,21 +101,21 @@ export async function loadMapCycle(): Promise<void> {
  * Apply an edit and write the result. `label` says what the edit was, in the
  * activity strip.
  */
-export function commitMapCycle(edit: Edit, label: string, hasMod: boolean) {
+export function commitMapCycle(edit: Edit, label: string, hasLua: boolean) {
   if (!state.base || state.conflict) return;
   pending.push({ edit, label });
   reshow();
-  if (!state.saving) void flush(hasMod);
+  if (!state.saving) void flush(hasLua);
 }
 
 /** Write back the cycle as it was before the last write that landed. */
-export function undoMapCycle(hasMod: boolean) {
+export function undoMapCycle(hasLua: boolean) {
   const before = state.undo;
   if (!before) return;
-  commitMapCycle(() => copy(before), "undo the last change", hasMod);
+  commitMapCycle(() => copy(before), "undo the last change", hasLua);
 }
 
-async function flush(hasMod: boolean): Promise<void> {
+async function flush(hasLua: boolean): Promise<void> {
   const base = state.base;
   if (!base || pending.length === 0) return;
   const batch = pending;
@@ -142,7 +142,7 @@ async function flush(hasMod: boolean): Promise<void> {
       return;
     }
 
-    const result = await setMapCycle(next, hasMod);
+    const result = await setMapCycle(next, hasLua);
     if (result.kind === "refused") {
       fail(`refused, nothing written: ${result.error}`);
       return;
@@ -177,7 +177,7 @@ async function flush(hasMod: boolean): Promise<void> {
     inFlight = null;
     emit({ saving: false });
     reshow();
-    if (pending.length > 0 && !state.conflict) void flush(hasMod);
+    if (pending.length > 0 && !state.conflict) void flush(hasLua);
     else pending = [];
   }
 }

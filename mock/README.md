@@ -47,7 +47,7 @@ which is what a panel pointed at the wrong server sees. `--mod` adds them:
 
 | | |
 | --- | --- |
-| `mod_version`, `max_players` (16), `map_loaded_at` | In the state blob. `map_loaded_at` is `getperf`'s `loaded_at`. |
+| `lua_version`, `max_players` (16), `map_loaded_at` | In the state blob. `map_loaded_at` is `getperf`'s `loaded_at`. |
 | `/` | A request with no parameters: at `/`, a browser (`Accept: text/html`) gets the panel's `index.html` from `--web` (or `fixtures/root-mod.html` without one) and anything else the state blob; any other path, the panel too. |
 | `runcommand` | What a command printed, as `Shared.CaptureConsoleCommand` returns it, tagged `audit` or `server`; `dispatched` is the audit line. The lines reach the log too. |
 | `getchatlist` | With `since`, a ring of 200 with times (the game's, after the ns2-game PR); without, the stock 20. Both empty at `sv_changemap`, ids from 1. |

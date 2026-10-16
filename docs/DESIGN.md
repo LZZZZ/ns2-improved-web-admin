@@ -31,7 +31,7 @@ on them ([CONSTRAINTS](CONSTRAINTS.md#engine-additions-item-18)).
 | Build output | Committed | The item can be assembled without a toolchain. |
 | Dev loop | `vite build --watch`, with the mock serving the built output | A dev server on another port is refused `403` by the engine's Origin rule, and a proxy would hide that rule and the no-404 fallthrough, the two places this API bites. |
 | Lua changes | **Change the Lua wherever it improves the result** | The mod replaces `ServerWebInterface.lua` wholesale. Other game Lua may be wrapped or overridden too; a wrapper usually survives a game update, a shipped copy must be re-diffed against each. Keep the HTTP API backward compatible when that is cheap, so the 2012 panel still works (gate `mock-acceptance.py`). When breaking it, record why and update `openapi.yaml`, the mock and the fixtures in the same commit. |
-| Stock servers | Require the mod; detect it and degrade loudly | The panel reads `mod_version` from the state blob, and on a stock server says what is unavailable. |
+| Stock servers | Require the mod; detect it and degrade loudly | The panel reads `lua_version` from the state blob, and on a stock server says what is unavailable. |
 | Shine | **First-class** | Almost every server runs it, and it replaces ban handling, `ServerAdminPrint` and map rotation. Every tab works on both ([details](CONSTRAINTS.md#shine)). |
 | Charts | **uPlot** | Canvas time series with cursor sync and drag-zoom. Tickrate, slowest tick, score and players share one unitless axis (all about 0-100); the legend carries the units. No dual y-axes. |
 | Icons | Lucide (`lucide-preact`, ISC), tree-shaken | Each icon carries `title` and hidden text for hover, screen readers and the gates. |

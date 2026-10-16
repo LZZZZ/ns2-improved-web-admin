@@ -33,8 +33,5 @@ Server side: `ns2/lua/ServerWebInterface.lua`.
     npm run check    # typecheck
     npm run build    # writes ns2/web/index.html, assets/, THIRD-PARTY-LICENSES.txt
 
-Upstream, with docs, a mock server and browser tests:
-https://github.com/LZZZZ/ns2-improved-web-admin
-
 MIT (LICENSE). Bundled libraries: ns2/web/THIRD-PARTY-LICENSES.txt.
 EOF

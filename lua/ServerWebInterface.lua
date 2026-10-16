@@ -12,7 +12,7 @@
 Script.Load("lua/RingBuffer.lua")
 
 -- Absent from the stock file's state, which is how the panel tells them apart.
-local kModVersion = "0.2.0"
+local kVersion = "0.2.0"
 
 -- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
@@ -162,8 +162,8 @@ local kRecentSweepSeconds = 10
 local kRecentSaveSeconds = 60
 local kRecentFileVersion = 1
 local kRecentSlots = {
-    "config://improved-webadmin/recent-players-a.json",
-    "config://improved-webadmin/recent-players-b.json",
+    "config://webadmin/recent-players-a.json",
+    "config://webadmin/recent-players-b.json",
 }
 
 -- Account id -> entry, as saved.
@@ -1161,7 +1161,7 @@ local function GetServerState()
         frame_rate = Server.GetFrameRate(),
         game_started = gamestarted,
         game_time = gametime,
-        mod_version = kModVersion,
+        lua_version = kVersion,
         -- Upper bound for the reserved slot amount.
         max_players = Server.GetMaxPlayers(),
         -- The Lua VM is rebuilt at a map change.
