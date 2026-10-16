@@ -3,6 +3,7 @@
 -- lua\ServerWebInterface.lua
 --
 --    Created by:   Brian Cronin (brianc@unknownworlds.com)
+--    Modified by:  LZZ (lzz@lzzbr.com)
 --
 -- ========= For more information, visit us at http://www.unknownworlds.com =====================
 
