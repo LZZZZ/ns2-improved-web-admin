@@ -24,9 +24,9 @@ Of the 2012 file, `getmods` is rewritten and `getmapcycle` and
 `setmapcycle` hardened; its other requests stay for scripts that use
 them. The rest is new:
 
-- **Wrappers on game functions** (the nil-client branch of
-  `ServerAdminPrint`, Shine's `Plugin:AddBan`). Only these change what the
-  game itself does (CONSTRAINTS, Shine).
+- **Wrappers on game functions** (Shine's `Plugin:AddBan`, and the
+  nil-client branch of `ServerAdminPrint` while `runcommand` runs). Only
+  these change what the game itself does (CONSTRAINTS, Shine).
 - **New request types**, run only when a client asks.
 - **Per-tick work** in the `UpdateServer` hook vanilla already had.
 

@@ -14,27 +14,6 @@ Script.Load("lua/RingBuffer.lua")
 -- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
 
--- Shine replaces ServerAdminPrint with one that prints nothing without a
--- client, so sv_ commands run from here returned no output. This puts the
--- nil-client branch back over whatever is current.
-local ourServerAdminPrint
-
-local function EnsureServerAdminPrintWrapped()
-
-    local current = ServerAdminPrint
-    if current == ourServerAdminPrint then return end
-
-    ourServerAdminPrint = function(client, message, ...)
-        if client == nil then
-            Shared.Message(tostring(message))
-            return
-        end
-        return current(client, message, ...)
-    end
-    ServerAdminPrint = ourServerAdminPrint
-
-end
-
 -- A command's output as lines. Script lines carry the log's "[hh:mm:ss]".
 local function CapturedLines(text)
 
@@ -1402,7 +1381,21 @@ local kRequests = { }
 
 function kRequests.runcommand(actions)
     local command = tostring(actions.cmd or "")
-    local lines = CapturedLines(Shared.CaptureConsoleCommand(command))
+    -- Shine's ServerAdminPrint prints nothing without a client, so sv_
+    -- commands run from here would return no output. Only for this capture,
+    -- put vanilla's nil-client branch back.
+    local adminPrint = ServerAdminPrint
+    ServerAdminPrint = function(client, message, ...)
+        if client == nil then
+            Shared.Message(tostring(message))
+            return
+        end
+        return adminPrint(client, message, ...)
+    end
+    local ok, text = pcall(Shared.CaptureConsoleCommand, command)
+    ServerAdminPrint = adminPrint
+    if not ok then error(text, 0) end
+    local lines = CapturedLines(text)
     local dispatched = false
     for _, line in ipairs(lines) do
         if line.src == "audit" then dispatched = true end
@@ -1554,8 +1547,7 @@ local function OnWebRequest(actions, request)
         return "application/json", Shared.JsonEncode(GetServerState())
     end
 
-    -- Before the request can print or ban.
-    EnsureServerAdminPrintWrapped()
+    -- Before the request can ban.
     EnsureShineAddBanWrapped()
 
     local handler = kRequests[actions.request]
@@ -1578,8 +1570,6 @@ Event.Hook("WebRequest", OnWebRequest)
 
 local function UpdateServerWebInterface()
 
-    -- Shine replaces ServerAdminPrint on its first tick.
-    EnsureServerAdminPrintWrapped()
     EnsureShineAddBanWrapped()
 
     UpdateRecentPlayers()

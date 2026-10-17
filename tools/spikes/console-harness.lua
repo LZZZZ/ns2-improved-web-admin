@@ -1,6 +1,6 @@
 -- Off-rig harness for runcommand in lua/ServerWebInterface.lua: the lines it
 -- makes of what Shared.CaptureConsoleCommand returns, and the nil-client
--- branch it puts back over Shine's ServerAdminPrint.
+-- branch it puts back over Shine's ServerAdminPrint for that capture only.
 --
 -- The capture's shape was measured on the rig, 10-12 engine, 2026-10-12: one
 -- string, a script's lines prefixed with the log's "[hh:mm:ss]", the engine's
@@ -105,17 +105,22 @@ r = run("nosuchcommand")
 check(r.dispatched == false and #r.lines == 0, "no such command: nothing, not dispatched")
 
 -- Shine replaces ServerAdminPrint on its first tick, without chaining: its
--- version sends to the client only. Ours goes back on top at the next tick.
-env.ServerAdminPrint = function(client, message)
+-- version sends to the client only.
+local shinePrint = function(client, message)
     if client then table.insert(delivered, { client, message }) end
 end
+env.ServerAdminPrint = shinePrint
 hooks.UpdateServer[1]()
 r = run("sv_listbans")
 check(#r.lines == 2 and r.lines[2].text == "No players are currently banned",
       "under Shine, a console command's ServerAdminPrint still prints")
+check(env.ServerAdminPrint == shinePrint, "and Shine's is back after the capture")
+local before = #printed
+env.ServerAdminPrint(nil, "Shine's own line")
+check(#printed == before, "outside a capture, a nil-client line stays silent")
 
 -- An in-game admin still gets Shine's line, and the console no copy of it.
-local before = #printed
+before = #printed
 env.ServerAdminPrint({ id = 1 }, "Console[N/A] gagged LZZ[3869225]")
 check(#delivered == 1 and #printed == before, "an admin's line goes to the admin only, as Shine sends it")
 
