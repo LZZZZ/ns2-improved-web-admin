@@ -8,7 +8,7 @@ A modern replacement for the dedicated server's web admin panel: a new front end
 [list]
 [*][b]Players:[/b] kick, ban, slay, move, eject, mute, round controls; Hive skill with the game's skill badges; IPs and Steam ids masked until asked.
 [*][b]Recent players:[/b] everyone seen in the last 24 hours, so a player who left can still be banned.
-[*][b]Bans and Reserved Slots:[/b] what the server actually enforces, Shine's when its plugins are on.
+[*][b]Bans and Reserved Slots:[/b] what the server actually enforces, Shine's when its plugins are on. Fixes the game's sv_unban, an unbanned player still being refused, and removed reserved slots coming back after a restart.
 [*][b]Chat:[/b] read with team (and time, where the game keeps it), and send to all, marines or aliens.
 [*][b]Maps:[/b] edit the map cycle by drag and drop, written at once and undoable; Shine's options and mapvote respected.
 [*][b]Mods and Workshop:[/b] what is mounted now, whether each mod is on the ranked whitelist, and Workshop search and install.
@@ -18,7 +18,7 @@ A modern replacement for the dedicated server's web admin panel: a new front end
 It never reports success it has not verified, and fetches nothing from a third party at runtime except Workshop thumbnails, which Settings turns off. Vanilla and Shine servers are both supported.
 
 [h2]Install[/h2]
-[b]Needs the 10-12 beta engine or later[/b] (Spark build 344.4035 and up): the mod uses the functions that engine added for web admin pages. On an older engine it does not load.
+[b]Needs the 10-12 beta engine or later[/b] (Spark build 344.4035 and up): the mod uses the functions that engine added for web admin pages. On an older engine it does not load. Build 345, due mid-November, is expected to include them. The mod is not a game mode, so it does not change which build (344 or 345) the server runs.
 {if-no-id}Add this item's id (the number in this page's address) to [b]mods[/b] in your server's [b]MapCycle.json[/b], then change map or restart. Open the web admin as before, at [b]/index.html[/b] on the web admin port.
 {if-id}Add [b]{hexid}[/b] (this item's id, {id}, in hex) to [b]mods[/b] in your server's [b]MapCycle.json[/b], then change map or restart. Open the web admin as before, at [b]/index.html[/b] on the web admin port.
 

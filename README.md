@@ -4,11 +4,12 @@ A modern replacement for the Natural Selection 2 dedicated server's web
 admin panel, shipped as a **workshop mod**: a new front end plus a
 corrected `ServerWebInterface.lua`, mounted together. No game-file edits.
 It needs the **10-12 beta engine or later** (Spark build `344.4035`+), for
-the functions the engine added for it.
+the functions the engine added for it; build 345, due mid-November 2026,
+is expected to ship them.
 
 > **Read this first.** This project was entirely vibe-coded: written by an
 > AI coding assistant, directed and reviewed by a human. It is **still in
-> development**: the Workshop item is an unlisted beta. It is
+> development**: the Workshop item is a public beta. It is
 > provided **as is, with no warranty** of any kind. It runs Lua inside your
 > game server and changes how that server handles bans, reserved slots and
 > the map cycle. **Use it at your own risk**, test it on a server you can
@@ -18,11 +19,12 @@ the functions the engine added for it.
 
 ## Status
 
-Version 0.3.2, an **unlisted** Workshop item:
+Version 0.4.0, a public beta on the Workshop:
 [3816039702](https://steamcommunity.com/sharedfiles/filedetails/?id=3816039702)
 (hex `e3742516`). It works on vanilla and Shine servers and covers every
-action of the 2012 panel. Remaining work is in
-[docs/DESIGN.md](docs/DESIGN.md#next).
+action of the 2012 panel. It is not part of the game: Unknown Worlds
+cannot accept AI-generated code, so a pull request to put it there was
+declined. Remaining work is in [docs/DESIGN.md](docs/DESIGN.md#next).
 
 ## What's new over the 2012 panel
 
@@ -37,7 +39,7 @@ action of the 2012 panel. Remaining work is in
 - Map cycle editing that keeps Shine's options
 - Shine support throughout
 - Steam ids and IPs masked until asked
-- Fixes for the stock Lua: the reserved slot amount, expired bans, the map cycle (unban and slot removal are fixed in the PR to the game)
+- Fixes for the stock Lua: `sv_unban`, an unbanned player still refused, removed reserved slots coming back, the reserved slot amount, expired bans, the map cycle
 - Nothing fetched from third parties but Workshop thumbnails (Settings turns them off)
 - Dark and light themes, settings kept in the browser
 
@@ -46,7 +48,9 @@ Details of each tab: [docs/DESIGN.md](docs/DESIGN.md#the-tabs).
 ## Installing
 
 The server is unranked while the mod is mounted. It needs the 10-12 beta
-engine or later; on an older one the Lua fails to load.
+engine or later; on an older one the Lua fails to load. It is not a game
+mode, so it does not choose between builds 344 and 345
+([details](docs/CONSTRAINTS.md#builds-344-and-345)).
 
 1. Add `e3742516` to `mods` in the server's `MapCycle.json`, then change
    map or restart.
