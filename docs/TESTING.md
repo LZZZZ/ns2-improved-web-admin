@@ -29,7 +29,7 @@ no Shine, no production config, and stock `ns2/web/` and
 
 **The mod needs the 10-12 drop or later** (`Build: 344.4035` and up): it
 calls the functions that drop added for web admin pages. The rig has run
-10-15 (`b7173011a9`, `Build: 344.4112`) since 2026-10-15; `overlay.sh <zip>`
+10-25 (`1f1ab60b7f`, `Build: 344.4265`) since 2026-10-25; `overlay.sh <zip>`
 in the rig applies a drop and checks every file, but 10-10 and later zips
 store backslash paths: extract them elsewhere and copy `x64/` over.
 
@@ -178,7 +178,8 @@ Harnesses: `maps-harness.lua` (the map cycle request types and
 `workshop-harness.lua`, `perf-harness.lua`, `tickstat-harness.lua` (a
 `Server.GetTickStat` stub, and the real lines in
 `tickstat-rig-20260928.txt`), `log-harness.lua` (a `Shared.ReadLog` stub
-over a file), `chat-harness.lua`, `console-harness.lua` (a
+over a file), `chat-harness.lua` (with the game's `RingBuffer.lua`),
+`bans-harness.lua` (a model of the game's ban map), `console-harness.lua` (a
 `Shared.CaptureConsoleCommand` stub) and `state-harness.lua`. The 10-12
 calls each harness does not stub itself come from `engine-stubs.lua`, with
 dkjson standing in for `Shared.JsonEncode`.

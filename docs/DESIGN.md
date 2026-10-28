@@ -80,18 +80,17 @@ and says so.
 
 ## Next
 
-- **Make the item public** once a populated round looks right: the
-  visibility setting on its Steam page, or `tools/build-workshop.sh
-  --visibility 0` and an upload.
+- **Test on build 345** once it ships (mid-November 2026), vanilla and
+  with Shine ([CONSTRAINTS.md](CONSTRAINTS.md#builds-344-and-345)).
 - **Captures from a populated round** with the mod mounted: named players,
   teams and a commander, chat, performance under load, the log, a paged
   `getperf` reply.
-- **Ranking.** Request whitelisting once the mod is public and has some
-  mileage.
+- **Ranking.** Ask for whitelisting once the mod has some mileage. UWE
+  cannot take AI-generated code into the game, so it may refuse.
 - **Engine additions still missing** after 10-12: the whitelist's full
   list and the reason ranking is off, uninstalling mods (REQUIREMENTS
   item 2), and the Workshop search fixes ([CONSTRAINTS.md](CONSTRAINTS.md)
   item 18).
-- **Inclusion in the game**: a PR to UWE's game repo is planned, with the
-  panel's source and built files; the maintainer agreed to MIT and to
-  Shine support that works without Shine.
+- **Not in the game.** A PR to UWE's game repo (2026-10-16) was declined
+  on 2026-10-25: Krafton's and Valve's content guidelines bar UWE from
+  accepting AI-generated code or art. The Workshop item is how it ships.

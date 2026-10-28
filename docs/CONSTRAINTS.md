@@ -102,7 +102,8 @@ supported mechanism.
 
 - **The server loses ranked status** while a mod that is not whitelisted
   is mounted, this one included (item 18 lists the engine's check).
-  Accepted until the mod can be whitelisted.
+  Accepted: UWE cannot accept AI-generated code into the game, so the
+  whitelist may stay closed to it too.
 - **Every joining client downloads the mod**: the whole item, 775,191
   bytes (Steam shows 775 KB), of which the minimaps are 367 KB. It is
   fetched once during the connect, then cached. A 09-28 client
@@ -113,6 +114,19 @@ supported mechanism.
   old paths; nothing links to them.
 - No consistency risk: `ServerWebInterface.lua` is loaded only from
   `Server.lua:35`, on the server.
+
+### Builds 344 and 345
+
+The next game update, build 345, is due mid-November 2026. A server
+running a game mode mod made for 344 (a `game_setup.xml` not named `ns2`,
+without `<build>345</build>`) mounts the stock 344 game files from
+`builds/build_344.zip`; `"settings": { "target_build": "auto" }` in
+`ServerConfig.json` (the default) follows the mod, `344` or `345` forces
+one. This mod has no `game_setup.xml`, so it never picks the build, and
+the game Lua it replaces or wraps (`ServerWebInterface.lua`, and the
+functions items 3, 8, 10 and 11 fix) is the same in 344 and in the 345
+beta files of 2026-10-28. Not yet tested on a 345 server; the engine
+functions of item 18 are in the 10-25 drop.
 
 ### Mounted from the Workshop
 
@@ -161,8 +175,10 @@ backward compatible where that is cheap.
    kept. Measurements: REQUIREMENTS item 4.
 3. **A cursor for `getchatlist`.** `getchatlist&since=<id>` answers from
    the game's `Server.recentChatMessages`, with `last_id` and `dropped`.
-   The PR to ns2-game makes that ring 200 messages with a time each
-   (`Server.lua`); a released game keeps 20, with no times. Without `since`
+   The game keeps 20 messages with no times (`Server.lua`, 344 and 345).
+   On its first tick or request the mod moves them into a ring of 200 and
+   wraps `Server.AddChatToHistory` to stamp each new message's time,
+   re-wrapping if something replaces it. Without `since`
    the reply is stock's: the last 20, as a bare array. On 09-27, `sv_say` and `sv_tsay 1` arrived as
    `Admin` with times, and a map change restarted the ids.
 4. **Stock types kept.** Stock sends `cheats`, `devmode` and `isbot` as
@@ -208,6 +224,13 @@ backward compatible where that is cheap.
 
 Each is a case where the server or the 2012 panel reports something that
 did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
+From 0.2.0 to 0.3.2 the fixes to 8, 10, 11 and chat (item 3) lived in a
+PR to the game instead; UWE declined it on 2026-10-25 (it cannot accept
+AI-generated code), so 0.4.0 carries them again. Re-verified on 2026-10-28
+on the 10-25 rig, vanilla and with Shine: a second `sv_unban` of the same
+id leaves the other bans alone, a removed slot is gone from
+`ReservedSlotsConfig.json`, chat replies with `buffer_size` 200 and times.
+`tools/spikes/bans-harness.lua` and `chat-harness.lua` cover them off-rig.
 
 7. **`setreservedslotamount` does nothing.** `ServerWebInterface.lua:209`
    calls `SetReservedSlotAmount(actions.amount)` against a function
@@ -221,8 +244,11 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
    (`ServerAdminCommands.lua:446`) and keys `bannedPlayersMap` by it, but
    `UnBan` passes the console argument, a string, to `UnbanUser`
    (`:485`), so it answers `No matching Steam Id in ban list` about a ban
-   plainly listed. Fixed in the PR to ns2-game: `UnbanUser` looks the id up with
-   `tonumber`.
+   plainly listed. The mod wraps `UnbanUser` to pass `tonumber(id)`, and
+   only for an id still in the game's list: a stale map entry (item 10)
+   would otherwise remove whichever ban took its index. That list is the
+   game's `GetBannedPlayersList`, kept from load time, since Shine's ban
+   plugin replaces the global a second later.
 9. **Expired bans stay in `getbanlist`.** `GetIsUserBanned` checks
    `ban.time`, so they no longer block anyone, but the list showed them.
    The mod filters them out; the raw list still has them.
@@ -241,14 +267,18 @@ did not happen. 7-10 were fixed and verified on 09-03, 11-13 on 09-26.
     On the rig, after an unban `getbanlist` returned `[]` and
     `GetIsUserBanned` still answered `true`. Stock never hits this
     because item 8 makes unbans fail first; fixing 8 alone would have
-    turned a visible failure into an invisible one. Fixed in the PR to ns2-game:
-    `GenerateBannedPlayersMap` clears the map before rebuilding it.
+    turned a visible failure into an invisible one. The map is local, so
+    the mod replaces `GetIsUserBanned` and `GetIsUserBannedPermanently`
+    with versions that read the live `GetBannedPlayersList()` (Shine's,
+    with string ids, under its ban plugin).
 11. **A removed reserved slot comes back after a restart.**
     `RemoveReservedSlot` (`ServerAdminCommands.lua:657`) saves with
     `Server.SaveConfigSettings()` instead of
     `Server.SaveReservedSlotsConfig()`, so the removal never reaches
-    `ReservedSlotsConfig.json` until some other change saves it. Fixed in
-    the PR to ns2-game.
+    `ReservedSlotsConfig.json` until some other change saves it.
+    `RemoveReservedSlot` is local, so the mod hooks
+    `Console_sv_remove_reserved_slot` as well and saves the reserved slots
+    on the next tick.
 12. **Reading the map cycle rewrites it.** `getmapcycle` hex-encodes a
     `table.copyDict` of the live cycle, and that copy is shallow
     (`ns2/lua/Table.lua:441` stores `v`, not `vCopy`). So every read

@@ -11,6 +11,89 @@
 
 Script.Load("lua/RingBuffer.lua")
 
+-- Fixes to the game's ServerAdminCommands.lua and Server.lua, which load
+-- around this file and are the same in builds 344 and 345.
+
+-- The game's ban list, before Shine replaces GetBannedPlayersList.
+local GetGameBans = GetBannedPlayersList
+
+-- Ids compare as numbers: Shine's list has string ids.
+local function FindBan(list, userId)
+    local id = tonumber(userId)
+    if not id then return nil end
+    for _, ban in ipairs(list) do
+        if tonumber(ban.id) == id then return ban end
+    end
+    return nil
+end
+
+-- The game's ban map only gains entries, so an unbanned player stayed
+-- refused until restart. Ask the live list instead.
+function GetIsUserBanned(userId)
+    local ban = FindBan(GetBannedPlayersList(), userId)
+    if not ban then return false end
+    return ban.time == 0 or Shared.GetSystemTime() < ban.time
+end
+
+function GetIsUserBannedPermanently(userId)
+    local ban = FindBan(GetBannedPlayersList(), userId)
+    return ban ~= nil and ban.time == 0
+end
+
+-- sv_unban passes a string id to a map keyed by number, so it never matched.
+-- A stale map entry would remove whatever ban took its place, so only an id
+-- still in the game's list goes through.
+local gameUnbanUser = UnbanUser
+function UnbanUser(userId)
+    if not FindBan(GetGameBans(), userId) then return false end
+    return gameUnbanUser(tonumber(userId))
+end
+
+-- sv_remove_reserved_slot saves the server config, not the reserved slots,
+-- so the removal was lost on restart. Its handler is local: save on the next
+-- tick instead.
+local reservedSlotsDirty = false
+Event.Hook("Console_sv_remove_reserved_slot", function()
+    reservedSlotsDirty = true
+end)
+
+local function SaveReservedSlotsIfDirty()
+    if reservedSlotsDirty then
+        reservedSlotsDirty = false
+        Server.SaveReservedSlotsConfig()
+    end
+end
+
+-- The game keeps 20 chat messages without a time. Server.lua sets them up
+-- after this file loads: then grow the ring to 200 and stamp each message.
+local kChatSize = 200
+local stampedAddChat
+
+local function EnsureChatHistory()
+
+    local ring = Server.recentChatMessages
+    if type(ring) ~= "table" or type(ring.ToTable) ~= "function" then return end
+
+    if ring.size < kChatSize then
+        local grown = CreateRingBuffer(kChatSize)
+        for _, entry in ipairs(ring:ToTable()) do grown:Insert(entry) end
+        Server.recentChatMessages = grown
+    end
+
+    local addChat = Server.AddChatToHistory
+    if type(addChat) ~= "function" or addChat == stampedAddChat then return end
+    stampedAddChat = function(...)
+        addChat(...)
+        local latest = Server.recentChatMessages
+        latest = latest.buffer and latest.buffer[latest.currentPos]
+        if type(latest) == "table" and latest.time == nil then
+            latest.time = Shared.GetSystemTime()
+        end
+    end
+    Server.AddChatToHistory = stampedAddChat
+
+end
+
 -- Printed by every admin command before it runs (core/lua/ServerAdmin.lua).
 local kAuditPattern = "^sv %- .- %- %d+: : .-: (%S+)"
 
@@ -1547,8 +1630,9 @@ local function OnWebRequest(actions, request)
         return "application/json", Shared.JsonEncode(GetServerState())
     end
 
-    -- Before the request can ban.
+    -- Before the request can ban or read chat.
     EnsureShineAddBanWrapped()
+    EnsureChatHistory()
 
     local handler = kRequests[actions.request]
     if handler then
@@ -1571,6 +1655,8 @@ Event.Hook("WebRequest", OnWebRequest)
 local function UpdateServerWebInterface()
 
     EnsureShineAddBanWrapped()
+    EnsureChatHistory()
+    SaveReservedSlotsIfDirty()
 
     UpdateRecentPlayers()
     UpdatePerfWindows()
