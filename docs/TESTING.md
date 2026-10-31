@@ -27,9 +27,13 @@ no Shine, no production config, and stock `ns2/web/` and
 
 ### Engine version
 
-**The mod needs the 10-12 drop or later** (`Build: 344.4035` and up): it
-calls the functions that drop added for web admin pages. The rig has run
-10-25 (`1f1ab60b7f`, `Build: 344.4265`) since 2026-10-25; `overlay.sh <zip>`
+**The mod needs build 345 or newer**: it calls the functions the engine
+added for web admin pages, and on an older engine it logs `NS2 Improved
+Web Admin needs build 345 or newer` and answers every request with that
+line. The rig has run Steam's `beta` branch (`Build: 345.4309`) since
+2026-10-29, installed with `+app_update 4940 -beta beta validate`
+(`update.sh` has no `-beta` and would put it back on `public`). For a 344
+drop, `overlay.sh <zip>`
 in the rig applies a drop and checks every file, but 10-10 and later zips
 store backslash paths: extract them elsewhere and copy `x64/` over.
 

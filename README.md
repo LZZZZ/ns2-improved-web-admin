@@ -3,9 +3,8 @@
 A modern replacement for the Natural Selection 2 dedicated server's web
 admin panel, shipped as a **workshop mod**: a new front end plus a
 corrected `ServerWebInterface.lua`, mounted together. No game-file edits.
-It needs the **10-12 beta engine or later** (Spark build `344.4035`+), for
-the functions the engine added for it; build 345, due mid-November 2026,
-is expected to ship them.
+It needs **build 345 or newer** of the game, for the functions the engine
+added for it.
 
 > **Read this first.** This project was entirely vibe-coded: written by an
 > AI coding assistant, directed and reviewed by a human. It is **still in
@@ -47,8 +46,9 @@ Details of each tab: [docs/DESIGN.md](docs/DESIGN.md#the-tabs).
 
 ## Installing
 
-The server is unranked while the mod is mounted. It needs the 10-12 beta
-engine or later; on an older one the Lua fails to load. It is not a game
+The server is unranked while the mod is mounted. It needs build 345 or
+newer; on an older server it logs that it needs 345 and answers every web
+admin request with that message. It is not a game
 mode, so it does not choose between builds 344 and 345
 ([details](docs/CONSTRAINTS.md#builds-344-and-345)).
 

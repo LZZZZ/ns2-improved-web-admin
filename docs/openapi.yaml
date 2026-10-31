@@ -5,8 +5,7 @@ info:
   version: "344+26-10-15"
   summary: The HTTP surface of the server web admin, as `ServerWebInterface.lua` implements it.
   description: |
-    Implemented by `ServerWebInterface.lua`. Needs the 10-12 beta engine or
-    later.
+    Implemented by `ServerWebInterface.lua`. Needs build 345 or newer.
 
     ## One endpoint
 

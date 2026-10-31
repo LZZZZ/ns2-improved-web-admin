@@ -9,7 +9,7 @@ Bootstrap 2; see [CURRENT-UI.md](CURRENT-UI.md)) as static files, over a
 304-line Lua backend that already answers in JSON. A mod can replace both
 without a game-file edit, because `Shared.SetWebRoot()` resolves through the
 mod filesystem and a mod can shadow `lua/ServerWebInterface.lua`
-([proof](CONSTRAINTS.md#shipping-as-a-mod)). The 10-12 beta engine added
+([proof](CONSTRAINTS.md#shipping-as-a-mod)). Build 345's engine added
 functions for web admin pages at this project's request, and the Lua relies
 on them ([CONSTRAINTS](CONSTRAINTS.md#engine-additions-item-18)).
 
@@ -80,8 +80,6 @@ and says so.
 
 ## Next
 
-- **Test on build 345** once it ships (mid-November 2026), vanilla and
-  with Shine ([CONSTRAINTS.md](CONSTRAINTS.md#builds-344-and-345)).
 - **Captures from a populated round** with the mod mounted: named players,
   teams and a commander, chat, performance under load, the log, a paged
   `getperf` reply.

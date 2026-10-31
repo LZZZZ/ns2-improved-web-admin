@@ -9,6 +9,16 @@
 
 -- The server side of the web admin panel in web/.
 
+-- Engine functions from build 345. On an older engine say so, rather than
+-- fail on a nil call.
+if not (Shared.CaptureConsoleCommand and Shared.ReadLog and Shared.JsonEncode
+        and Server.GetTickStat and Server.GetIsModWhitelisted) then
+    local kNeeds = "NS2 Improved Web Admin needs build 345 or newer of the dedicated server; this server is older, so the web admin is off."
+    Shared.Message(kNeeds)
+    Event.Hook("WebRequest", function() return "text/plain", kNeeds end)
+    return
+end
+
 Script.Load("lua/RingBuffer.lua")
 
 -- Fixes to the game's ServerAdminCommands.lua and Server.lua, which load

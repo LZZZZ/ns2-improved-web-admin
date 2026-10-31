@@ -1,7 +1,7 @@
 # Web admin HTTP API
 
 The API as `lua/ServerWebInterface.lua` implements it, the only handler.
-It needs the 10-12 beta engine or later: it calls
+It needs build 345 or newer: it calls
 `Shared.CaptureConsoleCommand`, `Shared.ReadLog`, `Shared.JsonEncode`,
 `Server.GetTickStat` and `Server.GetIsModWhitelisted`, and reads
 `WebRequest`'s second argument (CONSTRAINTS item 18). Every request type

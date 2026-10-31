@@ -7,8 +7,8 @@ so keep the numbers.
 
 Measurements name the engine drop they ran on (09-03, 09-26 hotfix, 09-27,
 09-28, 10-12 hotfix). "The rig" is the local test server
-([TESTING.md](TESTING.md)). The mod needs the 10-12 drop or later: it
-relies on the functions that drop added at this project's request
+([TESTING.md](TESTING.md)). The mod needs build 345 or newer: it
+relies on the functions the engine added at this project's request
 ([item 18](#engine-additions-item-18)).
 
 ## Engine rules
@@ -125,8 +125,11 @@ without `<build>345</build>`) mounts the stock 344 game files from
 one. This mod has no `game_setup.xml`, so it never picks the build, and
 the game Lua it replaces or wraps (`ServerWebInterface.lua`, and the
 functions items 3, 8, 10 and 11 fix) is the same in 344 and in the 345
-beta files of 2026-10-28. Not yet tested on a 345 server; the engine
-functions of item 18 are in the 10-25 drop.
+beta files of 2026-10-28. Tested on the 345 `beta` branch (server build
+26335229, `345.4309`) on 2026-10-31, vanilla and with Shine: every
+request type, the panel, and the bans, reserved slot and chat fixes. 345's
+own `ServerWebInterface.lua` switched to `Server.GetClientAddressString`;
+`Server.GetClientAddress`, which the mod calls, is still there.
 
 ### Mounted from the Workshop
 
@@ -496,7 +499,8 @@ probe, not an ask.
 >
 > Nothing breaks without them; the mod falls back to what it does today.
 
-The mod no longer falls back: it needs 10-12 or later.
+The mod no longer falls back: it needs build 345 or newer, and on an
+older server answers every request with a message saying so.
 
 ## Shine
 
